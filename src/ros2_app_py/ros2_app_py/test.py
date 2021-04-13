@@ -12,7 +12,7 @@ from  px4_msgs.msg import VehicleControlMode
 from random import seed
 from random import randint
 # seed random number generator
-seed(1)
+seed(2)
 
 
 
