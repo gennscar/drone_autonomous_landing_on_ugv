@@ -3,9 +3,10 @@
 <package format="3">
   <name>ros2_app_py</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>ROS2 package to work on thesis with PX4</description>
   <maintainer email="gennscar@todo.todo">gennscar</maintainer>
-  <license>TODO: License declaration</license>
+  <maintainer email="cosimocon@yahoo.it">Cosimo Conte</maintainer>
+  <license>Apache License 2.0</license>
 
   <depend>rclpy</depend>
   <depend>px4_msgs</depend>

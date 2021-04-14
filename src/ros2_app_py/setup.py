@@ -20,12 +20,12 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            "drone_controller = ros2_app_py.drone_controller:main",
             "local_position_listener = ros2_app_py.local_position_listener:main",
             "offboard_control = ros2_app_py.offboard_control:main",
-            "test = ros2_app_py.test:main",
             "target_position_publisher = ros2_app_py.target_position_publisher:main",
-            "drone_controller = ros2_app_py.drone_controller:main"
-            
+            "test = ros2_app_py.test:main",
+            "uwb_anchor = ros2_app_py.uwb_anchor:main"
         ],
     },
 )
