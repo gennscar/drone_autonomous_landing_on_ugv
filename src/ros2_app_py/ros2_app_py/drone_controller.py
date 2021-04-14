@@ -9,6 +9,7 @@ from  px4_msgs.msg import VehicleCommand
 from  px4_msgs.msg import VehicleControlMode
 from  px4_msgs.msg import VehicleLocalPosition
 from  px4_msgs.msg import VehicleStatus
+import numpy as np
 
 
 
@@ -20,7 +21,8 @@ class OffboardControl(Node):
         self.kp = 0.5
         self.ki = 0.0001
         self.vmax = float('inf')
-        self.target_pos = [-5, -5]
+        self.target_global_pos = [1.96, 5.0]
+        self.target_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
 
         self.i = 0.0
         self.arming_state = 0
@@ -116,7 +118,7 @@ class OffboardControl(Node):
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp
 
-        if self.i < 10.0:
+        if self.i < 5.0:
             self.get_logger().info("Approaching target 1..")
             msg.x = float("NaN")
             msg.y = float("NaN")
@@ -129,7 +131,7 @@ class OffboardControl(Node):
 
 
         else:
-            if (abs(self.x - self.target_pos[0]) < 0.2) and (abs(self.y - self.target_pos[1]) < 0.2) and (abs(self.vx) < 0.5) and (abs(self.vy) < 0.5):
+            if (abs(self.x - self.target_pos[0]) < 0.05) and (abs(self.y - self.target_pos[1]) < 0.05) and (abs(self.vx) < 0.5) and (abs(self.vy) < 0.5):
                 self.landing = 1
                 self.get_logger().info("Landing..")
                 self.publish_vehicle_command(21, 0.0, 0.0)
