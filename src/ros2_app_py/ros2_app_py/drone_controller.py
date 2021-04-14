@@ -20,13 +20,14 @@ class OffboardControl(Node):
         self.kp = 0.5
         self.ki = 0.0001
         self.vmax = float('inf')
+        self.target_pos = [-5, -5]
 
         self.i = 0.0
         self.arming_state = 0
         self.landing = 0
         
-        self.ex = 0.0
-        self.ey = 0.0
+        self.int_ex = 0.0
+        self.int_ey = 0.0
         
         self.vx_max = self.vmax
         self.vy_max = self.vmax
@@ -128,7 +129,7 @@ class OffboardControl(Node):
 
 
         else:
-            if (abs(self.x) < 0.2) and (abs(self.y) < 0.2) and (abs(self.vx) < 0.5) and (abs(self.vy) < 0.5):
+            if (abs(self.x - self.target_pos[0]) < 0.2) and (abs(self.y - self.target_pos[1]) < 0.2) and (abs(self.vx) < 0.5) and (abs(self.vy) < 0.5):
                 self.landing = 1
                 self.get_logger().info("Landing..")
                 self.publish_vehicle_command(21, 0.0, 0.0)
@@ -139,13 +140,17 @@ class OffboardControl(Node):
                 
                 msg.x = float("NaN")
                 msg.y = float("NaN")
-
-                self.ex = self.ex + self.x
-                self.ey = self.ey + self.y
-
-                msg.vx = - self.kp * self.x - self.ki * self.ex
-                msg.vy = - self.kp * self.y - self.ki * self.ey
                 msg.z = - 3.0
+
+                self.ex = self.x - self.target_pos[0]
+                self.ey = self.y - self.target_pos[1]
+
+                self.int_ex = self.int_ex + self.ex
+                self.int_ey = self.int_ey + self.ey
+
+                msg.vx = - self.kp * self.ex - self.ki * self.int_ex
+                msg.vy = - self.kp * self.ey - self.ki * self.int_ey
+                
 
                 if msg.vx > self.vx_max:
                     msg.vx = self.vx_max
