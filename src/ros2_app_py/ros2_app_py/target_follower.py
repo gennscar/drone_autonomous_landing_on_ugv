@@ -22,23 +22,20 @@ class OffboardControl(Node):
     def __init__(self):
         super().__init__("offboard_control")
 
-        self.kp = 0.5
-        self.ki = 0.0001
+        self.kp = 1
+        self.ki = 0.01
         self.vmax = float('inf')
         self.target_global_pos = [0, 0]
         self.target_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
+        
 
         self.i = 0.0
         self.arming_state = 0
         self.landing = 0
+        self.descending = 0
         
         self.int_ex = 0.0
         self.int_ey = 0.0
-        
-        self.vx_max = self.vmax
-        self.vy_max = self.vmax
-        self.vx_min = -self.vmax
-        self.vy_min = -self.vmax
 
         self.x = 0.0
         self.y = 0.0
@@ -140,32 +137,57 @@ class OffboardControl(Node):
             self.trajectory_setpoint_publisher_.publish(msg)
 
         else:
-            self.get_logger().info("Following target..")
             
             msg.x = float("NaN")
             msg.y = float("NaN")
-            msg.z = - 3.0
-
-            self.ex = self.x - self.target_pos[0]
-            self.ey = self.y - self.target_pos[1]
-
-            self.int_ex = self.int_ex + self.ex
-            self.int_ey = self.int_ey + self.ey
-
-            msg.vx = - self.kp * self.ex - self.ki * self.int_ex
-            msg.vy = - self.kp * self.ey - self.ki * self.int_ey
             
-
-            if msg.vx > self.vx_max:
-                msg.vx = self.vx_max
-            if msg.vx < self.vx_min:
-                msg.vx = self.vx_min
-            if msg.vy > self.vy_max:
-                msg.vy = self.vy_max
-            if msg.vy < self.vy_min:
-                msg.vy = self.vy_min
-
+            msg.vx, msg.vy, self.ex, self.ey, self.int_ex, self.int_ey = controller(self.x, self.y, self.target_pos[0], self.target_pos[1], self.kp, self.ki, self.vmax, self.int_ex, self.int_ey)
+            
+            if (abs(self.ex) < 0.3) and (abs(self.ey) < 0.3) and (-self.z < 1.1):
+                self.landing = 1
+                self.get_logger().info("Landing..")
+                self.publish_vehicle_command(21, 0.0, 0.0)
+            elif (abs(self.ex) < 0.2) and (abs(self.ey) < 0.2) and self.landing == 0:
+                self.descending = 1
+                self.get_logger().info("Descending on target..")
+                msg.z = float("NaN")
+                msg.vz = 0.2
+            elif self.landing == 0 and self.descending == 0:
+                self.get_logger().info("Following target..")
+                msg.z = -3.0
+                msg.vz = float("NaN")
+            elif self.landing == 0:
+                self.get_logger().info("Stopped descending..")
+                msg.z = float("NaN")
+                msg.vz = 0.0
+            if self.arming_state == 1 and self.landing == 1:
+                self.get_logger().info(f"Landed, with ex:{self.ex}, ey:{self.ey}")
+                rclpy.shutdown()
+            
+            
             self.trajectory_setpoint_publisher_.publish(msg)
+        
+def controller(drone_x, drone_y, target_x, target_y, kp, ki, v_max, int_ex, int_ey):
+    ex = drone_x - target_x
+    ey = drone_y - target_y
+    int_ex = int_ex + ex
+    int_ey = int_ey + ey
+    vx = - kp * ex - ki * int_ex
+    vy = - kp * ey - ki * int_ey
+    vx_max = v_max
+    vy_max = v_max
+    vx_min = -v_max
+    vy_min = -v_max
+    if vx > vx_max:
+        vx = vx_max
+    if vx < vx_min:
+        vx = vx_min
+    if vy > vy_max:
+        vy = vy_max
+    if vy < vy_min:
+        vy = vy_min
+    return vx, vy, ex, ey, int_ex, int_ey
+
 
 def main(args = None):
 
