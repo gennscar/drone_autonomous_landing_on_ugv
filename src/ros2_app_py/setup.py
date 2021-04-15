@@ -24,7 +24,8 @@ setup(
             "offboard_control = ros2_app_py.offboard_control:main",
             "test = ros2_app_py.test:main",
             "target_position_publisher = ros2_app_py.target_position_publisher:main",
-            "drone_controller = ros2_app_py.drone_controller:main"
+            "drone_controller = ros2_app_py.drone_controller:main",
+            "target_follower = ros2_app_py.target_follower:main"
             
         ],
     },
