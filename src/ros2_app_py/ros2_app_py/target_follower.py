@@ -22,7 +22,7 @@ class OffboardControl(Node):
     def __init__(self):
         super().__init__("offboard_control")
 
-        self.kp = 1
+        self.kp = 0.5
         self.ki = 0.01
         self.vmax = float('inf')
         self.target_global_pos = [0, 0]
@@ -33,7 +33,10 @@ class OffboardControl(Node):
         self.arming_state = 0
         self.landing = 0
         self.descending = 0
+        self.takeoff = 0
         
+        self.ex = 0.0
+        self.ey = 0.0
         self.int_ex = 0.0
         self.int_ey = 0.0
 
@@ -127,13 +130,14 @@ class OffboardControl(Node):
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp
 
-        if self.i < 5.0:
+        if self.takeoff == 0:
+            if abs(self.z) > 2.9:
+                self.takeoff = 1
             self.get_logger().info("Takeoff..")
             msg.x = 0.0
             msg.y = 0.0
             msg.z = -3.0
 
-            self.i = self.i + 0.05
             self.trajectory_setpoint_publisher_.publish(msg)
 
         else:
@@ -141,9 +145,18 @@ class OffboardControl(Node):
             msg.x = float("NaN")
             msg.y = float("NaN")
             
+            if abs(self.ex) > 2.0 or abs(self.ey) > 2.0:
+                self.kp = 1
+                self.ki = 0.005
+            else:
+                self.kp = 1.0
+                self.ki = 0.01
+
+
             msg.vx, msg.vy, self.ex, self.ey, self.int_ex, self.int_ey = controller(self.x, self.y, self.target_pos[0], self.target_pos[1], self.kp, self.ki, self.vmax, self.int_ex, self.int_ey)
             
-            if (abs(self.ex) < 0.3) and (abs(self.ey) < 0.3) and (-self.z < 1.1):
+
+            if (abs(self.ex) < 0.3) and (abs(self.ey) < 0.3) and (-self.z < 0.9):
                 self.landing = 1
                 self.get_logger().info("Landing..")
                 self.publish_vehicle_command(21, 0.0, 0.0)
@@ -158,8 +171,8 @@ class OffboardControl(Node):
                 msg.vz = float("NaN")
             elif self.landing == 0:
                 self.get_logger().info("Stopped descending..")
-                msg.z = float("NaN")
-                msg.vz = 0.0
+                msg.z = -1.5
+                msg.vz = -0.2
             if self.arming_state == 1 and self.landing == 1:
                 self.get_logger().info(f"Landed, with ex:{self.ex}, ey:{self.ey}")
                 rclpy.shutdown()
