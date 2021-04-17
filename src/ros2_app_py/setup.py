@@ -25,7 +25,8 @@ setup(
             "offboard_control = ros2_app_py.offboard_control:main",
             "target_position_publisher = ros2_app_py.target_position_publisher:main",
             "target_follower = ros2_app_py.target_follower:main",   
-            "uwb_anchor = ros2_app_py.uwb_anchor:main"
+            "uwb_anchor = ros2_app_py.uwb_anchor:main",
+            "uwb_vehicle = ros2_app_py.uwb_vehicle:main"
         ],
     },
 )
