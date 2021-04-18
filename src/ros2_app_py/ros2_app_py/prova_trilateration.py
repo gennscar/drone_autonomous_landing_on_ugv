@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 
 p1 = np.array([0.0,0.0,0.0])
@@ -29,3 +30,11 @@ pinvA = np.linalg.pinv(A, rcond=1e-15, hermitian=False)
 y = pinvA.dot(b)
 
 print(y)
+
+r =  R.from_quat([0, 0, np.sin(np.pi/4), np.cos(np.pi/4)])
+
+
+print(r)
+
+v = [1,2,3]
+print(r.apply(v))

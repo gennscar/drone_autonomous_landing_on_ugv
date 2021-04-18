@@ -5,8 +5,9 @@ import numpy as np
 from rclpy.node import Node
 from  px4_msgs.msg import VehicleLocalPosition
 from nav_msgs.msg import Odometry
+from scipy.spatial.transform import Rotation as R
 
-
+chassis_wrt_anchor0 = np.array([0.94859,0.44998,-0.32457])
 p0 = np.array([0.0,0.0,0.0])
 p1 = np.array([1.9,0.9,0.0])
 p2 = np.array([0.0,0.9,0.0])
@@ -37,21 +38,24 @@ class UwbPubSub(Node):
         super().__init__("uwb_pub_sub")
 
         self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_drone_position,10)
-        self.fixed_anchor_subscriber = self.create_subscription(Odometry,"/fixed_anchor/odom",self.callback_fixed_anchor,10)
         self.anchor_0_subscriber = self.create_subscription(Odometry,"/anchor_0/odom",self.callback_anchor_0,10)
         self.anchor_1_subscriber = self.create_subscription(Odometry,"/anchor_1/odom",self.callback_anchor_1,10)
         self.anchor_2_subscriber = self.create_subscription(Odometry,"/anchor_2/odom",self.callback_anchor_2,10)
         self.anchor_3_subscriber = self.create_subscription(Odometry,"/anchor_3/odom",self.callback_anchor_3,10)
+        self.chassis_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_chassis,10)
 
         self.get_logger().info("uwb pub sub has started")
         self.timer = self.create_timer(0.1, self.timer_callback)
 
     def callback_drone_position(self, msg):
         self.drone_local_pos = [msg.x, msg.y, msg.z]
+        self.drone_global_pos = [msg.y, msg.x, -msg.z]
         self.drone_local_vel = [msg.vx, msg.vy, msg.vz]
+        self.drone_global_vel = [msg.vy, msg.vx, -msg.vz]
 
-    def callback_fixed_anchor(self, msg):
-        self.fixed_anchor_pos = [msg.pose.pose.position.x,
+
+    def callback_chassis(self, msg):
+        self.chassis_pos = [msg.pose.pose.position.x,
                              msg.pose.pose.position.y,
                              msg.pose.pose.position.z]
 
@@ -59,6 +63,11 @@ class UwbPubSub(Node):
         self.anchor_0_pos = [msg.pose.pose.position.x,
                              msg.pose.pose.position.y,
                              msg.pose.pose.position.z]
+        self.anchor_0_orientation = [msg.pose.pose.orientation.x,
+                             msg.pose.pose.orientation.y,
+                             msg.pose.pose.orientation.z,
+                             msg.pose.pose.orientation.w]
+
 
     def callback_anchor_1(self, msg):
         self.anchor_1_pos = [msg.pose.pose.position.x,
@@ -77,33 +86,27 @@ class UwbPubSub(Node):
 
     def timer_callback(self):
 
-        self.r0 = np.subtract(self.anchor_0_pos,self.fixed_anchor_pos)
-        self.r1 = np.subtract(self.anchor_1_pos,self.fixed_anchor_pos)
-        self.r2 = np.subtract(self.anchor_2_pos,self.fixed_anchor_pos)
-        self.r3 = np.subtract(self.anchor_3_pos,self.fixed_anchor_pos)
 
-        self.d0 = np.linalg.norm(self.r0, ord = 2)
-        self.d1 = np.linalg.norm(self.r1, ord = 2)
-        self.d2 = np.linalg.norm(self.r2, ord = 2)
-        self.d3 = np.linalg.norm(self.r3, ord = 2)
-
-
-        #self.get_logger().info(f"""
-        #Fixed Anchor: {self.fixed_anchor_pos}
-        #Anchor 0: {self.anchor_0_pos}
-        #Anchor 1: {self.anchor_1_pos}
-        #Anchor 2: {self.anchor_2_pos}
-        #Anchor 3: {self.anchor_3_pos}""")
-
-        #self.get_logger().info(f"""
-        #d0: {self.d0}
-        #d1: {self.d1}
-        #d2: {self.d2}
-        #d3: {self.d3}""")
+        self.d0 = np.linalg.norm(self.anchor_0_pos, ord = 2)
+        self.d1 = np.linalg.norm(self.anchor_1_pos, ord = 2)
+        self.d2 = np.linalg.norm(self.anchor_2_pos, ord = 2)
+        self.d3 = np.linalg.norm(self.anchor_3_pos, ord = 2)
 
         self.y = trilateration(p0, p1, p2, p3, self.d0, self.d1, self.d2, self.d3, pinvA)
+        self.rel_pos_anchor0 = self.y[1:]
+        self.rot_world_to_anchor0 = R.from_quat(self.anchor_0_orientation)
 
-        self.get_logger().info(f"{self.y}")
+        self.rel_pos_chassis = np.subtract(self.rel_pos_anchor0, chassis_wrt_anchor0)
+        self.rel_pos_world_frame = - self.rot_world_to_anchor0.apply(self.rel_pos_chassis)
+
+        self.err_vec = np.subtract(self.rel_pos_world_frame ,self.chassis_pos)
+        self.err = np.linalg.norm(self.err_vec, ord = 2)
+
+        #self.get_logger().info(f"""
+        #trilateration:{self.rel_pos_world_frame}
+        #true: {self.chassis_pos}""")
+        #self.get_logger().info(f"{self.err_vec}")
+        self.get_logger().info(f"{self.err}")
 
 
 

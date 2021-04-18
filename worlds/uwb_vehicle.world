@@ -489,8 +489,31 @@
         <rpy_offset>0 0 0</rpy_offset>
         <gaussian_noise>0</gaussian_noise>
       </plugin>
-      
-      
+
+
+      <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
+        <ros>
+          <namespace>/chassis_anchor_0</namespace>
+        </ros>
+        <body_name>chassis</body_name>
+        <frame_name>anchor_0</frame_name>
+        <update_rate>50</update_rate>
+        <xyz_offset>0 0 0</xyz_offset>
+        <rpy_offset>0 0 0</rpy_offset>
+        <gaussian_noise>0</gaussian_noise>
+      </plugin>
+
+      <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
+        <ros>
+          <namespace>/chassis</namespace>
+        </ros>
+        <body_name>chassis</body_name>
+        <frame_name>world</frame_name>
+        <update_rate>50</update_rate>
+        <xyz_offset>0 0 0</xyz_offset>
+        <rpy_offset>0 0 0</rpy_offset>
+        <gaussian_noise>0</gaussian_noise>
+      </plugin>
       
       
     </model>
