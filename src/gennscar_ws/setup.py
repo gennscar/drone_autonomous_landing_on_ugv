@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'ros2_app_py'
+package_name = 'gennscar_ws'
 
 setup(
     name=package_name,
@@ -14,14 +14,14 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='gennscar',
-    maintainer_email='gennscar@todo.todo',
+    maintainer_email='gennscar97@gmail.com',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "target_follower = ros2_app_py.target_follower:main",   
-            "uwb_vehicle = ros2_app_py.uwb_vehicle:main"
+            "target_follower = gennscar_ws.target_follower:main",   
+            "uwb_vehicle = gennscar_ws.uwb_vehicle:main"
         ],
     },
 )

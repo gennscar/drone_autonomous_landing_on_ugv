@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>ros2_app_py</name>
+  <name>gennscar_ws</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="gennscar@todo.todo">gennscar</maintainer>
+  <maintainer email="gennscar97@gmail.com">gennscar</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
@@ -13,7 +13,6 @@
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>scipy</depend>
-
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
