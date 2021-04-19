@@ -24,11 +24,9 @@ class OffboardControl(Node):
 
         self.kp = 0.5
         self.ki = 0.01
+        self.kd = 0.0
         self.vmax = float('inf')
-        self.target_global_pos = [0, 0]
-        self.target_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
         
-
         self.i = 0.0
         self.arming_state = 0
         self.landing = 0
@@ -39,6 +37,8 @@ class OffboardControl(Node):
         self.ey = 0.0
         self.int_ex = 0.0
         self.int_ey = 0.0
+        self.ex_old = 0.0
+        self.ey_old = 0.0
 
         self.x = 0.0
         self.y = 0.0
@@ -46,6 +46,8 @@ class OffboardControl(Node):
         self.vx = 0.0
         self.vy = 0.0
         self.vz = 0.0
+        self.target_global_pos = [0, 0]
+        self.target_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
         
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
@@ -56,7 +58,9 @@ class OffboardControl(Node):
         
         self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_local_position,10)
         self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,10)
-        self.target_position_subscriber = self.create_subscription(Odometry,"demo/odom_demo",self.callback_target_position,10)
+        
+        self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_position,10)
+
         self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,10)
 
         self.timer = self.create_timer(0.1, self.timer_callback)
@@ -91,9 +95,9 @@ class OffboardControl(Node):
     
     def callback_target_position(self,msg):
         
+        
         self.target_global_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y]
         self.target_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
-
 
 
     def publish_vehicle_command(self, command, param1, param2):
@@ -139,24 +143,18 @@ class OffboardControl(Node):
             msg.z = -3.0
 
             self.trajectory_setpoint_publisher_.publish(msg)
+            self.ex = self.target_pos[0] - self.x
+            self.ey = self.target_pos[1] - self.y
 
         else:
             
             msg.x = float("NaN")
             msg.y = float("NaN")
-            
-            if abs(self.ex) > 2.0 or abs(self.ey) > 2.0:
-                self.kp = 1
-                self.ki = 0.005
-            else:
-                self.kp = 1.0
-                self.ki = 0.01
+
+            msg.vx, msg.vy, self.ex, self.ey, self.int_ex, self.int_ey, self.ex_old, self.ey_old, self.der_ex, self.der_ey= controller(self.x, self.y, self.target_pos[0], self.target_pos[1], self.kp, self.ki, self.kd, self.vmax, self.int_ex, self.int_ey, self.ex_old, self.ey_old)
 
 
-            msg.vx, msg.vy, self.ex, self.ey, self.int_ex, self.int_ey = controller(self.x, self.y, self.target_pos[0], self.target_pos[1], self.kp, self.ki, self.vmax, self.int_ex, self.int_ey)
-            
-
-            if (abs(self.ex) < 0.3) and (abs(self.ey) < 0.3) and (-self.z < 0.9):
+            if (abs(self.ex) < 0.3) and (abs(self.ey) < 0.3) and (-self.z < 0.95):
                 self.landing = 1
                 self.get_logger().info("Landing..")
                 self.publish_vehicle_command(21, 0.0, 0.0)
@@ -180,13 +178,17 @@ class OffboardControl(Node):
             
             self.trajectory_setpoint_publisher_.publish(msg)
         
-def controller(drone_x, drone_y, target_x, target_y, kp, ki, v_max, int_ex, int_ey):
+def controller(drone_x, drone_y, target_x, target_y, kp, ki, kd, v_max, int_ex, int_ey, ex_old, ey_old):
     ex = drone_x - target_x
     ey = drone_y - target_y
+    der_ex = (ex - ex_old)/0.1
+    der_ey = (ey - ey_old)/0.1
+    ex_old = ex
+    ey_old = ey
     int_ex = int_ex + ex
     int_ey = int_ey + ey
-    vx = - kp * ex - ki * int_ex
-    vy = - kp * ey - ki * int_ey
+    vx = - kp * ex - ki * int_ex - kd * der_ex
+    vy = - kp * ey - ki * int_ey - kd * der_ey
     vx_max = v_max
     vy_max = v_max
     vx_min = -v_max
@@ -199,7 +201,7 @@ def controller(drone_x, drone_y, target_x, target_y, kp, ki, v_max, int_ex, int_
         vy = vy_max
     if vy < vy_min:
         vy = vy_min
-    return vx, vy, ex, ey, int_ex, int_ey
+    return vx, vy, ex, ey, int_ex, int_ey, ex_old, ey_old, der_ex, der_ey
 
 
 def main(args = None):

@@ -518,68 +518,6 @@
       
     </model>
     
-    <model name='fixed_anchor'>
-      <pose>0 0 0 0 0 0</pose>
-
-      <link name='fixed_anchor'>
-        <pose>0 0 0 0 0 0</pose>
-        <visual name='visual'>
-          <geometry>
-            <box>
-              <size>0.03 0.03 1</size>
-            </box>
-          </geometry>
-        </visual>
-        <collision name='collision'>
-          <geometry>
-            <box>
-              <size>0.03 0.03 1</size>
-            </box>
-          </geometry>
-          <surface>
-            <friction>
-              <ode>
-                <mu>0.7</mu>
-                <mu2>0.7</mu2>
-                <slip1>0</slip1>
-                <slip2>0</slip2>
-              </ode>
-            </friction>
-            <contact>
-              <ode>
-                <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
-                <kp>1e+13</kp>
-                <kd>1</kd>
-                <max_vel>0.01</max_vel>
-                <min_depth>0.01</min_depth>
-              </ode>
-              <bullet>
-                <soft_cfm>0</soft_cfm>
-                <soft_erp>0.2</soft_erp>
-                <kp>1e+13</kp>
-                <kd>1</kd>
-		<split_impulse>1</split_impulse>
-		<split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
-              </bullet>
-            </contact>
-          </surface>
-        </collision>
-      </link>
-      
-      <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
-        <ros>
-          <namespace>/fixed_anchor</namespace>
-        </ros>
-        <body_name>fixed_anchor</body_name>
-        <frame_name>world</frame_name>
-        <update_rate>50</update_rate>
-        <xyz_offset>0 0 0</xyz_offset>
-        <rpy_offset>0 0 0</rpy_offset>
-        <gaussian_noise>0</gaussian_noise>
-      </plugin>
-    	
-      </model>
     
     
   </world>
