@@ -1,5 +1,7 @@
 import numpy as np
 
+# Anchor positions
+
 p0 = np.array([0.0,0.0,0.0])
 p1 = np.array([1.9,0.9,0.0])
 p2 = np.array([0.0,0.9,0.0])

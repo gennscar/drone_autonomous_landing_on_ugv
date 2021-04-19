@@ -7,8 +7,14 @@ from  px4_msgs.msg import VehicleLocalPosition
 from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 from geometry_msgs.msg import Pose
-from common_modules.standard_trilateration import trilateration
 
+# seed the pseudorandom number generator
+from random import seed
+from random import random
+# seed random number generator
+seed(1)
+
+from common_modules.standard_trilateration import trilateration
 chassis_wrt_anchor0 = np.array([0.94859,0.44998,-0.32457])
 
 class UwbPubSub(Node):
@@ -26,6 +32,7 @@ class UwbPubSub(Node):
         self.anchor_1_orientation = [0.0, 0.0, 0.0, 1.0]
         self.anchor_2_orientation = [0.0, 0.0, 0.0, 1.0]
         self.anchor_3_orientation = [0.0, 0.0, 0.0, 1.0]
+        self.y = [random(),random(),random()]
 
         self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_drone_position,10)
         self.anchor_0_subscriber = self.create_subscription(Odometry,"/anchor_0/odom",self.callback_anchor_0,10)
@@ -96,8 +103,11 @@ class UwbPubSub(Node):
         self.d2 = np.linalg.norm(self.r2, ord = 2)
         self.d3 = np.linalg.norm(self.r3, ord = 2)
 
+        self.get_logger().info(f"{self.d0},{self.d1},{self.d2},{self.d3}")
+
         self.y = trilateration(self.d0, self.d1, self.d2, self.d3)
         
+
         self.rel_pos_anchor0 = self.y[1:]
         self.rot_world_to_anchor0 = R.from_quat(self.anchor_0_orientation)
 
