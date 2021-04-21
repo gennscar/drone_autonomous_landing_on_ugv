@@ -1,26 +1,34 @@
 import numpy as np
 
 
-def ls_trilateration(anchors):
+def extract_anchor_data(anchors):
     N = len(anchors)
 
     # Extract anchor positions and ranges
     i = 0
-    p = np.empty((N, 3))
-    d = np.empty(N)
+    anchor_pos = np.empty((N, 3))
+    ranges = np.empty(N)
 
     for _, data in anchors.items():
-        p[i, :] = np.array(
+        anchor_pos[i, :] = np.array(
             [data.anchor_pos.x, data.anchor_pos.y, data.anchor_pos.z])
-        d[i] = data.range
+        ranges[i] = data.range
         i = i+1
 
+    return anchor_pos, ranges, N
+
+
+def ls_trilateration(anchors):
+    # Extract anchor positions and ranges
+    anchor_pos, ranges, N = extract_anchor_data(anchors)
+
     # Calculate b, A and its pseudoinverse
-    b = d**2 - p[:, 0]**2 - p[:, 1]**2 - p[:, 2]**2
-    A = np.concatenate((np.ones((N, 1)), -2*p), axis=1)
+    b = ranges**2 - anchor_pos[:, 0]**2 - \
+        anchor_pos[:, 1]**2 - anchor_pos[:, 2]**2
+    A = np.concatenate((np.ones((N, 1)), -2*anchor_pos), axis=1)
     pinvA = np.linalg.pinv(A, rcond=1e-15, hermitian=False)
 
-    # Resolve LS
+    # Resolve LS: y = pinv(A)*b
     y = pinvA.dot(b)
     return y[1:]
 
