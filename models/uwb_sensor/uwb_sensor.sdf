@@ -26,5 +26,18 @@
 			<link_name>uwb_sensor_head</link_name>
 			<update_rate>1</update_rate>
 		</plugin>
+
+		<plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
+        <ros>
+          <namespace>/uwb_sensor_true</namespace>
+        </ros>
+        <body_name>uwb_sensor_head</body_name>
+        <frame_name>world</frame_name>
+        <update_rate>50</update_rate>
+        <xyz_offset>0 0 0</xyz_offset>
+        <rpy_offset>0 0 0</rpy_offset>
+        <gaussian_noise>0</gaussian_noise>
+    </plugin>
+
   </model>
 </sdf>

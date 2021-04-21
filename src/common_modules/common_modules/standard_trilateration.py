@@ -1,22 +1,31 @@
 import numpy as np
 
 # Anchor positions
-
+"""
 p0 = np.array([0.0,0.0,0.0])
 p1 = np.array([1.9,0.9,0.0])
 p2 = np.array([0.0,0.9,0.0])
 p3 = np.array([1.9,0.0,0.2])
-
-
 
 a0 = np.concatenate([[1], -2*p0])
 a1 = np.concatenate([[1], -2*p1])
 a2 = np.concatenate([[1], -2*p2])
 a3 = np.concatenate([[1], -2*p3])
 A = np.array([a0,a1,a2,a3])
-pinvA = np.linalg.pinv(A, rcond=1e-15, hermitian=False)
+pinvA = np.linalg.pinv(A, rcond=1e-15, hermitian=False)"""
 
-def trilateration(d0, d1, d2, d3):
+def trilateration(d0, d1, d2, d3, p0, p1, p2, p3):
+    p0 = np.array(p0)
+    p1 = np.array(p1)
+    p2 = np.array(p2)
+    p3 = np.array(p3)
+
+    a0 = np.concatenate([[1], -2*p0])
+    a1 = np.concatenate([[1], -2*p1])
+    a2 = np.concatenate([[1], -2*p2])
+    a3 = np.concatenate([[1], -2*p3])
+    A = np.array([a0,a1,a2,a3])
+    pinvA = np.linalg.pinv(A, rcond=1e-15, hermitian=False)
 
     b0 = np.array(d0**2 - p0[0]**2 - p0[1]**2 - p0[2]**2)
     b1 = np.array(d1**2 - p1[0]**2 - p1[1]**2 - p1[2]**2)
