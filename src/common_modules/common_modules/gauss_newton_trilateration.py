@@ -1,13 +1,13 @@
 import numpy as np
 
-
+"""
 p0 = np.array([0.0,0.0,0.0])
 p1 = np.array([1.9,0.9,0.0])
 p2 = np.array([0.0,0.9,0.0])
-p3 = np.array([1.9,0.0,0.2])
+p3 = np.array([1.9,0.0,0.2])"""
 
 
-def trilateration(old_pos, d0, d1, d2, d3):
+def trilateration(old_pos, d0, d1, d2, d3, p0, p1, p2, p3):
 
     den_1 = ((old_pos[0]-p0[0])**2 + (old_pos[1]-p0[1])**2 + (old_pos[2]-p0[2])**2)**0.5
     den_2 = ((old_pos[0]-p1[0])**2 + (old_pos[1]-p1[1])**2 + (old_pos[2]-p1[2])**2)**0.5
