@@ -22,4 +22,9 @@ def ls_trilateration(anchors):
 
     # Resolve LS
     y = pinvA.dot(b)
-    return y
+    return y[1:]
+
+
+def gauss_newton_trilateration(anchors):
+    # todo
+    pass

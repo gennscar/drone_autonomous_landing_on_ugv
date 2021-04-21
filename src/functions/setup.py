@@ -13,7 +13,7 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='cosimo',
+    maintainer='Cosimo Conte',
     maintainer_email='cosimocon@yahoo.it',
     description='TODO: Package description',
     license='TODO: License declaration',
