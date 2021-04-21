@@ -23,7 +23,7 @@ setup(
             "offboard_control = common_modules.offboard_control:main",
             "local_position_listener = common_modules.local_position_listener:main",
             "target_position_publisher = common_modules.target_position_publisher:main",
-            "uwb_anchor = common_modules.uwb_anchor:main"
+            "uwb_pos_estimation = common_modules.uwb_pos_estimation:main"
         ],
     },
 )
