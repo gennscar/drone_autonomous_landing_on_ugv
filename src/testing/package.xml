@@ -7,6 +7,12 @@
   <maintainer email="cosimocon@yahoo.it">cosimo</maintainer>
   <license>TODO: License declaration</license>
 
+  <depend>rclpy</depend>
+  <depend>numpy</depend>
+  <depend>random</depend>
+  <depend>gazebo_msgs</depend>
+  <depend>nav_msgs</depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

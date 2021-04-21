@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            "uwb_pos_estimation = testing.uwb_pos_estimation:main"
         ],
     },
 )
