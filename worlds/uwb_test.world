@@ -12,17 +12,22 @@
 		<!-- UWB tags -->
     <include>
 			<name>uwb_tag_1</name>
-      <uri>model://uwb_anchor</uri>
-			<pose>0 0 0.5 0 0 0</pose>
+      <uri>//models//uwb_anchor</uri>
+			<pose>0 0 0 0 0 0</pose>
     </include>
-		<include>
+    <include>
 			<name>uwb_tag_2</name>
-      <uri>model://uwb_anchor</uri>
-			<pose>3 3 2 0 0 0</pose>
+      <uri>//models//uwb_anchor</uri>
+			<pose>1 1 0 0 0 0</pose>
     </include>
-		<include>
+    <include>
 			<name>uwb_tag_3</name>
-      <uri>model://uwb_anchor</uri>
+      <uri>//models//uwb_anchor</uri>
+			<pose>0 1 1 0 0 0</pose>
+    </include>
+    <include>
+			<name>uwb_tag_4</name>
+      <uri>//models//uwb_anchor</uri>
 			<pose>1 0 1 0 0 0</pose>
     </include>
 
