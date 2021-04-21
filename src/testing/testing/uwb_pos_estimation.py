@@ -18,7 +18,7 @@ seed(1)
 from common_modules import standard_trilateration
 from common_modules import gauss_newton_trilateration
 
-STD_TRILATERATION = True
+STD_TRILATERATION = False
 
 
 class UwbPubSub(Node):
@@ -29,7 +29,7 @@ class UwbPubSub(Node):
         self.distances = []
         self.positions = []
         self.dict = {}
-        #self.drone_global_pos = [0.0, 0.0, 0.0]
+        self.drone_global_pos = [0.0, 0.0, 0.0]
         self.num_anchors = 0
         self.y = [random(),random(),random()]
 
@@ -78,7 +78,7 @@ class UwbPubSub(Node):
                 self.y = standard_trilateration.trilateration(self.distances[0], self.distances[1], self.distances[2], self.distances[3], self.positions[0], self.positions[1], self.positions[2], self.positions[3])
                 self.y = self.y[1:]
             else:
-                self.y = gauss_newton_trilateration.trilateration(self.y, self.d0, self.d1, self.d2, self.d3)
+                self.y = gauss_newton_trilateration.trilateration(self.y, self.distances[0], self.distances[1], self.distances[2], self.distances[3], self.positions[0], self.positions[1], self.positions[2], self.positions[3])
 
             self.err_vec = np.subtract(self.y , self.sensor_true_pos)
             self.err = np.linalg.norm(self.err_vec, ord = 2)
