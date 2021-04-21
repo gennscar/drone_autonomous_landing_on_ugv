@@ -1,23 +1,18 @@
 import numpy as np
 
-# @todo: Port this code with a variable number of anchors in trilateration.py
+"""
+p0 = np.array([0.0,0.0,0.0])
+p1 = np.array([1.9,0.9,0.0])
+p2 = np.array([0.0,0.9,0.0])
+p3 = np.array([1.9,0.0,0.2])"""
 
-p0 = np.array([0.0, 0.0, 0.0])
-p1 = np.array([1.9, 0.9, 0.0])
-p2 = np.array([0.0, 0.9, 0.0])
-p3 = np.array([1.9, 0.0, 0.2])
 
+def trilateration(old_pos, d0, d1, d2, d3, p0, p1, p2, p3):
 
-def trilateration(old_pos, d0, d1, d2, d3):
-
-    den_1 = ((old_pos[0]-p0[0])**2 + (old_pos[1]-p0[1])
-             ** 2 + (old_pos[2]-p0[2])**2)**0.5
-    den_2 = ((old_pos[0]-p1[0])**2 + (old_pos[1]-p1[1])
-             ** 2 + (old_pos[2]-p1[2])**2)**0.5
-    den_3 = ((old_pos[0]-p2[0])**2 + (old_pos[1]-p2[1])
-             ** 2 + (old_pos[2]-p2[2])**2)**0.5
-    den_4 = ((old_pos[0]-p3[0])**2 + (old_pos[1]-p3[1])
-             ** 2 + (old_pos[2]-p3[2])**2)**0.5
+    den_1 = ((old_pos[0]-p0[0])**2 + (old_pos[1]-p0[1])**2 + (old_pos[2]-p0[2])**2)**0.5
+    den_2 = ((old_pos[0]-p1[0])**2 + (old_pos[1]-p1[1])**2 + (old_pos[2]-p1[2])**2)**0.5
+    den_3 = ((old_pos[0]-p2[0])**2 + (old_pos[1]-p2[1])**2 + (old_pos[2]-p2[2])**2)**0.5
+    den_4 = ((old_pos[0]-p3[0])**2 + (old_pos[1]-p3[1])**2 + (old_pos[2]-p3[2])**2)**0.5
 
     num_11 = old_pos[0] - p0[0]
     num_12 = old_pos[1] - p0[1]
@@ -43,14 +38,10 @@ def trilateration(old_pos, d0, d1, d2, d3):
     J = - np.array([J_row_1, J_row_2, J_row_3, J_row_4])
     pinvJ = (np.linalg.pinv(J, rcond=1e-15, hermitian=False))
 
-    residue_1 = d0 - ((old_pos[0]-p0[0])**2 +
-                      (old_pos[1]-p0[1])**2 + (old_pos[2]-p0[2])**2)**0.5
-    residue_2 = d1 - ((old_pos[0]-p1[0])**2 +
-                      (old_pos[1]-p1[1])**2 + (old_pos[2]-p1[2])**2)**0.5
-    residue_3 = d2 - ((old_pos[0]-p2[0])**2 +
-                      (old_pos[1]-p2[1])**2 + (old_pos[2]-p2[2])**2)**0.5
-    residue_4 = d3 - ((old_pos[0]-p3[0])**2 +
-                      (old_pos[1]-p3[1])**2 + (old_pos[2]-p3[2])**2)**0.5
+    residue_1 = d0 - ((old_pos[0]-p0[0])**2 + (old_pos[1]-p0[1])**2 + (old_pos[2]-p0[2])**2)**0.5
+    residue_2 = d1 - ((old_pos[0]-p1[0])**2 + (old_pos[1]-p1[1])**2 + (old_pos[2]-p1[2])**2)**0.5
+    residue_3 = d2 - ((old_pos[0]-p2[0])**2 + (old_pos[1]-p2[1])**2 + (old_pos[2]-p2[2])**2)**0.5
+    residue_4 = d3 - ((old_pos[0]-p3[0])**2 + (old_pos[1]-p3[1])**2 + (old_pos[2]-p3[2])**2)**0.5
     residue = np.array([residue_1, residue_2, residue_3, residue_4])
 
     new_pos = old_pos - (pinvJ).dot(residue)
