@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'common_modules'
+package_name = 'testing'
 
 setup(
     name=package_name,
@@ -13,17 +13,13 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='gennscar',
-    maintainer_email='gennscar97@gmail.com',
+    maintainer='cosimo',
+    maintainer_email='cosimocon@yahoo.it',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "offboard_control = common_modules.offboard_control:main",
-            "local_position_listener = common_modules.local_position_listener:main",
-            "target_position_publisher = common_modules.target_position_publisher:main",
-            "uwb_pos_estimation = common_modules.uwb_pos_estimation:main"
         ],
     },
 )
