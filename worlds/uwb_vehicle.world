@@ -248,6 +248,8 @@
             </box>
           </geometry>
         </collision>
+        
+      
       </link>
       
       
@@ -287,6 +289,8 @@
             </box>
           </geometry>
         </collision>
+        
+      
       </link>
       
       
@@ -453,6 +457,8 @@
         <rpy_offset>0 0 0</rpy_offset>
         <gaussian_noise>0</gaussian_noise>
       </plugin>
+
+
       
       <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
         <ros>
@@ -515,7 +521,11 @@
         <gaussian_noise>0</gaussian_noise>
       </plugin>
       
-      
+    <plugin name="gazebo_ros_uwb" filename="libgazebo_ros_uwb.so">
+        <anchor_id>1</anchor_id>
+        <update_rate>10</update_rate>
+      </plugin>
+     
     </model>
     
     
