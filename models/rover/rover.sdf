@@ -1,38 +1,7 @@
 <?xml version="1.0" ?>
-<sdf version="1.5">
-  <world name="default">
-    <!-- A global light source -->
-    <include>
-      <uri>model://sun</uri>
-    </include>
-    <!-- A ground plane -->
-    <include>
-      <uri>model://ground_plane</uri>
-    </include>
-    <physics name='default_physics' default='0' type='ode'>
-      <gravity>0 0 -9.8066</gravity>
-      <ode>
-        <solver>
-          <type>quick</type>
-          <iters>10</iters>
-          <sor>1.3</sor>
-          <use_dynamic_moi_rescaling>0</use_dynamic_moi_rescaling>
-        </solver>
-        <constraints>
-          <cfm>0</cfm>
-          <erp>0.2</erp>
-          <contact_max_correcting_vel>100</contact_max_correcting_vel>
-          <contact_surface_layer>0.001</contact_surface_layer>
-        </constraints>
-      </ode>
-      <max_step_size>0.004</max_step_size>
-      <real_time_factor>1</real_time_factor>
-      <real_time_update_rate>250</real_time_update_rate>
-      <magnetic_field>6.0e-6 2.3e-5 -4.2e-5</magnetic_field>
-    </physics>
-    
-    
-<model name='vehicle'>
+<sdf version='1.6'>
+  
+<model name='rover'>
       <pose>2 5 0.325 0 -0 0</pose>
 
       <link name='chassis'>
@@ -219,11 +188,6 @@
         </collision>
       </link>
       
-		<plugin name="uwb_plugin" filename="libgazebo_ros_uwb.so">
-			<link_name>chassis</link_name>
-			<update_rate>1</update_rate>
-		</plugin>
-      
       <link name='anchor_0'>
         <pose>-1.1 -0.45 0.5 0 -0 0</pose>
         <inertial>
@@ -252,7 +216,6 @@
           </geometry>
         </collision>
         
-      
       </link>
       
       
@@ -382,13 +345,7 @@
           <xyz>0 0 1</xyz>
         </axis>
       </joint>
-      
-      
-      
-      
-      
-      
-
+        
       <joint name='left_wheel_joint' type='revolute'>
         <parent>chassis</parent>
         <child>left_wheel</child>
@@ -421,9 +378,7 @@
       <plugin name='diff_drive' filename='libgazebo_ros_diff_drive.so'>
 
         <ros>
-          <namespace>/demo</namespace>
-          <remapping>cmd_vel:=cmd_demo</remapping>
-          <remapping>odom:=odom_demo</remapping>
+          <namespace>/rover</namespace>
         </ros>
 
         <!-- wheels -->
@@ -435,70 +390,19 @@
         <wheel_diameter>0.6</wheel_diameter>
 
         <!-- limits -->
-        <max_wheel_torque>20</max_wheel_torque>
-        <max_wheel_acceleration>1.0</max_wheel_acceleration>
+        <max_wheel_torque>100</max_wheel_torque>
+        <max_wheel_acceleration>100.0</max_wheel_acceleration>
 
         <!-- output -->
         <publish_odom>true</publish_odom>
         <publish_odom_tf>true</publish_odom_tf>
         <publish_wheel_tf>true</publish_wheel_tf>
 
-        <odometry_frame>odom_demo</odometry_frame>
+        <odometry_frame>odom_rover</odometry_frame>
         <robot_base_frame>chassis</robot_base_frame>
 
       </plugin>
       
-      
-      <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
-        <ros>
-          <namespace>/anchor_0</namespace>
-        </ros>
-        <body_name>anchor_0</body_name>
-        <frame_name>world</frame_name>
-        <update_rate>50</update_rate>
-        <xyz_offset>0 0 0</xyz_offset>
-        <rpy_offset>0 0 0</rpy_offset>
-        <gaussian_noise>0</gaussian_noise>
-      </plugin>
-
-
-      
-      <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
-        <ros>
-          <namespace>/anchor_1</namespace>
-        </ros>
-        <body_name>anchor_1</body_name>
-        <frame_name>world</frame_name>
-        <update_rate>50</update_rate>
-        <xyz_offset>0 0 0</xyz_offset>
-        <rpy_offset>0 0 0</rpy_offset>
-        <gaussian_noise>0</gaussian_noise>
-      </plugin>
-      
-      <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
-        <ros>
-          <namespace>/anchor_2</namespace>
-        </ros>
-        <body_name>anchor_2</body_name>
-        <frame_name>world</frame_name>
-        <update_rate>50</update_rate>
-        <xyz_offset>0 0 0</xyz_offset>
-        <rpy_offset>0 0 0</rpy_offset>
-        <gaussian_noise>0</gaussian_noise>
-      </plugin>
-      
-      <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
-        <ros>
-          <namespace>/anchor_3</namespace>
-        </ros>
-        <body_name>anchor_3</body_name>
-        <frame_name>world</frame_name>
-        <update_rate>50</update_rate>
-        <xyz_offset>0 0 0</xyz_offset>
-        <rpy_offset>0 0 0</rpy_offset>
-        <gaussian_noise>0</gaussian_noise>
-      </plugin>
-
 
       <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
         <ros>
@@ -523,11 +427,39 @@
         <rpy_offset>0 0 0</rpy_offset>
         <gaussian_noise>0</gaussian_noise>
       </plugin>
-      
-     
-    </model>
-    
-    
-    
-  </world>
+
+      <plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
+        <ros>
+          <namespace>/anchor_0</namespace>
+        </ros>
+        <body_name>anchor_0</body_name>
+        <frame_name>world</frame_name>
+        <update_rate>50</update_rate>
+        <xyz_offset>0 0 0</xyz_offset>
+        <rpy_offset>0 0 0</rpy_offset>
+        <gaussian_noise>0</gaussian_noise>
+      </plugin>
+
+        <plugin name="uwb_plugin" filename="libgazebo_ros_uwb.so">
+			<link_name>anchor_0</link_name>
+			<update_rate>1</update_rate>
+		</plugin>
+
+        <plugin name="uwb_plugin" filename="libgazebo_ros_uwb.so">
+			<link_name>anchor_1</link_name>
+			<update_rate>1</update_rate>
+		</plugin>
+
+        <plugin name="uwb_plugin" filename="libgazebo_ros_uwb.so">
+			<link_name>anchor_2</link_name>
+			<update_rate>1</update_rate>
+		</plugin>
+
+        <plugin name="uwb_plugin" filename="libgazebo_ros_uwb.so">
+			<link_name>anchor_3</link_name>
+			<update_rate>1</update_rate>
+		</plugin>
+
+
+  </model>
 </sdf>
