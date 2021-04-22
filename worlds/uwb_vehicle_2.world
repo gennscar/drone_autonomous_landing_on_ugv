@@ -12,8 +12,8 @@
 		<!-- vehicle -->
     
     <include>
-			<name>rover</name>
-      <uri>models//rover</uri>
+			<name>rover_uwb</name>
+      <uri>models//rover_uwb</uri>
 			<pose>5 5 0.325 0 0 0</pose>
     </include>
 

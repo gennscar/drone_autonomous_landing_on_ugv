@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <sdf version='1.6'>
   
-<model name='rover'>
+<model name='rover_uwb'>
       <pose>2 5 0.325 0 -0 0</pose>
 
       <link name='chassis'>
@@ -309,7 +309,7 @@
       </joint>
       
       <link name='anchor_3'>
-        <pose>+0.8 -0.45 0.7 0 -0 0</pose>
+        <pose>+0.8 -0.45 1.2 0 -0 0</pose>
         <inertial>
           <mass>1</mass>
           <inertia>
@@ -324,7 +324,7 @@
         <visual name='visual'>
           <geometry>
             <box>
-              <size>0.03 0.03 1</size>
+              <size>0.03 0.03 1.5</size>
             </box>
           </geometry>
         </visual>
@@ -378,7 +378,8 @@
       <plugin name='diff_drive' filename='libgazebo_ros_diff_drive.so'>
 
         <ros>
-          <namespace>/rover</namespace>
+          <namespace>/rover_uwb
+        </namespace>
         </ros>
 
         <!-- wheels -->

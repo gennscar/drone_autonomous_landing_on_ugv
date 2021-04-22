@@ -20,6 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            "target_follower = control.target_follower:main",
+            "offboard_control = control.offboard_control:main"
         ],
     },
 )
