@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'cosimo_ws'
+package_name = 'testing'
 
 setup(
     name=package_name,
@@ -13,14 +13,14 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Cosimo Conte',
+    maintainer='cosimo',
     maintainer_email='cosimocon@yahoo.it',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "uwb_test = cosimo_ws.uwb_test:main",
+            "uwb_pos_estimation = testing.uwb_pos_estimation:main"
         ],
     },
 )

@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'gennscar_ws'
+package_name = 'functions'
 
 setup(
     name=package_name,
@@ -13,15 +13,13 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='gennscar',
-    maintainer_email='gennscar97@gmail.com',
+    maintainer='Cosimo Conte',
+    maintainer_email='cosimocon@yahoo.it',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "target_follower = gennscar_ws.target_follower:main",   
-            "uwb_vehicle = gennscar_ws.uwb_vehicle:main"
         ],
     },
 )

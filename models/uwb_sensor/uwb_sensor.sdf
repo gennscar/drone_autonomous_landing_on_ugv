@@ -33,7 +33,7 @@
         </ros>
         <body_name>uwb_sensor_head</body_name>
         <frame_name>world</frame_name>
-        <update_rate>50</update_rate>
+        <update_rate>1</update_rate>
         <xyz_offset>0 0 0</xyz_offset>
         <rpy_offset>0 0 0</rpy_offset>
         <gaussian_noise>0</gaussian_noise>
