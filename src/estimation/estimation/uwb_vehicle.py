@@ -14,8 +14,7 @@ from random import random
 # seed random number generator
 seed(1)
 
-from common_modules import standard_trilateration
-from common_modules import gauss_newton_trilateration
+import functions
 
 STD_TRILATERATION = False
 
