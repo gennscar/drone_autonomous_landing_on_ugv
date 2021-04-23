@@ -8,6 +8,11 @@
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
+  <depend>numpy</depend>
+  <depend>random</depend>
+  <depend>gazebo_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>px4_msgs</depend>
   <depend>geometry_msgs</depend>
 
   <test_depend>ament_copyright</test_depend>
