@@ -6,6 +6,7 @@ from rclpy.node import Node
 
 from gazebo_msgs.msg import UwbSensor
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Float64
 
 import functions
 
@@ -15,7 +16,7 @@ from random import random
 # seed random number generator
 seed(1)
 
-STD_TRILATERATION = False
+STD_TRILATERATION = True
 
 
 class UwbPosEstimation(Node):
@@ -30,6 +31,9 @@ class UwbPosEstimation(Node):
             UwbSensor, "/uwb_sensor_0", self.callback_sensor_subscriber, 10)
         self.sensor_true_subscriber = self.create_subscription(
             Odometry, "/uwb_sensor_true/odom", self.callback_sensor_true_subscriber, 10)
+
+        self.position_mse_publisher = self.create_publisher(
+            Float64, "/position_mse", 10)
 
         self.get_logger().info("uwb_pos_estimation has started")
         self.timer = self.create_timer(0.1, self.timer_callback)
@@ -52,6 +56,10 @@ class UwbPosEstimation(Node):
 
             self.err = np.linalg.norm(
                 self.sensor_est_pos - self.sensor_true_pos, ord=2)
+
+            msg = Float64()
+            msg.data = self.err
+            self.position_mse_publisher.publish(msg)
 
             self.get_logger().info(f"""
             Computed pos: {self.sensor_est_pos}
