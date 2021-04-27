@@ -8,7 +8,12 @@ import tf2_ros as tf
 import json
 
 from geometry_msgs.msg import TransformStamped
-from geometry_msgs.msg import Transform
+
+
+# @todo: add this constants as parameters
+ERROR_THRESHOLD = 0.1
+REFERENCE_FRAME = "world"
+CONTROL_PERIOD = 1
 
 
 class HandOfGodNav(Node):
@@ -21,6 +26,7 @@ class HandOfGodNav(Node):
           frame_id (str): The frame id provided to the plugin
           target_positions (list): A list of positions to be reached by the target
         """
+
         super().__init__("hand_of_god_nav")
 
         self.get_logger().info("hand_of_god_nav has started on " + frame_id)
@@ -37,12 +43,20 @@ class HandOfGodNav(Node):
                                 self.target_positions_[0]["y"],
                                 self.target_positions_[0]["z"])
 
-        self.timer = self.create_timer(1, self.timer_callback)
+        self.timer = self.create_timer(CONTROL_PERIOD, self.timer_callback)
 
     def broadcast_position(self, x, y, z):
+        """Function used to broadcast a specific target to be reached
+
+        Args:
+            x (double): x position
+            y (double): y position
+            z (double): z position
+        """
+
         self.msg_ = TransformStamped()
 
-        self.msg_.header.frame_id = "world"
+        self.msg_.header.frame_id = REFERENCE_FRAME
         self.msg_.child_frame_id = self.frame_id_ + "_desired"
 
         self.msg_.transform.translation.x = x
@@ -52,7 +66,9 @@ class HandOfGodNav(Node):
         self.tf_broadcaster_.sendTransform(self.msg_)
 
     def timer_callback(self):
+        # Kill the node if all desired positions reached
         if(self.target_counter_ == len(self.target_positions_)):
+            self.destroy_node()
             return
 
         # Send desired position
@@ -66,7 +82,7 @@ class HandOfGodNav(Node):
         # Retrieve the actual position
         try:
             trans = self.tf_buffer_.lookup_transform(
-                "world", self.frame_id_ + "_actual", Time(seconds=0, nanoseconds=0))
+                REFERENCE_FRAME, self.frame_id_ + "_actual", Time(seconds=0, nanoseconds=0))
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return
 
@@ -82,7 +98,7 @@ class HandOfGodNav(Node):
         error = np.linalg.norm(actual_pos - desired_pos, ord=2)
 
         # Moving to the next target
-        if(error < 0.1):
+        if(error < ERROR_THRESHOLD):
             self.target_counter_ += 1
 
         # Logging
@@ -95,12 +111,12 @@ class HandOfGodNav(Node):
 
 
 def test(args=None):
-    """main used for test"""
+    """Testing script"""
 
     # Open file with test targets
     fd = open("json/target_test.json", mode="r")
 
-    # Initialize the Node
+    # Initialize the Node pointed to uwb_sensor_head
     rclpy.init(args=args)
     node = HandOfGodNav("uwb_sensor_head", json.load(fd))
     rclpy.spin(node)
