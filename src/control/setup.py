@@ -20,9 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-          "hand_of_god_nav = control.hand_of_god_nav:main",
-          "target_follower = control.target_follower:main",
-          "offboard_control = control.offboard_control:main"
+            "hand_of_god_nav = control.hand_of_god_nav:test",
+            "target_follower = control.target_follower:main",
+            "offboard_control = control.offboard_control:main"
         ],
     },
 )
