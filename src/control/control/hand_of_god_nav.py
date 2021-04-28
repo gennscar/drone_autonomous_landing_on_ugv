@@ -2,122 +2,66 @@
 
 import rclpy
 from rclpy.node import Node
-from rclpy.time import Time
-import numpy as np
 import tf2_ros as tf
-import json
 
 from geometry_msgs.msg import TransformStamped
 
 
-# @todo: add this constants as parameters
-ERROR_THRESHOLD = 0.1
-REFERENCE_FRAME = "world"
-CONTROL_PERIOD = 1
-
-
 class HandOfGodNav(Node):
-    """Script to use the HandOfGod plugin providing the list of positions to reach"""
+    """Node to use the HandOfGod plugin providing the positions to reach"""
 
-    def __init__(self, frame_id, target_positions):
-        """Initialize Node
-
-        Args:
-          frame_id (str): The frame id provided to the plugin
-          target_positions (list): A list of positions to be reached by the target
-        """
-
+    def __init__(self):
         super().__init__("hand_of_god_nav")
 
-        self.get_logger().info("hand_of_god_nav has started on " + frame_id)
+        # Parameters declaration
+        self.declare_parameter("frame_id", "")
+        self.declare_parameter("reference_id", "world")
+        self.declare_parameter("target_position", [0.0, 0.0, 0.0])
 
-        self.frame_id_ = frame_id
-        self.target_positions_ = target_positions
-        self.target_counter_ = 0
-
-        self.tf_buffer_ = tf.Buffer()
+        # Setting up tf2 broadcaster for communicating the targets to the plugin
         self.tf_broadcaster_ = tf.TransformBroadcaster(self)
-        self.tf_listener_ = tf.TransformListener(self.tf_buffer_, self)
 
-        self.broadcast_position(self.target_positions_[0]["x"],
-                                self.target_positions_[0]["y"],
-                                self.target_positions_[0]["z"])
+        # Broadcasting the desired position every 1 sec
+        self.timer = self.create_timer(1, self.broadcast_position)
 
-        self.timer = self.create_timer(CONTROL_PERIOD, self.timer_callback)
+        self.get_logger().info("hand_of_god_nav node has started")
 
-    def broadcast_position(self, x, y, z):
-        """Function used to broadcast a specific target to be reached
+    def broadcast_position(self):
+        # Parameter getters
+        frame_id = self.get_parameter(
+            'frame_id').get_parameter_value().string_value
 
-        Args:
-            x (double): x position
-            y (double): y position
-            z (double): z position
-        """
+        reference_id = self.get_parameter(
+            'reference_id').get_parameter_value().string_value
 
+        target_position = self.get_parameter(
+            'target_position').get_parameter_value().double_array_value
+
+        if(len(target_position) != 3):
+            self.get_logger().warn(f"""
+                                   <target_position> parameter not valid" {target_position}
+                                   """)
+            return
+
+        # Sending the desired position
         self.msg_ = TransformStamped()
 
-        self.msg_.header.frame_id = REFERENCE_FRAME
-        self.msg_.child_frame_id = self.frame_id_ + "_desired"
+        self.msg_.header.frame_id = reference_id
+        self.msg_.child_frame_id = frame_id + "_desired"
 
-        self.msg_.transform.translation.x = x
-        self.msg_.transform.translation.y = y
-        self.msg_.transform.translation.z = z
+        self.msg_.transform.translation.x = target_position[0]
+        self.msg_.transform.translation.y = target_position[1]
+        self.msg_.transform.translation.z = target_position[2]
 
         self.tf_broadcaster_.sendTransform(self.msg_)
 
-    def timer_callback(self):
-        # Kill the node if all desired positions reached
-        if(self.target_counter_ == len(self.target_positions_)):
-            self.destroy_node()
-            return
 
-        # Send desired position
-        self.broadcast_position(self.target_positions_[
-            self.target_counter_]["x"],
-            self.target_positions_[
-            self.target_counter_]["y"],
-            self.target_positions_[
-            self.target_counter_]["z"])
-
-        # Retrieve the actual position
-        try:
-            trans = self.tf_buffer_.lookup_transform(
-                REFERENCE_FRAME, self.frame_id_ + "_actual", Time(seconds=0, nanoseconds=0))
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            return
-
-        # Calculate the error
-        actual_pos = np.array([trans.transform.translation.x,
-                               trans.transform.translation.y,
-                               trans.transform.translation.z])
-
-        desired_pos = np.array([self.msg_.transform.translation.x,
-                                self.msg_.transform.translation.y,
-                                self.msg_.transform.translation.z])
-
-        error = np.linalg.norm(actual_pos - desired_pos, ord=2)
-
-        # Moving to the next target
-        if(error < ERROR_THRESHOLD):
-            self.target_counter_ += 1
-
-        # Logging
-        self.get_logger().info(f"""
-          Moving:           {self.frame_id_}
-          Actual Position:  {actual_pos}
-          Desired Position: {desired_pos}
-          Error:            {error}
-          """)
-
-
-def test(args=None):
-    """Testing script"""
-
-    # Open file with test targets
-    fd = open("json/target_test.json", mode="r")
-
-    # Initialize the Node pointed to uwb_sensor_head
+def main(args=None):
     rclpy.init(args=args)
-    node = HandOfGodNav("uwb_sensor_head", json.load(fd))
+    node = HandOfGodNav()
     rclpy.spin(node)
     rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
