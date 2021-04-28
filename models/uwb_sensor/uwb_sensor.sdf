@@ -33,7 +33,7 @@
         </ros>
         <body_name>uwb_sensor_head</body_name>
         <frame_name>world</frame_name>
-        <update_rate>100</update_rate>
+        <update_rate>10</update_rate>
     </plugin>
 
     <plugin name="gazebo_ros_hand_of_god" filename="libgazebo_ros_hand_of_god.so">
