@@ -13,9 +13,9 @@
 				</geometry>
 			</visual>
 		</link>
-		<plugin name="uwb_plugin" filename="libgazebo_ros_uwb.so">
+		<plugin name="gazebo_ros_uwb" filename="libgazebo_ros_uwb.so">
 			<link_name>uwb_anchor_head</link_name>
-			<update_rate>10</update_rate>
+			<update_rate>5</update_rate>
 		</plugin>
   </model>
 </sdf>

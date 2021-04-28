@@ -20,23 +20,20 @@
 				</geometry>
       </collision>
 		</link>
-		<plugin name="uwb_plugin" filename="libgazebo_ros_uwb.so">
+		<plugin name="gazebo_ros_uwb" filename="libgazebo_ros_uwb.so">
       <is_sensor/>
       <anchor_id>0</anchor_id>
 			<link_name>uwb_sensor_head</link_name>
-			<update_rate>1</update_rate>
+			<update_rate>5</update_rate>
 		</plugin>
 
 		<plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">
         <ros>
-          <namespace>/uwb_sensor_true</namespace>
+          <namespace>/uwb_sensor_0_true</namespace>
         </ros>
         <body_name>uwb_sensor_head</body_name>
         <frame_name>world</frame_name>
-        <update_rate>10</update_rate>
-        <xyz_offset>0 0 0</xyz_offset>
-        <rpy_offset>0 0 0</rpy_offset>
-        <gaussian_noise>0</gaussian_noise>
+        <update_rate>100</update_rate>
     </plugin>
 
     <plugin name="gazebo_ros_hand_of_god" filename="libgazebo_ros_hand_of_god.so">
