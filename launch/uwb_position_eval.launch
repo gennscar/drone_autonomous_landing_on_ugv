@@ -1,0 +1,28 @@
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+import testing
+import control
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        Node(
+            package='estimation',
+            executable='trilateration',
+            name='LS_uwb_estimator',
+            parameters=[
+                {"sensor_id": "0"},
+                {"method": "LS"}
+            ]
+        ),
+        Node(
+            package='estimation',
+            executable='trilateration',
+            name='GN_uwb_estimator',
+            parameters=[
+                {"sensor_id": "0"},
+                {"method": "GN"}
+            ]
+        )
+    ])

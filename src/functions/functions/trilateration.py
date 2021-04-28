@@ -26,7 +26,7 @@ def ls_trilateration(anchors):
     b = ranges**2 - anchor_pos[:, 0]**2 - \
         anchor_pos[:, 1]**2 - anchor_pos[:, 2]**2
     A = np.concatenate((np.ones((N, 1)), -2*anchor_pos), axis=1)
-    pinvA = np.linalg.pinv(A, rcond=1e-15, hermitian=False)
+    pinvA = np.linalg.pinv(A)
 
     # Resolve LS: y = pinv(A)*b
     y = pinvA.dot(b)
@@ -44,7 +44,7 @@ def gauss_newton_trilateration(old_pos, anchors):
     num = np.transpose(old_pos) - anchor_pos
     J = np.divide(num, np.expand_dims(den, 1))
 
-    pinvJ = np.linalg.pinv(-J, rcond=1e-15, hermitian=False)
+    pinvJ = np.linalg.pinv(-J)
     residue = ranges - ((old_pos[0]-anchor_pos[:, 0])**2 +
                         (old_pos[1]-anchor_pos[:, 1])**2 +
                         (old_pos[2]-anchor_pos[:, 2])**2)**0.5
