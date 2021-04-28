@@ -20,16 +20,20 @@ class Trilateration(Node):
         self.anchors = {}
         self.sensor_true_pos = []
         self.sensor_est_pos = [0.01, 0.01, 0.01]
+        self.est_error = []
 
         # Parameters declaration
         self.sensor_id_ = self.declare_parameter("sensor_id", "0")
         self.method_ = self.declare_parameter("method", "LS")
+        self.iterations_ = self.declare_parameter("iterations", 1)
 
         # Retrieve parameter values
         self.sensor_id_ = self.get_parameter(
             "sensor_id").get_parameter_value().string_value
         self.method_ = self.get_parameter(
             "method").get_parameter_value().string_value
+        self.iterations_ = self.get_parameter(
+            "iterations").get_parameter_value().integer_value
 
         # Setting up sensors subscribers
         self.sensor_subscriber = self.create_subscription(
@@ -38,8 +42,10 @@ class Trilateration(Node):
             Odometry, "/uwb_sensor_" + self.sensor_id_ + "_true/odom", self.callback_sensor_true_subscriber, 10)
 
         # Setting up a publishers to record the estimation error
+        error_topic_name = "/position_error_" + self.method_ + \
+            "_" + str(self.iterations_) + "_" + self.sensor_id_
         self.position_mse_publisher = self.create_publisher(
-            Float64, "/position_error_" + self.method_ + "_" + self.sensor_id_, 10)
+            Float64, error_topic_name, 10)
 
         self.get_logger().info("trilateration has started")
 
@@ -52,14 +58,18 @@ class Trilateration(Node):
                     self.anchors)
 
             if(self.method_ == "GN"):
-                self.sensor_est_pos = functions.gauss_newton_trilateration(
-                    self.sensor_est_pos, self.anchors)
+                for i in range(self.iterations_):
+                    self.sensor_est_pos = functions.gauss_newton_trilateration(
+                        self.sensor_est_pos, self.anchors)
 
-            est_error = np.linalg.norm(
-                self.sensor_est_pos - self.sensor_true_pos, ord=2)
+            self.est_error.append(np.linalg.norm(
+                self.sensor_est_pos - self.sensor_true_pos, ord=2))
+
+            if(len(self.est_error) > 200):
+                self.est_error.pop(0)
 
             msg = Float64()
-            msg.data = est_error
+            msg.data = sum(self.est_error) / len(self.est_error)
             self.position_mse_publisher.publish(msg)
 
     def callback_sensor_true_subscriber(self, msg):

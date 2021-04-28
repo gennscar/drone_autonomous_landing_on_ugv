@@ -33,5 +33,15 @@ def generate_launch_description():
                 {"sensor_id": "0"},
                 {"method": "GN"}
             ]
-        )
+        ),
+        Node(
+            package='estimation',
+            executable='trilateration',
+            name='GN_10iter_uwb_estimator',
+            parameters=[
+                {"sensor_id": "0"},
+                {"method": "GN"},
+                {"iterations": 10}
+            ]
+        ),
     ])
