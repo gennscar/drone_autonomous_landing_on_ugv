@@ -25,6 +25,7 @@
       <anchor_id>0</anchor_id>
 			<link_name>uwb_sensor_head</link_name>
 			<update_rate>5</update_rate>
+      <gaussian_noise>1</gaussian_noise>
 		</plugin>
 
 		<plugin name="gazebo_ros_p3d" filename="libgazebo_ros_p3d.so">

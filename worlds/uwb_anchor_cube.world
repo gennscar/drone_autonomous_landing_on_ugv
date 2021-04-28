@@ -18,37 +18,37 @@
     <include>
 			<name>uwb_tag_1</name>
       <uri>models//uwb_anchor</uri>
-			<pose>0 0 100 0 0 0</pose>
+			<pose>0 0 50 0 0 0</pose>
     </include>
     <include>
 			<name>uwb_tag_2</name>
       <uri>models//uwb_anchor</uri>
-			<pose>0 100 0 0 0 0</pose>
+			<pose>0 50 0 0 0 0</pose>
     </include>
     <include>
 			<name>uwb_tag_3</name>
       <uri>models//uwb_anchor</uri>
-			<pose>0 100 100 0 0 0</pose>
+			<pose>0 50 50 0 0 0</pose>
     </include>
     <include>
 			<name>uwb_tag_4</name>
       <uri>models//uwb_anchor</uri>
-			<pose>100 0 0 0 0 0</pose>
+			<pose>50 0 0 0 0 0</pose>
     </include>
     <include>
 			<name>uwb_tag_5</name>
       <uri>models//uwb_anchor</uri>
-			<pose>100 0 100 0 0 0</pose>
+			<pose>50 0 50 0 0 0</pose>
     </include>
     <include>
 			<name>uwb_tag_6</name>
       <uri>models//uwb_anchor</uri>
-			<pose>100 100 0 0 0 0</pose>
+			<pose>50 50 0 0 0 0</pose>
     </include>
     <include>
 			<name>uwb_tag_7</name>
       <uri>models//uwb_anchor</uri>
-			<pose>100 100 100 0 0 0</pose>
+			<pose>50 50 50 0 0 0</pose>
     </include>
 
 
@@ -56,7 +56,7 @@
     <include>
 			<name>uwb_sensor_0</name>
       <uri>models//uwb_sensor</uri>
-			<pose>1 1 1 0 0 0</pose>
+			<pose>25 25 25 0 0 0</pose>
     </include>
 
 		<!-- Physics -->
