@@ -1,6 +1,9 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
   <world name="default">
+    <scene>
+      <shadows>0</shadows>
+    </scene>
     <!-- A global light source -->
     <include>
       <uri>model://sun</uri>
@@ -10,7 +13,7 @@
       <uri>model://ground_plane</uri>
     </include>
 		<!-- vehicle -->
-    
+
     <include>
 			<name>rover_pic4ser</name>
       <uri>models//rover_pic4ser</uri>

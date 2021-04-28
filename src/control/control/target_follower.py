@@ -2,6 +2,8 @@
 
 import rclpy
 from rclpy.node import Node
+import functions
+import numpy as np
 
 from  px4_msgs.msg import OffboardControlMode
 from  px4_msgs.msg import TrajectorySetpoint
@@ -10,35 +12,30 @@ from  px4_msgs.msg import VehicleCommand
 from  px4_msgs.msg import VehicleControlMode
 from  px4_msgs.msg import VehicleLocalPosition
 from  px4_msgs.msg import VehicleStatus
-
-import numpy as np
-
 from nav_msgs.msg import Odometry
-
-
 
 
 class OffboardControl(Node):
     def __init__(self):
         super().__init__("offboard_control")
 
+        self.int_e = np.array([0,0])
+        self.e_dot = np.array([0,0])
+        self.e_old = np.array([0,0])
+        self.e = np.array([0,0])
+        
         self.kp = 0.5
         self.ki = 0.01
         self.kd = 0.0
-        self.vmax = float('inf')
+        self.int_max = 250.0
+        self.vmax = 7 #float('inf')
+        self.vmin = - 7 #float('inf')
         
-        self.i = 0.0
         self.arming_state = 0
         self.landing = 0
         self.descending = 0
         self.takeoff = 0
         
-        self.ex = 0.0
-        self.ey = 0.0
-        self.int_ex = 0.0
-        self.int_ey = 0.0
-        self.ex_old = 0.0
-        self.ey_old = 0.0
 
         self.x = 0.0
         self.y = 0.0
@@ -47,21 +44,19 @@ class OffboardControl(Node):
         self.vy = 0.0
         self.vz = 0.0
         self.target_global_pos = [0, 0]
-        self.target_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
+        self.target_pos = [0, 0]
         
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
 
-        self.offboard_control_mode_publisher_=self.create_publisher(OffboardControlMode,"OffboardControlMode_PubSubTopic",10)
-        self.trajectory_setpoint_publisher_=self.create_publisher(TrajectorySetpoint,"TrajectorySetpoint_PubSubTopic",10)
-        self.vehicle_command_publisher_=self.create_publisher(VehicleCommand,"VehicleCommand_PubSubTopic",10)
+        self.offboard_control_mode_publisher_=self.create_publisher(OffboardControlMode,"OffboardControlMode_PubSubTopic",3)
+        self.trajectory_setpoint_publisher_=self.create_publisher(TrajectorySetpoint,"TrajectorySetpoint_PubSubTopic",3)
+        self.vehicle_command_publisher_=self.create_publisher(VehicleCommand,"VehicleCommand_PubSubTopic",3)
         
-        self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_local_position,10)
-        self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,10)
-        
-        self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_position,10)
-
-        self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,10)
+        self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_local_position,3)
+        self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,3)
+        self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_position,3)
+        self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
 
         self.timer = self.create_timer(0.1, self.timer_callback)
 
@@ -77,7 +72,6 @@ class OffboardControl(Node):
         self.vz = msg.vz
 
     def timer_callback(self):
-
         if (self.offboard_setpoint_counter_ == 20):
             self.publish_vehicle_command(176, 1.0, 6.0)
 
@@ -94,8 +88,6 @@ class OffboardControl(Node):
         self.arming_state = msg.arming_state
     
     def callback_target_position(self,msg):
-        
-        
         self.target_global_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y]
         self.target_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
 
@@ -143,65 +135,44 @@ class OffboardControl(Node):
             msg.z = -3.0
 
             self.trajectory_setpoint_publisher_.publish(msg)
-            self.ex = self.target_pos[0] - self.x
-            self.ey = self.target_pos[1] - self.y
 
         else:
             
             msg.x = float("NaN")
             msg.y = float("NaN")
+            
 
-            msg.vx, msg.vy, self.ex, self.ey, self.int_ex, self.int_ey, self.ex_old, self.ey_old, self.der_ex, self.der_ey= controller(self.x, self.y, self.target_pos[0], self.target_pos[1], self.kp, self.ki, self.kd, self.vmax, self.int_ex, self.int_ey, self.ex_old, self.ey_old)
+            self.e = np.array([self.x - self.target_pos[0], self.y - self.target_pos[1]])
 
+            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(self.kp, self.ki, self.kd, self.e, self.e_old, self.int_e, self.vmax, self.vmin, self.int_max)
+            
+            self.norm_e = np.linalg.norm(self.e, ord=2)
+            self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
-            if (abs(self.ex) < 0.3) and (abs(self.ey) < 0.3) and (-self.z < 0.95):
+            self.get_logger().info(f"""int: {self.int_e}""")
+            if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and (-self.z < 1.0):
                 self.landing = 1
                 self.get_logger().info("Landing..")
                 self.publish_vehicle_command(21, 0.0, 0.0)
-            elif (abs(self.ex) < 0.2) and (abs(self.ey) < 0.2) and self.landing == 0:
+            elif ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and self.landing == 0:
                 self.descending = 1
                 self.get_logger().info("Descending on target..")
                 msg.z = float("NaN")
                 msg.vz = 0.2
             elif self.landing == 0 and self.descending == 0:
                 self.get_logger().info("Following target..")
-                msg.z = -3.0
+                msg.z = - 3.0
                 msg.vz = float("NaN")
             elif self.landing == 0:
                 self.get_logger().info("Stopped descending..")
-                msg.z = -1.5
-                msg.vz = -0.2
+                msg.z = - 1.5
+                msg.vz = - 0.1
             if self.arming_state == 1 and self.landing == 1:
-                self.get_logger().info(f"Landed, with ex:{self.ex}, ey:{self.ey}")
+                self.get_logger().info(f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
                 rclpy.shutdown()
             
             
             self.trajectory_setpoint_publisher_.publish(msg)
-        
-def controller(drone_x, drone_y, target_x, target_y, kp, ki, kd, v_max, int_ex, int_ey, ex_old, ey_old):
-    ex = drone_x - target_x
-    ey = drone_y - target_y
-    der_ex = (ex - ex_old)/0.1
-    der_ey = (ey - ey_old)/0.1
-    ex_old = ex
-    ey_old = ey
-    int_ex = int_ex + ex
-    int_ey = int_ey + ey
-    vx = - kp * ex - ki * int_ex - kd * der_ex
-    vy = - kp * ey - ki * int_ey - kd * der_ey
-    vx_max = v_max
-    vy_max = v_max
-    vx_min = -v_max
-    vy_min = -v_max
-    if vx > vx_max:
-        vx = vx_max
-    if vx < vx_min:
-        vx = vx_min
-    if vy > vy_max:
-        vy = vy_max
-    if vy < vy_min:
-        vy = vy_min
-    return vx, vy, ex, ey, int_ex, int_ey, ex_old, ey_old, der_ex, der_ey
 
 
 def main(args = None):
