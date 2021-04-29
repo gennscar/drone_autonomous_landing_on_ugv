@@ -105,6 +105,13 @@ class OffboardControl(Node):
         elif request.control_mode == "landing_mode":
             self.control_mode = 3
             response.success = "Control mode set to: " + request.control_mode
+        elif request.control_mode == "setpoint_mode":
+            self.control_mode = 4
+            try:
+                self.setpoint = [request.y-1, request.x-1, - request.z]
+                response.success = "Control mode set to: " + request.control_mode
+            except:
+                response.success = "Please insert the coordinates"
         else:
             response.success = "A problem has occurred"
         return response
@@ -149,6 +156,10 @@ class OffboardControl(Node):
             msg = self.target_follower_mode(msg)
         elif self.control_mode == 3:
             msg = self.landing_mode(msg)
+        elif self.control_mode == 4:
+            msg = self.setpoint_mode(msg)
+        else:
+            msg = self.takeoff_mode(msg)
         
         self.trajectory_setpoint_publisher_.publish(msg)
         
@@ -198,6 +209,12 @@ class OffboardControl(Node):
             self.get_logger().info("Following target..")
             msg.z = - 3.0
             msg.vz = float("NaN")
+            return msg
+
+    def setpoint_mode(self,msg):
+            msg.x = self.setpoint[0]
+            msg.y = self.setpoint[1]
+            msg.z = self.setpoint[2]
             return msg
 
 
