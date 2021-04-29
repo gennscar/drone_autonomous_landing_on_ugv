@@ -13,6 +13,7 @@ from  px4_msgs.msg import VehicleControlMode
 from  px4_msgs.msg import VehicleLocalPosition
 from  px4_msgs.msg import VehicleStatus
 from nav_msgs.msg import Odometry
+from custom_interfaces.srv import ControlMode
 
 # Control parameters
 KP = 0.5
@@ -34,7 +35,6 @@ class OffboardControl(Node):
         self.ARMING_STATE = 0
         self.LANDING_STATE = 0
         self.DESCENDING_STATE = 0
-        self.TAKEOFF_STATE = 0
         self.x = 0.0
         self.y = 0.0
         self.z = 0.0
@@ -45,6 +45,7 @@ class OffboardControl(Node):
         self.target_local_pos = [0, 0]
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
+        self.control_mode = []
 
         # Publishers
         self.offboard_control_mode_publisher_=self.create_publisher(OffboardControlMode,"OffboardControlMode_PubSubTopic",3)
@@ -57,6 +58,9 @@ class OffboardControl(Node):
         self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_position,3)
         self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
         
+        # Services
+        self.control_mode = self.create_service(ControlMode, "control_mode", self.callback_control_mode)
+
         # Control loop timer
         self.timer = self.create_timer(0.1, self.timer_callback)
 
@@ -91,6 +95,19 @@ class OffboardControl(Node):
         self.target_global_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y]
         self.target_local_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
 
+    def callback_control_mode(self, request, response):
+        if request.control_mode == "takeoff_mode":
+            self.control_mode = 1
+            response.success = "Control mode set to: " + request.control_mode
+        elif request.control_mode == "target_follower_mode":
+            self.control_mode = 2
+            response.success = "Control mode set to: " + request.control_mode
+        elif request.control_mode == "landing_mode":
+            self.control_mode = 3
+            response.success = "Control mode set to: " + request.control_mode
+        else:
+            response.success = "A problem has occurred"
+        return response
 
     def publish_vehicle_command(self, command, param1, param2):
         msg = VehicleCommand()
@@ -126,17 +143,17 @@ class OffboardControl(Node):
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp
 
-        if self.TAKEOFF_STATE == 0:
-            if abs(self.z) > 2.9:
-                self.TAKEOFF_STATE = 1
-            self.get_logger().info("Takeoff..")
-            msg.x = float("NaN")
-            msg.y = float("NaN")
-            msg.z = -3.0
+        if self.control_mode == 1:
+            msg = self.takeoff_mode(msg)
+        elif self.control_mode == 2:
+            msg = self.target_follower_mode(msg)
+        elif self.control_mode == 3:
+            msg = self.landing_mode(msg)
+        
+        self.trajectory_setpoint_publisher_.publish(msg)
+        
 
-            self.trajectory_setpoint_publisher_.publish(msg)
-
-        else:
+    def landing_mode(self,msg):
             msg.x = float("NaN")
             msg.y = float("NaN")
 
@@ -144,13 +161,13 @@ class OffboardControl(Node):
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-            self.get_logger().info(f"""int: {self.int_e}""")
-
+            #self.get_logger().info(f"""int: {self.int_e}""")
+            """
             if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and (-self.z < 0.9):
                 self.LANDING_STATE = 1
                 self.get_logger().info("Landing..")
-                self.publish_vehicle_command(21, 0.0, 0.0)
-            elif ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and self.LANDING_STATE == 0:
+                self.publish_vehicle_command(21, 0.0, 0.0)"""
+            if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and self.LANDING_STATE == 0:
                 self.DESCENDING_STATE = 1
                 self.get_logger().info("Descending on target..")
                 msg.z = float("NaN")
@@ -163,12 +180,33 @@ class OffboardControl(Node):
                 self.get_logger().info("Stopped descending..")
                 msg.z = - 1.5
                 msg.vz = - 0.1
+            """
             if self.ARMING_STATE == 1 and self.LANDING_STATE == 1:
                 self.get_logger().info(f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
-                rclpy.shutdown()
-            
-            self.trajectory_setpoint_publisher_.publish(msg)
+                rclpy.shutdown()"""
+            return msg
 
+    def target_follower_mode(self,msg):
+            msg.x = float("NaN")
+            msg.y = float("NaN")
+
+            self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])
+            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX)
+            self.norm_e = np.linalg.norm(self.e, ord=2)
+            self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
+
+            self.get_logger().info("Following target..")
+            msg.z = - 3.0
+            msg.vz = float("NaN")
+            return msg
+
+
+    def takeoff_mode(self,msg):
+            self.get_logger().info("Takeoff..")
+            msg.x = float("NaN")
+            msg.y = float("NaN")
+            msg.z = -3.0
+            return msg
 
 def main(args = None):
     rclpy.init(args = args)
