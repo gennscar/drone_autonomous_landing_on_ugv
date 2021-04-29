@@ -28,12 +28,12 @@ class UwbPosEstimation(Node):
         self.sensor_est_pos = [random(), random(), random()]
 
         self.sensor_subscriber = self.create_subscription(
-            UwbSensor, "/uwb_sensor_0", self.callback_sensor_subscriber, 1)
+            UwbSensor, "/uwb_sensor_0", self.callback_sensor_subscriber, 10)
         self.sensor_true_subscriber = self.create_subscription(
-            Odometry, "/uwb_sensor_true/odom", self.callback_sensor_true_subscriber, 1)
+            Odometry, "/uwb_sensor_true/odom", self.callback_sensor_true_subscriber, 10)
 
         self.position_mse_publisher = self.create_publisher(
-            Float64, "/position_mse", 1)
+            Float64, "/position_mse", 10)
 
         self.get_logger().info("uwb_pos_estimation has started")
         self.timer = self.create_timer(0.1, self.timer_callback)

@@ -14,29 +14,27 @@ from  px4_msgs.msg import VehicleLocalPosition
 from  px4_msgs.msg import VehicleStatus
 from nav_msgs.msg import Odometry
 
+# Control parameters
+KP = 0.5
+KI = 0.01
+KD = 0.0
+INT_MAX = 250.0
+VMAX = float('inf')
+VMIN = - VMAX
 
 class OffboardControl(Node):
     def __init__(self):
         super().__init__("offboard_control")
 
+        # Initialization to 0 of all parameters
         self.int_e = np.array([0,0])
         self.e_dot = np.array([0,0])
         self.e_old = np.array([0,0])
         self.e = np.array([0,0])
-        
-        self.kp = 0.5
-        self.ki = 0.01
-        self.kd = 0.0
-        self.int_max = 250.0
-        self.vmax = 7 #float('inf')
-        self.vmin = - 7 #float('inf')
-        
-        self.arming_state = 0
-        self.landing = 0
-        self.descending = 0
-        self.takeoff = 0
-        
-
+        self.ARMING_STATE = 0
+        self.LANDING_STATE = 0
+        self.DESCENDING_STATE = 0
+        self.TAKEOFF_STATE = 0
         self.x = 0.0
         self.y = 0.0
         self.z = 0.0
@@ -44,20 +42,22 @@ class OffboardControl(Node):
         self.vy = 0.0
         self.vz = 0.0
         self.target_global_pos = [0, 0]
-        self.target_pos = [0, 0]
-        
+        self.target_local_pos = [0, 0]
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
 
+        # Publishers
         self.offboard_control_mode_publisher_=self.create_publisher(OffboardControlMode,"OffboardControlMode_PubSubTopic",3)
         self.trajectory_setpoint_publisher_=self.create_publisher(TrajectorySetpoint,"TrajectorySetpoint_PubSubTopic",3)
         self.vehicle_command_publisher_=self.create_publisher(VehicleCommand,"VehicleCommand_PubSubTopic",3)
         
+        # Subscribers
         self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_local_position,3)
         self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,3)
         self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_position,3)
         self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
-
+        
+        # Control loop timer
         self.timer = self.create_timer(0.1, self.timer_callback)
 
     def callback_timesync(self, msg):
@@ -85,11 +85,11 @@ class OffboardControl(Node):
             self.offboard_setpoint_counter_ += 1
 
     def callback_drone_status(self, msg):
-        self.arming_state = msg.arming_state
+        self.ARMING_STATE = msg.arming_state
     
     def callback_target_position(self,msg):
         self.target_global_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y]
-        self.target_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
+        self.target_local_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
 
 
     def publish_vehicle_command(self, command, param1, param2):
@@ -126,61 +126,54 @@ class OffboardControl(Node):
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp
 
-        if self.takeoff == 0:
+        if self.TAKEOFF_STATE == 0:
             if abs(self.z) > 2.9:
-                self.takeoff = 1
+                self.TAKEOFF_STATE = 1
             self.get_logger().info("Takeoff..")
-            msg.x = 0.0
-            msg.y = 0.0
+            msg.x = float("NaN")
+            msg.y = float("NaN")
             msg.z = -3.0
 
             self.trajectory_setpoint_publisher_.publish(msg)
 
         else:
-            
             msg.x = float("NaN")
             msg.y = float("NaN")
-            
 
-            self.e = np.array([self.x - self.target_pos[0], self.y - self.target_pos[1]])
-
-            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(self.kp, self.ki, self.kd, self.e, self.e_old, self.int_e, self.vmax, self.vmin, self.int_max)
-            
+            self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])
+            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-
             self.get_logger().info(f"""int: {self.int_e}""")
-            if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and (-self.z < 1.0):
-                self.landing = 1
+
+            if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and (-self.z < 0.9):
+                self.LANDING_STATE = 1
                 self.get_logger().info("Landing..")
                 self.publish_vehicle_command(21, 0.0, 0.0)
-            elif ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and self.landing == 0:
-                self.descending = 1
+            elif ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and self.LANDING_STATE == 0:
+                self.DESCENDING_STATE = 1
                 self.get_logger().info("Descending on target..")
                 msg.z = float("NaN")
                 msg.vz = 0.2
-            elif self.landing == 0 and self.descending == 0:
+            elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0:
                 self.get_logger().info("Following target..")
                 msg.z = - 3.0
                 msg.vz = float("NaN")
-            elif self.landing == 0:
+            elif self.LANDING_STATE == 0:
                 self.get_logger().info("Stopped descending..")
                 msg.z = - 1.5
                 msg.vz = - 0.1
-            if self.arming_state == 1 and self.landing == 1:
+            if self.ARMING_STATE == 1 and self.LANDING_STATE == 1:
                 self.get_logger().info(f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
                 rclpy.shutdown()
-            
             
             self.trajectory_setpoint_publisher_.publish(msg)
 
 
 def main(args = None):
-
     rclpy.init(args = args)
     node = OffboardControl()
     rclpy.spin(node)
     rclpy.shutdown()
-
 if __name__ == "main":
     main()
