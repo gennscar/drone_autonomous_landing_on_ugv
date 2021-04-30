@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 
+# Useful alias:
+# alias killgazebo="killall -9 gazebo & killall -9 gzserver  & killall -9 gzclient"
+# alias go_home="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: 0, y: 0, z: 3.0}'"
+# alias hover="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'takeoff_mode'}'"
+# alias land_on_target="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'land_on_target_mode'}'"
+# alias follow_target="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'target_follower_mode'}'"
+# alias land="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'landing_mode'}'"
+# alias restart_drone="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'restart_drone'}'"
+# alias vehicle_forward="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: 2.5}, angular: {z: 0.0}}' -1"
+# alias vehicle_back="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: -2.5}, angular: {z: 0.0}}' -1"
+# alias vehicle_stop="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: 0}, angular: {z: 0.0}}' -1"
+# alias start_agent="micrortps_agent -t UDP"
+
 import rclpy
 from rclpy.node import Node
 import functions
@@ -76,7 +89,7 @@ class OffboardControl(Node):
         self.vz = msg.vz
 
     def timer_callback(self):
-        if (self.offboard_setpoint_counter_ == 20):
+        if (self.offboard_setpoint_counter_ == 10):
             self.publish_vehicle_command(176, 1.0, 6.0)
 
             self.get_logger().info("arming..")
@@ -85,8 +98,11 @@ class OffboardControl(Node):
         self.publish_offboard_control_mode()
         self.publish_trajectory_setpoint()
 
-        if (self.offboard_setpoint_counter_ < 21):
+        if (self.offboard_setpoint_counter_ < 30):
             self.offboard_setpoint_counter_ += 1
+        elif (-self.z) < 0.5:
+            self.restart_drone()
+        
 
     def callback_drone_status(self, msg):
         self.ARMING_STATE = msg.arming_state
@@ -98,22 +114,21 @@ class OffboardControl(Node):
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
             self.control_mode = 1
-            response.success = "Control mode set to: " + request.control_mode
         elif request.control_mode == "target_follower_mode":
             self.control_mode = 2
-            response.success = "Control mode set to: " + request.control_mode
-        elif request.control_mode == "landing_mode":
+        elif request.control_mode == "land_on_target_mode":
             self.control_mode = 3
-            response.success = "Control mode set to: " + request.control_mode
         elif request.control_mode == "setpoint_mode":
             self.control_mode = 4
             try:
                 self.setpoint = [request.y-1, request.x-1, - request.z]
-                response.success = "Control mode set to: " + request.control_mode
             except:
-                response.success = "Please insert the coordinates"
-        else:
-            response.success = "A problem has occurred"
+                 print("Please insert the coordinates")
+        elif request.control_mode == "landing_mode":
+            self.control_mode = 5
+        elif request.control_mode == "restart_drone":
+            self.control_mode = 6
+        response.success = "Done"
         return response
 
     def publish_vehicle_command(self, command, param1, param2):
@@ -155,16 +170,21 @@ class OffboardControl(Node):
         elif self.control_mode == 2:
             msg = self.target_follower_mode(msg)
         elif self.control_mode == 3:
-            msg = self.landing_mode(msg)
+            msg = self.land_on_target_mode(msg)
         elif self.control_mode == 4:
             msg = self.setpoint_mode(msg)
+        elif self.control_mode == 5:
+            msg = self.landing_mode(msg)
+        elif self.control_mode == 6:
+            self.restart_drone()
+            self.control_mode = 1
         else:
             msg = self.takeoff_mode(msg)
         
         self.trajectory_setpoint_publisher_.publish(msg)
         
 
-    def landing_mode(self,msg):
+    def land_on_target_mode(self,msg):
             msg.x = float("NaN")
             msg.y = float("NaN")
 
@@ -215,6 +235,7 @@ class OffboardControl(Node):
             msg.x = self.setpoint[0]
             msg.y = self.setpoint[1]
             msg.z = self.setpoint[2]
+            self.get_logger().info("Reaching setpoint..")
             return msg
 
 
@@ -224,6 +245,14 @@ class OffboardControl(Node):
             msg.y = float("NaN")
             msg.z = -3.0
             return msg
+
+    def landing_mode(self,msg):
+            self.get_logger().info("Landing..")
+            self.publish_vehicle_command(21, 0.0, 0.0)
+            return msg
+
+    def restart_drone(self):
+            self.offboard_setpoint_counter_=0
 
 def main(args = None):
     rclpy.init(args = args)
