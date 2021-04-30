@@ -123,7 +123,8 @@ class OffboardControl(Node):
             try:
                 self.setpoint = [request.y-1, request.x-1, - request.z]
             except:
-                 print("Please insert the coordinates")
+                response.success = "Please insert the coordinates"
+                return response
         elif request.control_mode == "landing_mode":
             self.control_mode = 5
         elif request.control_mode == "restart_drone":
