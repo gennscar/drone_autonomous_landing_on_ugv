@@ -21,7 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             "hand_of_god_nav = control.hand_of_god_nav:main",
-            "target_follower = control.target_follower:main",
+            "drone_controller = control.drone_controller:main",
             "offboard_control = control.offboard_control:main"
         ],
     },

@@ -16,7 +16,7 @@ from random import random
 # seed random number generator
 seed(1)
 
-STD_TRILATERATION = True
+STD_TRILATERATION = False
 
 
 class UwbPosEstimation(Node):
