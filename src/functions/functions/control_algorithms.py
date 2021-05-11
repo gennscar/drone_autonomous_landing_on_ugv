@@ -25,7 +25,7 @@ def DLQR_optimizer(A, B, Q, R):
     P = np.matrix(scipy.linalg.solve_discrete_are(A, B, Q, R))
     # compute the LQR gain
     K = np.matrix(scipy.linalg.inv(B.T*P*B+R)*(B.T*P*A))
-    return -K
+    return K
 
 def DLQR(K, xk, u_max, u_min):
 

@@ -61,12 +61,22 @@
         </collision>
       </link>
 
-      <plugin name="hand_of_god" filename="libgazebo_ros_hand_of_god.so">
+    <plugin name="chassis" filename="libgazebo_ros_p3d.so">
         <ros>
           <namespace>/rover_pic4ser</namespace>
         </ros>
-        <link_name>chassis</link_name>
-        <frame_id>chassis</frame_id>
+        <body_name>chassis</body_name>
+        <frame_name>world</frame_name>
+        <update_rate>50</update_rate>
+        <xyz_offset>0 0 0</xyz_offset>
+        <rpy_offset>0 0 0</rpy_offset>
+        <gaussian_noise>0</gaussian_noise>
+      </plugin>
+
+      <plugin name='planar_move' filename='libgazebo_ros_planar_move.so'>
+        <ros>
+          <namespace>/rover_pic4ser</namespace>
+      </ros>
       </plugin>
 
 
