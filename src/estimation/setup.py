@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "trilateration = estimation.trilateration:main"
+            "uwb_positioning = estimation.uwb_positioning:main"
         ],
     },
 )

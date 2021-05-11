@@ -8,18 +8,9 @@ import control
 def generate_launch_description():
     return LaunchDescription([
         Node(
-            package='control',
-            executable='hand_of_god_nav',
-            name='hand_of_god',
-            parameters=[
-                {"frame_id": "uwb_sensor_head"},
-                {"target_position": [25.0, 25.0, 25.0]}
-            ]
-        ),
-        Node(
             package='estimation',
-            executable='trilateration',
-            name='LS_uwb_estimator',
+            executable='uwb_positioning',
+            namespace='LS_uwb_estimator',
             parameters=[
                 {"sensor_id": "0"},
                 {"method": "LS"}
@@ -27,8 +18,8 @@ def generate_launch_description():
         ),
         Node(
             package='estimation',
-            executable='trilateration',
-            name='GN_uwb_estimator',
+            executable='uwb_positioning',
+            namespace='GN_uwb_estimator',
             parameters=[
                 {"sensor_id": "0"},
                 {"method": "GN"}
@@ -36,8 +27,8 @@ def generate_launch_description():
         ),
         Node(
             package='estimation',
-            executable='trilateration',
-            name='GN_10iter_uwb_estimator',
+            executable='uwb_positioning',
+            namespace='GN_10iter_uwb_estimator',
             parameters=[
                 {"sensor_id": "0"},
                 {"method": "GN"},
