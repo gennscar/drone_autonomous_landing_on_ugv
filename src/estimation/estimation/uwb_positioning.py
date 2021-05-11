@@ -5,7 +5,6 @@ import numpy as np
 from rclpy.node import Node
 
 from gazebo_msgs.msg import UwbSensor
-from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PointStamped
 
 import functions
@@ -53,7 +52,7 @@ class UwbPositioning(Node):
                     self.anchors_)
 
             if(self.method_ == "GN"):
-                for i in range(self.iterations_):
+                for _ in range(self.iterations_):
                     self.sensor_est_pos_ = functions.gauss_newton_trilateration(
                         self.sensor_est_pos_, self.anchors_)
 
