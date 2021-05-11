@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             "hand_of_god_nav = control.hand_of_god_nav:main",
             "drone_controller = control.drone_controller:main",
+            "vehicle_controller = control.vehicle_controller:main",
             "offboard_control = control.offboard_control:main"
         ],
     },

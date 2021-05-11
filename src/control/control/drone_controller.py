@@ -185,7 +185,7 @@ class OffboardControl(Node):
         elif self.control_mode == 4:
             msg = self.setpoint_mode(msg)
         elif self.control_mode == 5:
-            msg = self.landing_mode(msg)
+            self.landing_mode()
         elif self.control_mode == 6:
             self.restart_drone()
             self.control_mode = 1
@@ -205,11 +205,12 @@ class OffboardControl(Node):
         self.norm_e = np.linalg.norm(self.e, ord=2)
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
         #self.get_logger().info(f"""int: {self.int_e}""")
-        """
-            if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and (-self.z < 0.9):
-                self.LANDING_STATE = 1
-                self.get_logger().info("Landing..")
-                self.publish_vehicle_command(21, 0.0, 0.0)"""
+        if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and (-self.z < 0.9):
+            self.LANDING_STATE = 1
+            self.get_logger().info("Landing..")
+            #self.publish_vehicle_command(21, 0.0, 0.0)
+            self.publish_vehicle_command(185, 1.0, 0.0)
+
         if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and self.LANDING_STATE == 0:
             self.DESCENDING_STATE = 1
             self.get_logger().info("Descending on target..")
@@ -223,10 +224,10 @@ class OffboardControl(Node):
             self.get_logger().info("Stopped descending..")
             msg.z = - 1.5
             msg.vz = - 0.1
-        """
-            if self.ARMING_STATE == 1 and self.LANDING_STATE == 1:
-                self.get_logger().info(f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
-                rclpy.shutdown()"""
+        if self.ARMING_STATE == 1 and self.LANDING_STATE == 1:
+            self.get_logger().info(
+                f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
+            rclpy.shutdown()
         return msg
 
     def target_follower_mode(self, msg):
@@ -259,12 +260,13 @@ class OffboardControl(Node):
         msg.z = -3.0
         return msg
 
-    def landing_mode(self, msg):
+    def landing_mode(self):
         self.get_logger().info("Landing..")
         self.publish_vehicle_command(21, 0.0, 0.0)
-        return msg
 
     def restart_drone(self):
+        self.LANDING_STATE = 0
+        self.DESCENDING_STATE = 0
         self.offboard_setpoint_counter_ = 0
 
 
