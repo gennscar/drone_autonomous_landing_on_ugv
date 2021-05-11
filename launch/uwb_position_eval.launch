@@ -1,9 +1,6 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
-import testing
-import control
-
 
 def generate_launch_description():
     return LaunchDescription([
@@ -35,4 +32,9 @@ def generate_launch_description():
                 {"iterations": 10}
             ]
         ),
+        Node(
+            package='testing',
+            executable='positioning_error',
+            namespace='positioning_error'
+        )
     ])

@@ -91,6 +91,7 @@ class UwbPositioning(Node):
             # Sending the estimated position and the name of the node that generated it
             msg = PointStamped()
             msg.header.frame_id = self.estimator_topic_name_
+            msg.header.stamp = self.get_clock().now().to_msg()
             msg.point.x = self.sensor_est_pos_[0]
             msg.point.y = self.sensor_est_pos_[1]
             msg.point.z = self.sensor_est_pos_[2]
