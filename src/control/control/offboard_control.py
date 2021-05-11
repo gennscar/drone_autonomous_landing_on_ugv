@@ -6,11 +6,10 @@ from px4_msgs.msg import OffboardControlMode
 from px4_msgs.msg import TrajectorySetpoint
 from px4_msgs.msg import Timesync
 from px4_msgs.msg import VehicleCommand
-from px4_msgs.msg import VehicleControlMode
+
 
 # generate random integer values
 from random import seed
-from random import randint
 # seed random number generator
 seed(1)
 

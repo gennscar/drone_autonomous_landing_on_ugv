@@ -5,7 +5,6 @@ from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 import numpy as np
-import math
 
 
 class VehicleController(Node):
