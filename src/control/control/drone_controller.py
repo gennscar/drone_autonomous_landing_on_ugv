@@ -205,8 +205,6 @@ class DroneController(Node):
 
         self.trajectory_setpoint_publisher_.publish(msg)
 
- 
-
     def land_on_target_mode(self,msg):
             msg.x = float("NaN")
             msg.y = float("NaN")
@@ -263,36 +261,6 @@ class DroneController(Node):
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-
-    def land_on_target_mode(self, msg):
-        msg.x = float("NaN")
-        msg.y = float("NaN")
-
-        self.e = np.array([self.x - self.target_local_pos[0],
-                          self.y - self.target_local_pos[1]])
-        [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(
-            KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX)
-        self.norm_e = np.linalg.norm(self.e, ord=2)
-        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-        #self.get_logger().info(f"""int: {self.int_e}""")
-        if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and (-self.z < 0.9):
-            self.LANDING_STATE = 1
-            self.get_logger().info("Landing..")
-            #self.publish_vehicle_command(21, 0.0, 0.0)
-            self.publish_vehicle_command(185, 1.0, 0.0)
-
-        if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and self.LANDING_STATE == 0:
-            self.DESCENDING_STATE = 1
-            self.get_logger().info("Descending on target..")
-            msg.z = float("NaN")
-            msg.vz = 0.2
-        elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0:
-            self.get_logger().info("Following target..")
-            msg.z = - 3.0
-            msg.vz = float("NaN")
-
-
-            return msg
 
     def setpoint_mode(self,msg):
             msg.x = self.setpoint[0]
