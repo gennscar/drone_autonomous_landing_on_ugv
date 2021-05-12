@@ -15,10 +15,10 @@ dt = 0.1
 t1 = 100 #200
 t2 = t1 + 30
 lin_vel = 2.5
-curvature = False
+curvature = True
 ang_vel = 0.5
 
-noise = False
+noise = True
 noise_dt = 2
 
 class VehicleController(Node):

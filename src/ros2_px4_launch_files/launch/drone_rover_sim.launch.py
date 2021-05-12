@@ -6,7 +6,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     drone_controller_node = Node(
-        package = "control",
+        package = "ros2_px4_control",
         executable = "drone_controller",
         name = "DroneController",
         parameters = [
@@ -14,7 +14,7 @@ def generate_launch_description():
         ]
     )
     vehicle_controller_node = Node(
-        package = "control",
+        package = "ros2_px4_control",
         executable = "vehicle_controller",
         name = "VehicleController"
     )

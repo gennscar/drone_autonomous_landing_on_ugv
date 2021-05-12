@@ -12,7 +12,10 @@
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
-  <exec_depend>control</exec_depend>
+  <exec_depend>ros2_px4_control</exec_depend>
+  <exec_depend>estimation</exec_depend>
+  <exec_depend>testing</exec_depend>
+
   
   <export>
     <build_type>ament_cmake</build_type>

@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'control'
+package_name = 'ros2_px4_control'
 
 setup(
     name=package_name,
@@ -13,17 +13,17 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Cosimo Conte',
-    maintainer_email='cosimocon@yahoo.it',
+    maintainer='gennscar',
+    maintainer_email='gennscar97@gmail.com',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "hand_of_god_nav = control.hand_of_god_nav:main",
-            "drone_controller = control.drone_controller:main",
-            "vehicle_controller = control.vehicle_controller:main",
-            "offboard_control = control.offboard_control:main"
+            "hand_of_god_nav = ros2_px4_control.hand_of_god_nav:main",
+            "drone_controller = ros2_px4_control.drone_controller:main",
+            "vehicle_controller = ros2_px4_control.vehicle_controller:main",
+            "offboard_control = ros2_px4_control.offboard_control:main"
         ],
     },
 )
