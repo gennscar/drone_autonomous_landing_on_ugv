@@ -41,8 +41,11 @@ class PositioningError(Node):
 
         error.header.stamp = self.get_clock().now().to_msg()
         error.header.frame_id = msg.header.frame_id
-        error.current = np.linalg.norm(
-            sensor_est_pos - self.sensor_real_pos_, ord=2)
+        if(self.sensor_real_pos_ == []):
+            error.current = 0
+        else:
+            error.current = np.linalg.norm(
+                sensor_est_pos - self.sensor_real_pos_, ord=2)
 
         if(msg.header.frame_id in self.estimator_topics_.keys()):
             self.estimator_topics_[msg.header.frame_id].publish(error)
