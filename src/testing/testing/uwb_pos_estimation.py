@@ -7,7 +7,7 @@ from rclpy.node import Node
 from gazebo_msgs.msg import UwbSensor
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
-
+from geometry_msgs.msg import Point
 import functions
 
 # seed the pseudorandom number generator
@@ -34,6 +34,8 @@ class UwbPosEstimation(Node):
 
         self.position_mse_publisher = self.create_publisher(
             Float64, "/position_mse", 10)
+        self.position_publisher = self.create_publisher(
+            Point, "/position_uwb", 10)
 
         self.get_logger().info("uwb_pos_estimation has started")
         self.timer = self.create_timer(0.1, self.timer_callback)
@@ -60,6 +62,11 @@ class UwbPosEstimation(Node):
             msg = Float64()
             msg.data = self.err
             self.position_mse_publisher.publish(msg)
+            pos = Point()
+            pos.x = self.sensor_est_pos[0]
+            pos.y = self.sensor_est_pos[1]
+            pos.z = self.sensor_est_pos[2]
+            self.position_publisher.publish(pos)
 
             self.get_logger().info(f"""
             Computed pos: {self.sensor_est_pos}

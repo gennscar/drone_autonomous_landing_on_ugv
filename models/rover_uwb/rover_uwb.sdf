@@ -391,8 +391,8 @@
         <wheel_diameter>0.6</wheel_diameter>
 
         <!-- limits -->
-        <max_wheel_torque>100</max_wheel_torque>
-        <max_wheel_acceleration>100.0</max_wheel_acceleration>
+        <max_wheel_torque>20.0</max_wheel_torque>
+        <max_wheel_acceleration>1.0</max_wheel_acceleration>
 
         <!-- output -->
         <publish_odom>true</publish_odom>

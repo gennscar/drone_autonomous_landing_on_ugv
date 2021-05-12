@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Useful alias:
-# alias killgazebo="killall -9 gazebo & killall -9 gzserver  & killall -9 gzclient"
+# alias start_drone="ros2 run control drone_controller"
 # alias go_home="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: 0, y: 0, z: 3.0}'"
 # alias hover="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'takeoff_mode'}'"
 # alias land_on_target="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'land_on_target_mode'}'"
@@ -12,6 +12,7 @@
 # alias vehicle_back="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: -2.5}, angular: {z: 0.0}}' -1"
 # alias vehicle_stop="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: 0}, angular: {z: 0.0}}' -1"
 # alias start_agent="micrortps_agent -t UDP"
+# To move the drone do: ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: 0, y: 0, z: 3.0}'
 
 import rclpy
 from rclpy.node import Node
@@ -26,17 +27,23 @@ from  px4_msgs.msg import VehicleControlMode
 from  px4_msgs.msg import VehicleLocalPosition
 from  px4_msgs.msg import VehicleStatus
 from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Point
 from custom_interfaces.srv import ControlMode
 
 # Control parameters
-KP = 0.5
-KI = 0.01
-KD = 0.0
-INT_MAX = 250.0
-VMAX = float('inf')
+KP = 1.5 #3 #1
+KI = 0.03 #0.035 #0.03
+KD = 0.01 #0.3 #0.0
+INT_MAX = 250/(KI*100) #float('inf') #250
+VMAX = 10.0 #float('inf')
 VMIN = - VMAX
-
-class OffboardControl(Node):
+LAND_ERR_TOLL = 0.3 #0.2 Maximum position error allowed to perform landing
+LAND_VEL_TOLL = 1 #0.2 # Maximum velocity error allowed to perform landing
+LAND_DESC_VEL = 0.5 #0.2
+LAND_H_TOLL = 0.9 #0.85 # Turn off motors at this height
+UWB_MODE = 0 # Relative target position given by UWB
+dt = 0.1
+class DroneController(Node):
     def __init__(self):
         super().__init__("offboard_control")
 
@@ -54,28 +61,38 @@ class OffboardControl(Node):
         self.vx = 0.0
         self.vy = 0.0
         self.vz = 0.0
-        self.target_global_pos = [0, 0]
-        self.target_local_pos = [0, 0]
+        self.target_global_pos = [10,10]
+        self.target_local_pos = [10,10]
+        self.target_uwb_global_pos = [10,10]
+        self.target_uwb_local_pos = [10,10]
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
-        self.control_mode = []
+        
+        # Parameters declaration
+        self.control_mode = self.declare_parameter("control_mode", 0)
+
+        # Retrieve parameter values
+        self.control_mode = self.get_parameter(
+            "control_mode").get_parameter_value().integer_value
 
         # Publishers
         self.offboard_control_mode_publisher_=self.create_publisher(OffboardControlMode,"OffboardControlMode_PubSubTopic",3)
         self.trajectory_setpoint_publisher_=self.create_publisher(TrajectorySetpoint,"TrajectorySetpoint_PubSubTopic",3)
         self.vehicle_command_publisher_=self.create_publisher(VehicleCommand,"VehicleCommand_PubSubTopic",3)
-        
+        self.control_error_publisher_=self.create_publisher(Point,"control_error",3)
+
         # Subscribers
         self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_local_position,3)
         self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,3)
         self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_position,3)
         self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
-        
+        self.target_uwb_position_subscriber = self.create_subscription(Point,"prova",self.callback_target_uwb_position,3)
+
         # Services
-        self.control_mode = self.create_service(ControlMode, "control_mode", self.callback_control_mode)
+        self.control_mode_service = self.create_service(ControlMode, "control_mode", self.callback_control_mode)
 
         # Control loop timer
-        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.timer = self.create_timer(dt, self.timer_callback)
 
     def callback_timesync(self, msg):
         self.timestamp = msg.timestamp
@@ -110,6 +127,10 @@ class OffboardControl(Node):
     def callback_target_position(self,msg):
         self.target_global_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y]
         self.target_local_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
+
+    def callback_target_uwb_position(self,msg):
+        self.target_uwb_global_pos = [msg.x, msg.y]
+        self.target_uwb_local_pos = [self.target_uwb_global_pos[1]-1, self.target_uwb_global_pos[0]-1]
 
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
@@ -165,7 +186,7 @@ class OffboardControl(Node):
     def publish_trajectory_setpoint(self):
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp
-
+        
         if self.control_mode == 1:
             msg = self.takeoff_mode(msg)
         elif self.control_mode == 2:
@@ -183,28 +204,33 @@ class OffboardControl(Node):
             msg = self.takeoff_mode(msg)
         
         self.trajectory_setpoint_publisher_.publish(msg)
-        
+
+ 
 
     def land_on_target_mode(self,msg):
             msg.x = float("NaN")
             msg.y = float("NaN")
-
-            self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])
-            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX)
+            
+            if UWB_MODE == 1:
+                self.e = self.target_uwb_local_pos
+            else:
+                self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
+            
+            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-            #self.get_logger().info(f"""int: {self.int_e}""")
-            if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and (-self.z < 0.9):
+
+            if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (-self.z < LAND_H_TOLL):
                 self.LANDING_STATE = 1
                 self.get_logger().info("Landing..")
                 #self.publish_vehicle_command(21, 0.0, 0.0)
                 self.publish_vehicle_command(185, 1.0, 0.0)
 
-            if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and self.LANDING_STATE == 0:
+            if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and self.LANDING_STATE == 0:
                 self.DESCENDING_STATE = 1
                 self.get_logger().info("Descending on target..")
                 msg.z = float("NaN")
-                msg.vz = 0.2
+                msg.vz = LAND_DESC_VEL
             elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0:
                 self.get_logger().info("Following target..")
                 msg.z = - 3.0
@@ -212,24 +238,37 @@ class OffboardControl(Node):
             elif self.LANDING_STATE == 0:
                 self.get_logger().info("Stopped descending..")
                 msg.z = - 1.5
-                msg.vz = - 0.1
+                msg.vz = - 0.05
             if self.ARMING_STATE == 1 and self.LANDING_STATE == 1:
                 self.get_logger().info(f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
                 rclpy.shutdown()
+            try:
+                control_error = Point()
+                control_error.x = self.e[0]
+                control_error.y = self.e[1]
+                control_error.z = - self.z
+                self.control_error_publisher_.publish(control_error)
+            except:
+                pass
+
             return msg
 
     def target_follower_mode(self,msg):
             msg.x = float("NaN")
             msg.y = float("NaN")
-
-            self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])
-            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX)
+            if UWB_MODE == 1:
+                self.e = self.target_uwb_local_pos
+            else:
+                self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
+            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
             self.get_logger().info("Following target..")
             msg.z = - 3.0
             msg.vz = float("NaN")
+
+
             return msg
 
     def setpoint_mode(self,msg):
@@ -258,7 +297,7 @@ class OffboardControl(Node):
 
 def main(args = None):
     rclpy.init(args = args)
-    node = OffboardControl()
+    node = DroneController()
     rclpy.spin(node)
     rclpy.shutdown()
 if __name__ == "main":

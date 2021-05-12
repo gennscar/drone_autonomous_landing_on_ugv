@@ -15,6 +15,10 @@
   <depend>px4_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>math</depend>
+  <depend>custom_interfaces</depend>
+  <depend>functions</depend>
+  <depend>random</depend>
+
 
 
   <test_depend>ament_copyright</test_depend>
