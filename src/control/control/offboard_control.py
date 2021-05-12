@@ -2,19 +2,16 @@
 
 import rclpy
 from rclpy.node import Node
-from  px4_msgs.msg import OffboardControlMode
-from  px4_msgs.msg import TrajectorySetpoint
-from  px4_msgs.msg import Timesync
-from  px4_msgs.msg import VehicleCommand
-from  px4_msgs.msg import VehicleControlMode
+from px4_msgs.msg import OffboardControlMode
+from px4_msgs.msg import TrajectorySetpoint
+from px4_msgs.msg import Timesync
+from px4_msgs.msg import VehicleCommand
+
 
 # generate random integer values
 from random import seed
-from random import randint
 # seed random number generator
 seed(1)
-
-
 
 
 class OffboardControl(Node):
@@ -24,11 +21,15 @@ class OffboardControl(Node):
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
 
-        self.offboard_control_mode_publisher_=self.create_publisher(OffboardControlMode,"OffboardControlMode_PubSubTopic",10)
-        self.trajectory_setpoint_publisher_=self.create_publisher(TrajectorySetpoint,"TrajectorySetpoint_PubSubTopic",10)
-        self.vehicle_command_publisher_=self.create_publisher(VehicleCommand,"VehicleCommand_PubSubTopic",10)
+        self.offboard_control_mode_publisher_ = self.create_publisher(
+            OffboardControlMode, "OffboardControlMode_PubSubTopic", 10)
+        self.trajectory_setpoint_publisher_ = self.create_publisher(
+            TrajectorySetpoint, "TrajectorySetpoint_PubSubTopic", 10)
+        self.vehicle_command_publisher_ = self.create_publisher(
+            VehicleCommand, "VehicleCommand_PubSubTopic", 10)
 
-        self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,10)
+        self.timesync_sub_ = self.create_subscription(
+            Timesync, "Timesync_PubSubTopic", self.callback_timesync, 10)
 
         self.timer = self.create_timer(0.1, self.timer_callback)
 
@@ -49,7 +50,7 @@ class OffboardControl(Node):
 
         if (self.offboard_setpoint_counter_ < 11):
             self.offboard_setpoint_counter_ += 1
-    
+
     def publish_vehicle_command(self, command, param1, param2):
         msg = VehicleCommand()
         msg.timestamp = self.timestamp
@@ -86,15 +87,14 @@ class OffboardControl(Node):
         #msg.vx = 10.0
         self.trajectory_setpoint_publisher_.publish(msg)
 
-        
 
+def main(args=None):
 
-def main(args = None):
-
-    rclpy.init(args = args)
+    rclpy.init(args=args)
     node = OffboardControl()
     rclpy.spin(node)
     rclpy.shutdown()
+
 
 if __name__ == "main":
     main()

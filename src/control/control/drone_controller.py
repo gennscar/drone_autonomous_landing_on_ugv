@@ -19,13 +19,12 @@ from rclpy.node import Node
 import functions
 import numpy as np
 
-from  px4_msgs.msg import OffboardControlMode
-from  px4_msgs.msg import TrajectorySetpoint
-from  px4_msgs.msg import Timesync
-from  px4_msgs.msg import VehicleCommand
-from  px4_msgs.msg import VehicleControlMode
-from  px4_msgs.msg import VehicleLocalPosition
-from  px4_msgs.msg import VehicleStatus
+from px4_msgs.msg import OffboardControlMode
+from px4_msgs.msg import TrajectorySetpoint
+from px4_msgs.msg import Timesync
+from px4_msgs.msg import VehicleCommand
+from px4_msgs.msg import VehicleLocalPosition
+from px4_msgs.msg import VehicleStatus
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point
 from custom_interfaces.srv import ControlMode
@@ -37,6 +36,7 @@ KD = 0.01 #0.3 #0.0
 INT_MAX = 250/(KI*100) #float('inf') #250
 VMAX = 10.0 #float('inf')
 VMIN = - VMAX
+<<<<<<< HEAD
 LAND_ERR_TOLL = 0.3 #0.2 Maximum position error allowed to perform landing
 LAND_VEL_TOLL = 1 #0.2 # Maximum velocity error allowed to perform landing
 LAND_DESC_VEL = 0.5 #0.2
@@ -44,14 +44,19 @@ LAND_H_TOLL = 0.9 #0.85 # Turn off motors at this height
 UWB_MODE = 0 # Relative target position given by UWB
 dt = 0.1
 class DroneController(Node):
+=======
+
+
+class OffboardControl(Node):
+>>>>>>> 0665663ad900e2f30202ae499d89853eb126a5e7
     def __init__(self):
         super().__init__("offboard_control")
 
         # Initialization to 0 of all parameters
-        self.int_e = np.array([0,0])
-        self.e_dot = np.array([0,0])
-        self.e_old = np.array([0,0])
-        self.e = np.array([0,0])
+        self.int_e = np.array([0, 0])
+        self.e_dot = np.array([0, 0])
+        self.e_old = np.array([0, 0])
+        self.e = np.array([0, 0])
         self.ARMING_STATE = 0
         self.LANDING_STATE = 0
         self.DESCENDING_STATE = 0
@@ -97,7 +102,7 @@ class DroneController(Node):
     def callback_timesync(self, msg):
         self.timestamp = msg.timestamp
 
-    def callback_local_position(self,msg):
+    def callback_local_position(self, msg):
         self.x = msg.x
         self.y = msg.y
         self.z = msg.z
@@ -119,14 +124,15 @@ class DroneController(Node):
             self.offboard_setpoint_counter_ += 1
         elif (-self.z) < 0.5:
             self.restart_drone()
-        
 
     def callback_drone_status(self, msg):
         self.ARMING_STATE = msg.arming_state
-    
-    def callback_target_position(self,msg):
-        self.target_global_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y]
-        self.target_local_pos = [self.target_global_pos[1]-1, self.target_global_pos[0]-1]
+
+    def callback_target_position(self, msg):
+        self.target_global_pos = [
+            msg.pose.pose.position.x, msg.pose.pose.position.y]
+        self.target_local_pos = [
+            self.target_global_pos[1]-1, self.target_global_pos[0]-1]
 
     def callback_target_uwb_position(self,msg):
         self.target_uwb_global_pos = [msg.x, msg.y]
@@ -202,8 +208,9 @@ class DroneController(Node):
             self.control_mode = 1
         else:
             msg = self.takeoff_mode(msg)
-        
+
         self.trajectory_setpoint_publisher_.publish(msg)
+<<<<<<< HEAD
 
  
 
@@ -263,10 +270,36 @@ class DroneController(Node):
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
+=======
+>>>>>>> 0665663ad900e2f30202ae499d89853eb126a5e7
 
+    def land_on_target_mode(self, msg):
+        msg.x = float("NaN")
+        msg.y = float("NaN")
+
+        self.e = np.array([self.x - self.target_local_pos[0],
+                          self.y - self.target_local_pos[1]])
+        [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(
+            KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX)
+        self.norm_e = np.linalg.norm(self.e, ord=2)
+        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
+        #self.get_logger().info(f"""int: {self.int_e}""")
+        if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and (-self.z < 0.9):
+            self.LANDING_STATE = 1
+            self.get_logger().info("Landing..")
+            #self.publish_vehicle_command(21, 0.0, 0.0)
+            self.publish_vehicle_command(185, 1.0, 0.0)
+
+        if ((self.norm_e) < 0.1) and ((self.norm_e_dot) < 0.2) and self.LANDING_STATE == 0:
+            self.DESCENDING_STATE = 1
+            self.get_logger().info("Descending on target..")
+            msg.z = float("NaN")
+            msg.vz = 0.2
+        elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0:
             self.get_logger().info("Following target..")
             msg.z = - 3.0
             msg.vz = float("NaN")
+<<<<<<< HEAD
 
 
             return msg
@@ -285,20 +318,70 @@ class DroneController(Node):
             msg.y = float("NaN")
             msg.z = -3.0
             return msg
+=======
+        elif self.LANDING_STATE == 0:
+            self.get_logger().info("Stopped descending..")
+            msg.z = - 1.5
+            msg.vz = - 0.1
+        if self.ARMING_STATE == 1 and self.LANDING_STATE == 1:
+            self.get_logger().info(
+                f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
+            rclpy.shutdown()
+        return msg
+
+    def target_follower_mode(self, msg):
+        msg.x = float("NaN")
+        msg.y = float("NaN")
+
+        self.e = np.array([self.x - self.target_local_pos[0],
+                          self.y - self.target_local_pos[1]])
+        [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(
+            KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX)
+        self.norm_e = np.linalg.norm(self.e, ord=2)
+        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
+
+        self.get_logger().info("Following target..")
+        msg.z = - 3.0
+        msg.vz = float("NaN")
+        return msg
+
+    def setpoint_mode(self, msg):
+        msg.x = self.setpoint[0]
+        msg.y = self.setpoint[1]
+        msg.z = self.setpoint[2]
+        self.get_logger().info("Reaching setpoint..")
+        return msg
+
+    def takeoff_mode(self, msg):
+        self.get_logger().info("Takeoff..")
+        msg.x = float("NaN")
+        msg.y = float("NaN")
+        msg.z = -3.0
+        return msg
+>>>>>>> 0665663ad900e2f30202ae499d89853eb126a5e7
 
     def landing_mode(self):
-            self.get_logger().info("Landing..")
-            self.publish_vehicle_command(21, 0.0, 0.0)
+        self.get_logger().info("Landing..")
+        self.publish_vehicle_command(21, 0.0, 0.0)
 
     def restart_drone(self):
-            self.LANDING_STATE = 0
-            self.DESCENDING_STATE = 0
-            self.offboard_setpoint_counter_=0
+        self.LANDING_STATE = 0
+        self.DESCENDING_STATE = 0
+        self.offboard_setpoint_counter_ = 0
 
+
+<<<<<<< HEAD
 def main(args = None):
     rclpy.init(args = args)
     node = DroneController()
+=======
+def main(args=None):
+    rclpy.init(args=args)
+    node = OffboardControl()
+>>>>>>> 0665663ad900e2f30202ae499d89853eb126a5e7
     rclpy.spin(node)
     rclpy.shutdown()
+
+
 if __name__ == "main":
     main()
