@@ -8,7 +8,17 @@ from geometry_msgs.msg import TransformStamped
 
 
 class HandOfGodNav(Node):
-    """Node to use the HandOfGod plugin providing the positions to reach"""
+    """
+    Node to use the HandOfGod plugin providing the positions to reach
+
+    Params:
+      frame_id (str): The name of the model to control
+
+      reference_id (str): The name of the reference system of the <target_position>,
+        leave blank for world/global reference frame
+
+      target_position (list): Numbers of iterations, valid only with the GN method
+    """
 
     def __init__(self):
         super().__init__("hand_of_god_nav")
@@ -24,7 +34,7 @@ class HandOfGodNav(Node):
         # Broadcasting the desired position every 1 sec
         self.timer = self.create_timer(1, self.broadcast_position)
 
-        self.get_logger().info("hand_of_god_nav node has started")
+        self.get_logger().info("Node has started")
 
     def broadcast_position(self):
         # Parameter getters
@@ -54,6 +64,12 @@ class HandOfGodNav(Node):
         self.msg_.transform.translation.z = target_position[2]
 
         self.tf_broadcaster_.sendTransform(self.msg_)
+
+        self.get_logger().info(f"""
+                                  Frame ID:       {frame_id}
+                                  Reference ID:   {reference_id}
+                                  Target Position {target_position}
+                                """)
 
 
 def main(args=None):
