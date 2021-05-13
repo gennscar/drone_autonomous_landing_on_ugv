@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Useful alias:
+# Useful aliases:
 # alias start_drone="ros2 run control drone_controller"
 # alias go_home="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: 0, y: 0, z: 3.0}'"
 # alias hover="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'takeoff_mode'}'"
@@ -12,7 +12,9 @@
 # alias vehicle_back="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: -2.5}, angular: {z: 0.0}}' -1"
 # alias vehicle_stop="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: 0}, angular: {z: 0.0}}' -1"
 # alias start_agent="micrortps_agent -t UDP"
-# To move the drone do: ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: 0, y: 0, z: 3.0}'
+#function setpoint() {
+#  eval "ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: $1, y: $2, z: $3}'"
+#}
 
 import rclpy
 from rclpy.node import Node
@@ -30,18 +32,21 @@ from geometry_msgs.msg import Point
 from custom_interfaces.srv import ControlMode
 
 # Control parameters
-KP = 1.5 #3 #1
-KI = 0.03 #0.035 #0.03
-KD = 0.01 #0.3 #0.0
-INT_MAX = 250/(KI*100) #float('inf') #250
+KP = 1.5 #1
+KI = 0.04 #0.03
+KD = 0 #0.0
+INT_MAX = 250/(KI*100) #float('inf')
 VMAX = 10.0 #float('inf')
 VMIN = - VMAX
 LAND_ERR_TOLL = 0.3 #0.2 Maximum position error allowed to perform landing
 LAND_VEL_TOLL = 1 #0.2 # Maximum velocity error allowed to perform landing
 LAND_DESC_VEL = 0.5 #0.2
 LAND_H_TOLL = 0.9 #0.85 # Turn off motors at this height
+LAND_HOVERING_HEIGHT = 1.5
 UWB_MODE = 0 # Relative target position given by UWB
+
 dt = 0.1
+
 class DroneController(Node):
     def __init__(self):
         super().__init__("offboard_control")
@@ -54,16 +59,17 @@ class DroneController(Node):
         self.ARMING_STATE = 0
         self.LANDING_STATE = 0
         self.DESCENDING_STATE = 0
+        self.TAKEOFF_STATE = 0
         self.x = 0.0
         self.y = 0.0
         self.z = 0.0
         self.vx = 0.0
         self.vy = 0.0
         self.vz = 0.0
-        self.target_global_pos = [10,10]
-        self.target_local_pos = [10,10]
-        self.target_uwb_global_pos = [10,10]
-        self.target_uwb_local_pos = [10,10]
+        self.target_global_pos = []
+        self.target_local_pos = []
+        self.target_uwb_global_pos = []
+        self.target_uwb_local_pos = []
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
         
@@ -83,7 +89,7 @@ class DroneController(Node):
         # Subscribers
         self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_local_position,3)
         self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,3)
-        self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_position,3)
+        self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_state,3)
         self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
         self.target_uwb_position_subscriber = self.create_subscription(Point,"prova",self.callback_target_uwb_position,3)
 
@@ -122,7 +128,7 @@ class DroneController(Node):
     def callback_drone_status(self, msg):
         self.ARMING_STATE = msg.arming_state
 
-    def callback_target_position(self, msg):
+    def callback_target_state(self, msg):
         self.target_global_pos = [
             msg.pose.pose.position.x, msg.pose.pose.position.y]
         self.target_local_pos = [
@@ -209,6 +215,13 @@ class DroneController(Node):
             msg.x = float("NaN")
             msg.y = float("NaN")
             
+            if self.TAKEOFF_STATE == 0:
+                if -self.z <= LAND_HOVERING_HEIGHT:
+                    msg.z = - LAND_HOVERING_HEIGHT - 0.5
+                    return msg
+                else:
+                    self.TAKEOFF_STATE = 1
+            
             if UWB_MODE == 1:
                 self.e = self.target_uwb_local_pos
             else:
@@ -231,11 +244,11 @@ class DroneController(Node):
                 msg.vz = LAND_DESC_VEL
             elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0:
                 self.get_logger().info("Following target..")
-                msg.z = - 3.0
+                msg.z = - LAND_HOVERING_HEIGHT
                 msg.vz = float("NaN")
             elif self.LANDING_STATE == 0:
                 self.get_logger().info("Stopped descending..")
-                msg.z = - 1.5
+                msg.z = - LAND_HOVERING_HEIGHT
                 msg.vz = - 0.05
             if self.ARMING_STATE == 1 and self.LANDING_STATE == 1:
                 self.get_logger().info(f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
@@ -254,6 +267,7 @@ class DroneController(Node):
     def target_follower_mode(self,msg):
             msg.x = float("NaN")
             msg.y = float("NaN")
+            msg.z = - 3.0
             if UWB_MODE == 1:
                 self.e = self.target_uwb_local_pos
             else:
@@ -261,6 +275,8 @@ class DroneController(Node):
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
+            
+            return msg
 
     def setpoint_mode(self,msg):
             msg.x = self.setpoint[0]

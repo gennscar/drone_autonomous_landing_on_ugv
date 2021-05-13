@@ -94,7 +94,7 @@ while t < t_sim:
 
     # PID
     uk, int_e, e_dot, e_old = functions.PID(
-        kp, ki, kd, xk, e_old, int_e, u_max, u_min, int_max)
+        kp, ki, kd, xk, e_old, int_e, u_max, u_min, int_max, dt)
 
     xk = Ad*xk + Bd*uk
     e = np.subtract(ref, xk)

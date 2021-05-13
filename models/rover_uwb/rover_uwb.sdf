@@ -345,7 +345,33 @@
           <xyz>0 0 1</xyz>
         </axis>
       </joint>
-        
+
+    <link name='apriltag'>
+    <pose frame=''>0 0 0.459 0 0 0</pose>
+      <visual name='apriltag_Visual'>
+        <geometry>
+          <box>
+          <size>1.0 1.0 0.01</size>
+          </box>
+        </geometry>
+           <material>
+          <script>
+            <uri>models//Apriltag36_11_00000/materials/scripts</uri>
+            <uri>models//Apriltag36_11_00000/materials/textures</uri>
+            <name>Apriltag36_11_00000</name>
+          </script>
+        </material>
+      </visual>
+     </link>
+
+      <joint name='apriltag_joint' type='fixed'>
+        <parent>chassis</parent>
+        <child>apriltag</child>
+        <axis>
+          <xyz>0 0 1</xyz>
+        </axis>
+      </joint>
+
       <joint name='left_wheel_joint' type='revolute'>
         <parent>chassis</parent>
         <child>left_wheel</child>
