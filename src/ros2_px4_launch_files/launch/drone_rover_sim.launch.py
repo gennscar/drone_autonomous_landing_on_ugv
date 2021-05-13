@@ -18,8 +18,13 @@ def generate_launch_description():
         executable = "vehicle_controller",
         name = "VehicleController"
     )
-
+    video_streamer_node = Node(
+        package = "testing",
+        executable = "video_streamer",
+        name = "VideoStreamerNode"
+    )
     ld.add_action(drone_controller_node)
     ld.add_action(vehicle_controller_node)
+    ld.add_action(video_streamer_node)
 
     return ld

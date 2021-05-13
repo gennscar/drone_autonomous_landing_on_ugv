@@ -21,7 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             "uwb_pos_estimation = testing.uwb_pos_estimation:main",
-            "positioning_error = testing.positioning_error:main"
+            "positioning_error = testing.positioning_error:main",
+            "video_streamer = testing.video_streamer:main"
         ],
     },
 )
