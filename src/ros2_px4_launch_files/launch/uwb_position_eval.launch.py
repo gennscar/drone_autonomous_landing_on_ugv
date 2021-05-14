@@ -24,13 +24,8 @@ def generate_launch_description():
         ),
         Node(
             package='estimation',
-            executable='uwb_positioning',
-            namespace='GN_10iter_uwb_estimator',
-            parameters=[
-                {"sensor_id": "0"},
-                {"method": "GN"},
-                {"iterations": 10}
-            ]
+            executable='ins_positioning',
+            namespace='ins_estimator'
         ),
         Node(
             package='testing',

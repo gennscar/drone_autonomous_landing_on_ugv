@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "uwb_positioning = estimation.uwb_positioning:main"
+            "uwb_positioning = estimation.uwb_positioning:main",
+            "ins_positioning = estimation.ins_positioning:main"
         ],
     },
 )
