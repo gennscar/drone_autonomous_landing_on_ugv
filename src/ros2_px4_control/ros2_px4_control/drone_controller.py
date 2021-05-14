@@ -34,9 +34,9 @@ from custom_interfaces.srv import ControlMode
 # Control parameters
 KP = 1.5 #1
 KI = 0.04 #0.03
-KD = 0 #0.0
+KD = 0.0 #0.0
 INT_MAX = 250/(KI*100) #float('inf')
-VMAX = 10.0 #float('inf')
+VMAX = 5.0 #float('inf')
 VMIN = - VMAX
 LAND_ERR_TOLL = 0.3 #0.2 Maximum position error allowed to perform landing
 LAND_VEL_TOLL = 1 #0.2 # Maximum velocity error allowed to perform landing
@@ -250,7 +250,7 @@ class DroneController(Node):
                 self.get_logger().info("Stopped descending..")
                 msg.z = - LAND_HOVERING_HEIGHT
                 msg.vz = - 0.05
-            if self.ARMING_STATE == 1 and self.LANDING_STATE == 1:
+            if self.ARMING_STATE == 1:
                 self.get_logger().info(f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
                 rclpy.shutdown()
             try:

@@ -7,6 +7,7 @@ from sensor_msgs.msg import Image # Image is the message type
 from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 import cv2 # OpenCV library
 import numpy as np
+from dt_apriltags import Detector
 
 
 class VideoStreamerNode(Node):
@@ -23,24 +24,43 @@ class VideoStreamerNode(Node):
         # to the video_frames topic. The queue size is 10 messages.
     
         # Create the subscriber
-        self.subscription1 = self.create_subscription(Image, '/camera/image_raw', self.camera_callback, 10)
+        self.video_subscriber = self.create_subscription(Image, '/camera/image_raw', self.video_callback, 10)
                 
-        self.subscription1 # prevent unused variable warning
-        
+        self.video_subscriber # prevent unused variable warning
+
+        self.at_detector = Detector(searchpath=['apriltags'],
+                              families='tag36h11',
+                              nthreads=1,
+                              quad_decimate=1.0,
+                              quad_sigma=0.0,
+                              refine_edges=1,
+                              decode_sharpening=0.25,
+                              debug=0)
        
         # Used to convert between ROS and OpenCV images
         self.br = CvBridge()
         
     
 
-    def camera_callback(self, data):
+    def video_callback(self, data):
         """
         Callback function.
         """    
         # Convert ROS Image message to OpenCV image
         frame = self.br.imgmsg_to_cv2(data)
+        scale_percent = 200 # percent of original size
+        width = int(frame.shape[1] * scale_percent / 100)
+        height = int(frame.shape[0] * scale_percent / 100)
+        dim = (width, height)
+          
+        # resize image
+        frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        tags = self.at_detector.detect(gray_frame, estimate_tag_pose=False, camera_params=None, tag_size=None)
+        self.get_logger().info(f"{tags}")
+
         frame_rgb = frame[:, :, ::-1].copy()    
-  
+        
         # Publish the image.
         # The 'cv2_to_imgmsg' method converts an OpenCV image to a ROS 2 image message        
         # Display image
