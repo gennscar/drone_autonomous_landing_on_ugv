@@ -59,7 +59,7 @@ class UwbPositioning(Node):
             PointStamped, self.estimator_topic_name_, 10)
 
         self.get_logger().info(f"""
-                                uwb_positioning has started:
+                                Node has started:
                                   Sensor ID:  {self.sensor_id_}
                                   Method:     {self.method_}
                                   Iterations  {self.iterations_}

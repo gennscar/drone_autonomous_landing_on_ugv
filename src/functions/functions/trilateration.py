@@ -91,3 +91,27 @@ def gauss_newton_trilateration(old_pos, anchors):
     new_pos = old_pos - (pinvJ).dot(residue)
 
     return new_pos
+
+
+def main():
+    print('ciao')
+    anchors = {}
+
+    anchors['0'].anchor_pos = [3.5, 3, 0]
+    anchors['0'].ranges = 3.20
+
+    anchors['1'].anchor_pos = [4.5, 3, 0]
+    anchors['1'].ranges = 4.03
+
+    anchors['2'].anchor_pos = [4.5, 1, 0]
+    anchors['2'].ranges = 3.5
+
+    anchors['3'].anchor_pos = [3.5, 1, 0]
+    anchors['3'].ranges = 2.5
+
+    pos = ls_trilateration(anchors)
+    print(pos)
+
+
+if __name__ == "main":
+    main()
