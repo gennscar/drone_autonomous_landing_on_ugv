@@ -2,3 +2,4 @@
 
 std_msgs/Header header
 float64 current
+float64 mean

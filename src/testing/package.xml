@@ -9,7 +9,6 @@
 
   <depend>rclpy</depend>
   <depend>random</depend>
-  <depend>math</depend>
   <depend>numpy</depend>
   <depend>scipy</depend>
   <depend>matplotlib</depend>

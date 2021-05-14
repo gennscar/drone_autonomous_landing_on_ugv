@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
 import rclpy
-from rclpy.node import Node
-import math
 import numpy as np
+from rclpy.node import Node
 
 from geometry_msgs.msg import PointStamped
 from nav_msgs.msg import Odometry
@@ -37,11 +36,9 @@ class PositioningError(Node):
                     Error, topic_name.replace("estimated_pos", "") + "mse", 10)
 
     def callback_sensor_subscriber(self, msg):
-        # Retriving the estimated position
+        error = Error()
         sensor_est_pos = np.array([msg.point.x, msg.point.y, msg.point.z])
 
-        # Filling error message
-        error = Error()
         error.header.stamp = self.get_clock().now().to_msg()
         error.header.frame_id = msg.header.frame_id
         if(self.sensor_real_pos_ == []):
@@ -50,7 +47,6 @@ class PositioningError(Node):
             error.current = np.linalg.norm(
                 sensor_est_pos - self.sensor_real_pos_, ord=2)
 
-        # Sending error message only if the estimator is valid
         if(msg.header.frame_id in self.estimator_topics_.keys()):
             self.estimator_topics_[msg.header.frame_id].publish(error)
 
