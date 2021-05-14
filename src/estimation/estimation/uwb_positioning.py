@@ -76,6 +76,10 @@ class UwbPositioning(Node):
         # Saving the message in a dict
         self.anchors_[msg.anchor_id] = msg
 
+        for anchor_id in list(self.anchors_.keys()):
+            if msg.timestamp - self.anchors_[anchor_id].timestamp > 0.01:
+                self.anchors_.pop(anchor_id)
+
         # Only if trilateration is possible
         if len(self.anchors_) > 3:
             if(self.method_ == "LS"):
