@@ -57,7 +57,8 @@ class VideoStreamerNode(Node):
         frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         tags = self.at_detector.detect(gray_frame, estimate_tag_pose=False, camera_params=None, tag_size=None)
-        self.get_logger().info(f"{tags}")
+        if tags!=[]:
+          self.get_logger().info(f"TAG DETECTED: {tags}")
 
         frame_rgb = frame[:, :, ::-1].copy()    
         
