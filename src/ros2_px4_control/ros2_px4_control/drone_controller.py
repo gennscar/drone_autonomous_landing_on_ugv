@@ -36,13 +36,13 @@ KP = 1.5 #1
 KI = 0.04 #0.03
 KD = 0.0 #0.0
 INT_MAX = 250/(KI*100) #float('inf')
-VMAX = 5.0 #float('inf')
+VMAX = 7.0 #float('inf')
 VMIN = - VMAX
 LAND_ERR_TOLL = 0.3 #0.2 Maximum position error allowed to perform landing
 LAND_VEL_TOLL = 1 #0.2 # Maximum velocity error allowed to perform landing
 LAND_DESC_VEL = 0.5 #0.2
 LAND_H_TOLL = 0.9 #0.85 # Turn off motors at this height
-LAND_HOVERING_HEIGHT = 1.5
+LAND_HOVERING_HEIGHT = 1.3
 UWB_MODE = 0 # Relative target position given by UWB
 
 dt = 0.1
@@ -68,7 +68,6 @@ class DroneController(Node):
         self.vz = 0.0
         self.target_global_pos = []
         self.target_local_pos = []
-        self.target_uwb_global_pos = []
         self.target_uwb_local_pos = []
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
@@ -91,7 +90,7 @@ class DroneController(Node):
         self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,3)
         self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_state,3)
         self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
-        self.target_uwb_position_subscriber = self.create_subscription(Point,"prova",self.callback_target_uwb_position,3)
+        self.target_uwb_position_subscriber = self.create_subscription(Point,"/chassis_to_drone_rotation/target_coordinates",self.callback_target_uwb_position,3)
 
         # Services
         self.control_mode_service = self.create_service(ControlMode, "control_mode", self.callback_control_mode)
@@ -135,8 +134,7 @@ class DroneController(Node):
             self.target_global_pos[1]-1, self.target_global_pos[0]-1]
 
     def callback_target_uwb_position(self,msg):
-        self.target_uwb_global_pos = [msg.x, msg.y]
-        self.target_uwb_local_pos = [self.target_uwb_global_pos[1]-1, self.target_uwb_global_pos[0]-1]
+        self.target_uwb_local_pos = [msg.x, msg.y]
 
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
@@ -223,7 +221,7 @@ class DroneController(Node):
                     self.TAKEOFF_STATE = 1
             
             if UWB_MODE == 1:
-                self.e = self.target_uwb_local_pos
+                self.e = - np.array(self.target_uwb_local_pos)
             else:
                 self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
             
@@ -251,7 +249,7 @@ class DroneController(Node):
                 msg.z = - LAND_HOVERING_HEIGHT
                 msg.vz = - 0.05
             if self.ARMING_STATE == 1:
-                self.get_logger().info(f"Landed, with ex:{self.e[0]}, ey:{self.e[1]}")
+                self.get_logger().info(f"Landed, with err:{self.norm_e}")
                 rclpy.shutdown()
             try:
                 control_error = Point()
@@ -269,7 +267,7 @@ class DroneController(Node):
             msg.y = float("NaN")
             msg.z = - 3.0
             if UWB_MODE == 1:
-                self.e = self.target_uwb_local_pos
+                self.e = - np.array(self.target_uwb_local_pos)
             else:
                 self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
