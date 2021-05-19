@@ -2,7 +2,6 @@
 
 import rclpy
 from rclpy.node import Node
-import math
 import numpy as np
 
 from geometry_msgs.msg import PointStamped
