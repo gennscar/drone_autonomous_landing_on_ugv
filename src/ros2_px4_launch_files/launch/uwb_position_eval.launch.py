@@ -23,9 +23,9 @@ def generate_launch_description():
             ]
         ),
         Node(
-            package='estimation',
-            executable='ins_positioning',
-            namespace='ins_estimator'
+            package="ros2_px4_control",
+            executable="drone_controller",
+            name="DroneController"
         ),
         Node(
             package='testing',
