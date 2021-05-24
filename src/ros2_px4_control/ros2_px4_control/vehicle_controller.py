@@ -12,7 +12,7 @@ from random import gauss
 seed(1)
 
 dt = 0.1
-t1 = 100 #200
+t1 = 200 #100 #200
 t2 = t1 + 30
 lin_vel = 2.5
 curvature = True

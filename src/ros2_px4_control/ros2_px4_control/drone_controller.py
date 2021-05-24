@@ -32,17 +32,17 @@ from geometry_msgs.msg import Point
 from custom_interfaces.srv import ControlMode
 
 # Control parameters
-KP = 1.5 #1
-KI = 0.04 #0.03
-KD = 0.0 #0.0
+KP = 1.1 #1
+KI = 0.025 #0.03
+KD = 0.008 #0.0
 INT_MAX = 250/(KI*100) #float('inf')
-VMAX = 7.0 #float('inf')
+VMAX = 5.0 #float('inf')
 VMIN = - VMAX
 LAND_ERR_TOLL = 0.3 #0.2 Maximum position error allowed to perform landing
-LAND_VEL_TOLL = 1 #0.2 # Maximum velocity error allowed to perform landing
+LAND_VEL_TOLL = 0.8 #0.2 # Maximum velocity error allowed to perform landing
 LAND_DESC_VEL = 0.5 #0.2
 LAND_H_TOLL = 0.9 #0.85 # Turn off motors at this height
-LAND_HOVERING_HEIGHT = 1.3
+LAND_HOVERING_HEIGHT = 1.5
 UWB_MODE = 1 # Relative target position given by UWB
 
 dt = 0.1
@@ -56,6 +56,8 @@ class DroneController(Node):
         self.e_dot = np.array([0, 0])
         self.e_old = np.array([0, 0])
         self.e = np.array([0, 0])
+        self.true_err = np.array([0, 0])
+
         self.ARMING_STATE = 0
         self.LANDING_STATE = 0
         self.DESCENDING_STATE = 0
@@ -111,7 +113,7 @@ class DroneController(Node):
         self.vz = msg.vz
 
     def timer_callback(self):
-        if (self.offboard_setpoint_counter_ == 10):
+        if (self.offboard_setpoint_counter_ == 10 and self.LANDING_STATE == 0):
             self.publish_vehicle_command(176, 1.0, 6.0)
 
             self.get_logger().info("arming..")
@@ -120,7 +122,7 @@ class DroneController(Node):
         self.publish_offboard_control_mode()
         self.publish_trajectory_setpoint()
 
-        if (self.offboard_setpoint_counter_ < 30):
+        if (self.offboard_setpoint_counter_ < 30 and self.LANDING_STATE == 0):
             self.offboard_setpoint_counter_ += 1
         elif (-self.z) < 0.5:
             self.restart_drone()
@@ -140,12 +142,16 @@ class DroneController(Node):
 
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
+            self.reset_counters()
             self.control_mode = 1
         elif request.control_mode == "target_follower_mode":
+            self.reset_counters()
             self.control_mode = 2
         elif request.control_mode == "land_on_target_mode":
+            self.reset_counters()
             self.control_mode = 3
         elif request.control_mode == "setpoint_mode":
+            self.reset_counters()
             self.control_mode = 4
             try:
                 self.setpoint = [request.y-1, request.x-1, - request.z]
@@ -153,8 +159,10 @@ class DroneController(Node):
                 response.success = "Please insert the coordinates"
                 return response
         elif request.control_mode == "landing_mode":
+            self.reset_counters()
             self.control_mode = 5
         elif request.control_mode == "restart_drone":
+            self.reset_counters()
             self.control_mode = 6
         response.success = "Done"
         return response
@@ -221,12 +229,14 @@ class DroneController(Node):
                     return msg
                 else:
                     self.TAKEOFF_STATE = 1
-            
+            self.true_err = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
+            self.norm_true_err = np.linalg.norm(self.true_err, ord=2)
+
             if UWB_MODE == 1:
-                self.e = np.array(self.target_uwb_local_pos)
+                self.uwb_err = np.array(self.target_uwb_local_pos)
+                self.e = self.uwb_err
             else:
-                self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
-            
+                self.e = self.true_err
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
@@ -251,7 +261,7 @@ class DroneController(Node):
                 msg.z = - LAND_HOVERING_HEIGHT
                 msg.vz = - 0.05
             if self.ARMING_STATE == 1:
-                self.get_logger().info(f"Landed, with err:{self.norm_e}")
+                self.get_logger().info(f"Landed, with err:{self.norm_true_err}")
                 rclpy.shutdown()
             try:
                 control_error = Point()
@@ -269,9 +279,10 @@ class DroneController(Node):
             msg.y = float("NaN")
             msg.z = - 3.0
             if UWB_MODE == 1:
-                self.e = np.array(self.target_uwb_local_pos)
+                self.uwb_err = np.array(self.target_uwb_local_pos)
+                self.e = self.uwb_err
             else:
-                self.e = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
+                self.e = self.true_err
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
@@ -298,10 +309,13 @@ class DroneController(Node):
         self.publish_vehicle_command(21, 0.0, 0.0)
 
     def restart_drone(self):
-        self.LANDING_STATE = 0
-        self.DESCENDING_STATE = 0
+        self.reset_counters()
         self.offboard_setpoint_counter_ = 0
 
+    def reset_counters(self):
+        self.LANDING_STATE = 0
+        self.TAKEOFF_STATE = 0
+        self.DESCENDING_STATE = 0
 
 def main(args = None):
     rclpy.init(args = args)
