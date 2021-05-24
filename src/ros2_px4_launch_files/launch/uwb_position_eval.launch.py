@@ -23,14 +23,9 @@ def generate_launch_description():
             ]
         ),
         Node(
-            package='estimation',
-            executable='uwb_positioning',
-            namespace='GN_10iter_uwb_estimator',
-            parameters=[
-                {"sensor_id": "0"},
-                {"method": "GN"},
-                {"iterations": 10}
-            ]
+            package="ros2_px4_control",
+            executable="drone_controller",
+            name="DroneController"
         ),
         Node(
             package='testing',
