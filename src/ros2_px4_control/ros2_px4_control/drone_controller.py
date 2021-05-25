@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 
 # Useful aliases:
-# alias start_drone="ros2 run control drone_controller"
-# alias go_home="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: 0, y: 0, z: 3.0}'"
-# alias hover="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'takeoff_mode'}'"
-# alias land_on_target="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'land_on_target_mode'}'"
-# alias follow_target="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'target_follower_mode'}'"
-# alias land="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'landing_mode'}'"
-# alias restart_drone="ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'restart_drone'}'"
+# alias start_drone="ros2 run ros2_px4_control drone_controller"
+# alias go_home="ros2 service call /control_mode ros2_px4_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: 0, y: 0, z: 3.0}'"
+# alias hover="ros2 service call /control_mode ros2_px4_interfaces/srv/ControlMode '{control_mode: 'takeoff_mode'}'"
+# alias land_on_target="ros2 service call /control_mode ros2_px4_interfaces/srv/ControlMode '{control_mode: 'land_on_target_mode'}'"
+# alias follow_target="ros2 service call /control_mode ros2_px4_interfaces/srv/ControlMode '{control_mode: 'target_follower_mode'}'"
+# alias land="ros2 service call /control_mode ros2_px4_interfaces/srv/ControlMode '{control_mode: 'landing_mode'}'"
+# alias restart_drone="ros2 service call /control_mode ros2_px4_interfaces/srv/ControlMode '{control_mode: 'restart_drone'}'"
 # alias vehicle_forward="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: 2.5}, angular: {z: 0.0}}' -1"
 # alias vehicle_back="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: -2.5}, angular: {z: 0.0}}' -1"
 # alias vehicle_stop="ros2 topic pub /rover_uwb/cmd_vel geometry_msgs/Twist '{linear: {x: 0}, angular: {z: 0.0}}' -1"
 # alias start_agent="micrortps_agent -t UDP"
 #function setpoint() {
-#  eval "ros2 service call /control_mode custom_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: $1, y: $2, z: $3}'"
+#  eval "ros2 service call /control_mode ros2_px4_interfaces/srv/ControlMode '{control_mode: 'setpoint_mode', x: $1, y: $2, z: $3}'"
 #}
 
 import rclpy
 from rclpy.node import Node
-import functions
+import ros2_px4_functions
 import numpy as np
 
 from px4_msgs.msg import OffboardControlMode
@@ -29,7 +29,7 @@ from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleStatus
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point
-from custom_interfaces.srv import ControlMode
+from ros2_px4_interfaces.srv import ControlMode
 
 # Control parameters
 KP = 1.15 #1
@@ -93,7 +93,7 @@ class DroneController(Node):
         self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,3)
         self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_state,3)
         self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
-        self.target_uwb_position_subscriber = self.create_subscription(Point,"/chassis_to_drone_rotation/target_coordinates",self.callback_target_uwb_position,3)
+        self.target_uwb_position_subscriber = self.create_subscription(Point,"/drone_vehicle_uwb_positioning/target_coordinates",self.callback_target_uwb_position,3)
 
         # Services
         self.control_mode_service = self.create_service(ControlMode, "control_mode", self.callback_control_mode)
@@ -237,7 +237,7 @@ class DroneController(Node):
                 self.e = self.uwb_err
             else:
                 self.e = self.true_err
-            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
+            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = ros2_px4_functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
@@ -283,7 +283,7 @@ class DroneController(Node):
                 self.e = self.uwb_err
             else:
                 self.e = self.true_err
-            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
+            [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = ros2_px4_functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
             self.get_logger().info("Following target..")

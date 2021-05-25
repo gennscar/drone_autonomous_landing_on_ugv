@@ -12,7 +12,7 @@ from std_msgs.msg import Float64
 
 class UwbPubSub(Node):
     def __init__(self):
-        super().__init__("uwb_pub_sub")
+        super().__init__("drone_vehicle_uwb_pub_sub")
 
         self.uwb_position_wrt_world = [0.0, 0.0, 0.0]
         self.uwb_position_wrt_chassis = [0.0, 0.0, 0.0]

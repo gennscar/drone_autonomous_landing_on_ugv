@@ -14,8 +14,8 @@
   <depend>px4_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>math</depend>
-  <depend>custom_interfaces</depend>
-  <depend>functions</depend>
+  <depend>ros2_px4_interfaces</depend>
+  <depend>ros2_px4_functions</depend>
   <depend>tf2_ros</depend>
 
   <test_depend>ament_copyright</test_depend>

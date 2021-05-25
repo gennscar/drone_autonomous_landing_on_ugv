@@ -19,7 +19,7 @@ def generate_launch_description():
         name = "VehicleController"
     )
     video_streamer_node = Node(
-        package = "testing",
+        package = "ros2_px4_testing",
         executable = "video_streamer",
         name = "VideoStreamerNode"
     )

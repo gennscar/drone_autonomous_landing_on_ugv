@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from dt_apriltags import Detector
 
-imagepath = 'test.ppm'
+imagepath = 'img_apriltag.ppm'
 img = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
 #cv2.imshow('image',img)
 #cv2.waitKey(0)

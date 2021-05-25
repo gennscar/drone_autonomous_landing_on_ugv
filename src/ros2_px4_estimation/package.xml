@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>estimation</name>
+  <name>ros2_px4_estimation</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="cosimocon@yahoo.it">Cosimo Conte</maintainer>
+  <maintainer email="gennscar97@gmail.com">gennscar</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
@@ -17,7 +17,7 @@
   <depend>px4_msgs</depend>
   <depend>gazebo_msgs</depend>
 
-  <depend>functions</depend>
+  <depend>ros2_px4_functions</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

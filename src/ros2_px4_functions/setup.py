@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'estimation'
+package_name = 'ros2_px4_functions'
 
 setup(
     name=package_name,
@@ -13,17 +13,13 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Cosimo Conte',
-    maintainer_email='cosimocon@yahoo.it',
+    maintainer='gennscar',
+    maintainer_email='gennscar97@gmail.com',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "uwb_positioning = estimation.uwb_positioning:main",
-            "ins_positioning = estimation.ins_positioning:main",
-            "px4_positioning = estimation.px4_positioning:main",
-            "kf_positioning = estimation.kf_positioning:main"
         ],
     },
 )

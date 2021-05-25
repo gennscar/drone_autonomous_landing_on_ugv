@@ -6,7 +6,7 @@ import numpy as np
 
 from geometry_msgs.msg import PointStamped
 from nav_msgs.msg import Odometry
-from custom_interfaces.msg import Error
+from ros2_px4_interfaces.msg import Error
 
 
 class PositioningError(Node):

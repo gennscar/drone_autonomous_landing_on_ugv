@@ -5,7 +5,7 @@ estimation_mode = 'GN_10iter_uwb_estimator'
 def generate_launch_description():
     return LaunchDescription([
         Node(
-            package = 'estimation',
+            package = 'ros2_px4_estimation',
             executable='uwb_positioning',
             namespace = estimation_mode,
             parameters=[
@@ -15,9 +15,9 @@ def generate_launch_description():
             ]
         ),
         Node(
-            package='testing',
-            executable='chassis_to_drone_rotation',
-            namespace='chassis_to_drone_rotation',
+            package='ros2_px4_testing',
+            executable='drone_vehicle_uwb_positioning',
+            namespace='drone_vehicle_uwb_positioning',
             parameters=[
                 {"estimation_mode": estimation_mode},
             ]

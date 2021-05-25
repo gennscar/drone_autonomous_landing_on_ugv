@@ -13,8 +13,8 @@
   <test_depend>ament_lint_common</test_depend>
 
   <exec_depend>ros2_px4_control</exec_depend>
-  <exec_depend>estimation</exec_depend>
-  <exec_depend>testing</exec_depend>
+  <exec_depend>ros2_px4_estimation</exec_depend>
+  <exec_depend>ros2_px4_testing</exec_depend>
 
   
   <export>

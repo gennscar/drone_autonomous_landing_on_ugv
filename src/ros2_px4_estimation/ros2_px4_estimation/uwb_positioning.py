@@ -7,7 +7,7 @@ from rclpy.node import Node
 from gazebo_msgs.msg import UwbSensor
 from geometry_msgs.msg import PointStamped
 
-import functions
+import ros2_px4_functions
 
 
 class UwbPositioning(Node):
@@ -83,13 +83,13 @@ class UwbPositioning(Node):
         # Only if trilateration is possible
         if len(self.anchors_) > 3:
             if(self.method_ == "LS"):
-                self.sensor_est_pos_ = functions.ls_trilateration(
+                self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
                     self.anchors_)
 
             if(self.method_ == "GN"):
                 # Perform N iterations of GN
                 for _ in range(self.iterations_):
-                    self.sensor_est_pos_ = functions.gauss_newton_trilateration(
+                    self.sensor_est_pos_ = ros2_px4_functions.gauss_newton_trilateration(
                         self.sensor_est_pos_, self.anchors_)
 
             # Sending the estimated position and the name of the node that generated it

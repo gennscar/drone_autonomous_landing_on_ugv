@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'testing'
+package_name = 'ros2_px4_testing'
 
 setup(
     name=package_name,
@@ -13,17 +13,16 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='cosimo',
-    maintainer_email='cosimocon@yahoo.it',
+    maintainer='gennscar',
+    maintainer_email='gennscar97@gmail.com',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "uwb_pos_estimation = testing.uwb_pos_estimation:main",
-            "positioning_error = testing.positioning_error:main",
-            "video_streamer = testing.video_streamer:main",
-            "chassis_to_drone_rotation = testing.chassis_to_drone_rotation:main"
+            "positioning_error = ros2_px4_testing.positioning_error:main",
+            "video_streamer = ros2_px4_testing.video_streamer:main",
+            "drone_vehicle_uwb_positioning = ros2_px4_testing.drone_vehicle_uwb_positioning:main"
         ],
     },
 )

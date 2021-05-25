@@ -1,4 +1,4 @@
-import functions
+import ros2_px4_functions
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
@@ -25,7 +25,7 @@ Dd = sys.D
 # LQR
 Q = np.matrix([[1, 0], [0, 1]])*1
 R = np.matrix([[1, 0], [0, 1]])*4
-K = functions.DLQR_optimizer(Ad, Bd, Q, R)
+K = ros2_px4_functions.DLQR_optimizer(Ad, Bd, Q, R)
 
 G_i = 0.0000001
 G_xy = 10
@@ -36,7 +36,7 @@ Q_aug = np.matrix([[G_i, 0, 0, 0], [0, G_i, 0, 0], [
 R_aug = np.matrix([[1, 0], [0, 1]])*G_r
 A_aug = np.r_[np.c_[[[1, 0], [0, 1]], -dt*Cd], np.c_[np.zeros((2, 2)), Ad]]
 B_aug = np.r_[np.zeros((2, 2)), Bd]
-K_aug = functions.DLQR_optimizer(A_aug, B_aug, Q_aug, R_aug)
+K_aug = ros2_px4_functions.DLQR_optimizer(A_aug, B_aug, Q_aug, R_aug)
 Ki = K_aug[:, 0:2]
 Ko = K_aug[:, 2:]
 print(Ki)
@@ -93,7 +93,7 @@ UY_PID = []
 while t < t_sim:
 
     # PID
-    uk, int_e, e_dot, e_old = functions.PID(
+    uk, int_e, e_dot, e_old = ros2_px4_functions.PID(
         kp, ki, kd, xk, e_old, int_e, u_max, u_min, int_max, dt)
 
     xk = Ad*xk + Bd*uk
