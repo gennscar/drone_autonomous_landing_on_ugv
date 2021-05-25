@@ -3,7 +3,6 @@
 import rclpy
 import numpy as np
 from rclpy.node import Node
-from px4_msgs.msg import VehicleLocalPosition
 from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 from geometry_msgs.msg import Point, PointStamped

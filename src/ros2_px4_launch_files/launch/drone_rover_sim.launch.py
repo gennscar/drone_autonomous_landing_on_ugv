@@ -10,7 +10,7 @@ def generate_launch_description():
         executable = "drone_controller",
         name = "DroneController",
         parameters = [
-        {"control_mode": 3}
+        {"control_mode": 2} #2 is follow, 3 is land
         ]
     )
     vehicle_controller_node = Node(
