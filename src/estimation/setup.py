@@ -22,7 +22,8 @@ setup(
         'console_scripts': [
             "uwb_positioning = estimation.uwb_positioning:main",
             "ins_positioning = estimation.ins_positioning:main",
-            "px4_positioning = estimation.px4_positioning:main"
+            "px4_positioning = estimation.px4_positioning:main",
+            "kf_positioning = estimation.kf_positioning:main"
         ],
     },
 )
