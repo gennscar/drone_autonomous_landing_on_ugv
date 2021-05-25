@@ -65,6 +65,13 @@ class VideoStreamerNode(Node):
         # Publish the image.
         # The 'cv2_to_imgmsg' method converts an OpenCV image to a ROS 2 image message        
         # Display image
+
+        start_point = (int(tags[0].corners[3][0]), int(tags[0].corners[3][1]))
+        end_point = (int(tags[0].corners[1][0]), int(tags[0].corners[1][1]))
+        center_x = int(tags[0].center[0])
+        center_y = int(tags[0].center[1])
+        frame_rgb = cv2.rectangle(frame_rgb, start_point, end_point, (0, 0, 255), 2)
+        frame_rgb = cv2.circle(frame_rgb, (center_x, center_y), 5, (0, 0, 255), -1)
         cv2.imshow("Video", frame_rgb)
         cv2.waitKey(1)    
         
