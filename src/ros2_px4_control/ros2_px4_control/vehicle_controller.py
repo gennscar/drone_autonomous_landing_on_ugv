@@ -12,14 +12,16 @@ from random import gauss
 seed(1)
 
 dt = 0.1
+noise_dt = 2
 t1 = 200 #100 #200
 t2 = t1 + 30
+
 lin_vel = 2.5
-curvature = True
 ang_vel = 0.5
 
-noise = True
-noise_dt = 2
+curvature = True
+noise = False
+
 
 class VehicleController(Node):
     def __init__(self):

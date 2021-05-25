@@ -32,8 +32,8 @@ from geometry_msgs.msg import Point
 from custom_interfaces.srv import ControlMode
 
 # Control parameters
-KP = 1.1 #1
-KI = 0.025 #0.03
+KP = 1.15 #1
+KI = 0.03 #0.03
 KD = 0.008 #0.0
 INT_MAX = 250/(KI*100) #float('inf')
 VMAX = 5.0 #float('inf')
@@ -286,7 +286,8 @@ class DroneController(Node):
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-            
+            self.get_logger().info("Following target..")
+
             return msg
 
     def setpoint_mode(self,msg):

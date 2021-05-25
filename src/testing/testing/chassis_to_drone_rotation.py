@@ -21,12 +21,20 @@ class UwbPubSub(Node):
         self.chassis_pos = [0.0, 0.0, 0.0]
         self.chassis_orientation = [0.0, 0.0, 0.0, 1.0]
 
+        # Parameters declaration
+        self.estimation_mode = self.declare_parameter("estimation_mode", "GN_10iter_uwb_estimator")
+
+        # Retrieve parameter values
+        self.estimation_mode = self.get_parameter(
+            "estimation_mode").get_parameter_value().string_value
+        self.estimation_topic = '/' + self.estimation_mode + '/estimated_pos'
+
         self.drone_position_subscriber = self.create_subscription(
             Odometry, "/uwb_sensor_iris/odom", self.callback_drone_position, 10)
         self.chassis_position_subscriber = self.create_subscription(
             Odometry, "/chassis/odom", self.callback_chassis_position, 10)
         self.uwb_position_wrt_chassis_position_subscriber = self.create_subscription(
-            PointStamped, "/GN_10iter_uwb_estimator/estimated_pos", self.callback_uwb_position_wrt_chassis, 10)
+            PointStamped, self.estimation_topic, self.callback_uwb_position_wrt_chassis, 10)
         self.target_coordinates_publisher = self.create_publisher(
             Point, "target_coordinates", 10)
         self.uwb_error_publisher = self.create_publisher(
