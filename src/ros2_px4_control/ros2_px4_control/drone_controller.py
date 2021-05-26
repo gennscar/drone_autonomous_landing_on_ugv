@@ -113,7 +113,7 @@ class DroneController(Node):
         self.vz = msg.vz
 
     def timer_callback(self):
-        if (self.offboard_setpoint_counter_ == 10 and self.LANDING_STATE == 0):
+        if (self.offboard_setpoint_counter_ == 10):
             self.publish_vehicle_command(176, 1.0, 6.0)
 
             self.get_logger().info("arming..")
@@ -122,9 +122,9 @@ class DroneController(Node):
         self.publish_offboard_control_mode()
         self.publish_trajectory_setpoint()
 
-        if (self.offboard_setpoint_counter_ < 30 and self.LANDING_STATE == 0):
+        if (self.offboard_setpoint_counter_ < 30):
             self.offboard_setpoint_counter_ += 1
-        elif (-self.z) < 0.5:
+        elif (-self.z) < 0.5 and self.TAKEOFF_STATE == 0:
             self.restart_drone()
 
     def callback_drone_status(self, msg):
@@ -278,11 +278,22 @@ class DroneController(Node):
             msg.x = float("NaN")
             msg.y = float("NaN")
             msg.z = - 3.0
+
+            if self.TAKEOFF_STATE == 0:
+                if -self.z <= LAND_HOVERING_HEIGHT:
+                    msg.z = - LAND_HOVERING_HEIGHT - 0.5
+                    return msg
+                else:
+                    self.TAKEOFF_STATE = 1
+            self.true_err = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
+            self.norm_true_err = np.linalg.norm(self.true_err, ord=2)
+
             if UWB_MODE == 1:
                 self.uwb_err = np.array(self.target_uwb_local_pos)
                 self.e = self.uwb_err
             else:
                 self.e = self.true_err
+
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = ros2_px4_functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)

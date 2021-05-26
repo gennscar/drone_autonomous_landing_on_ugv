@@ -15,7 +15,7 @@ def generate_launch_description():
             ]
         ),
         Node(
-            package='ros2_px4_testing',
+            package='ros2_px4_estimation',
             executable='drone_vehicle_uwb_positioning',
             namespace='drone_vehicle_uwb_positioning',
             parameters=[

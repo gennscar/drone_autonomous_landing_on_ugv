@@ -20,9 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "positioning_error = ros2_px4_testing.positioning_error:main",
-            "video_streamer = ros2_px4_testing.video_streamer:main",
-            "drone_vehicle_uwb_positioning = ros2_px4_testing.drone_vehicle_uwb_positioning:main"
+            "positioning_error = ros2_px4_testing.positioning_error:main"
         ],
     },
 )
