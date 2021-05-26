@@ -23,7 +23,7 @@ setup(
             "uwb_positioning = ros2_px4_estimation.uwb_positioning:main",
             "ins_positioning = ros2_px4_estimation.ins_positioning:main",
             "px4_positioning = ros2_px4_estimation.px4_positioning:main",
-            "kf_positioning = ros2_px4_estimation.kf_positioning:main"
+            "kf_positioning = ros2_px4_estimation.kf_loose_positioning:main"
         ],
     },
 )
