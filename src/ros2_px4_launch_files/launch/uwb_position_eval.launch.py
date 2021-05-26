@@ -15,25 +15,6 @@ def generate_launch_description():
         ),
         Node(
             package='ros2_px4_estimation',
-            executable='uwb_positioning',
-            namespace='GN_uwb_estimator',
-            parameters=[
-                {"sensor_id": "0"},
-                {"method": "GN"}
-            ]
-        ),
-        Node(
-            package='ros2_px4_estimation',
-            executable='uwb_positioning',
-            namespace='GN10iter_uwb_estimator',
-            parameters=[
-                {"sensor_id": "0"},
-                {"method": "GN"},
-                {"iterations": 10}
-            ]
-        ),
-        Node(
-            package='ros2_px4_estimation',
             executable='px4_positioning',
             namespace='PX4_estimator'
         ),
@@ -41,11 +22,6 @@ def generate_launch_description():
             package='ros2_px4_estimation',
             executable='kf_positioning',
             namespace='KF_estimator'
-        ),
-        Node(
-            package="ros2_px4_control",
-            executable="drone_controller",
-            name="DroneController"
         ),
         Node(
             package='ros2_px4_testing',

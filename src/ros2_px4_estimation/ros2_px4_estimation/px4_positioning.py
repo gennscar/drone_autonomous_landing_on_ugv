@@ -31,8 +31,8 @@ class Px4Positioning(Node):
         est_pos = PointStamped()
         est_pos.header.stamp = self.get_clock().now().to_msg()
         est_pos.header.frame_id = self.get_namespace() + "/estimated_pos"
-        est_pos.point.x = msg.x + 1.0
-        est_pos.point.y = msg.y + 1.0
+        est_pos.point.x = msg.y + 1.0
+        est_pos.point.y = msg.x + 1.0
         est_pos.point.z = -msg.z
         self.est_pos_publisher_.publish(est_pos)
 
