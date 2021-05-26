@@ -19,8 +19,9 @@
   <depend>nav_msgs</depend>
   <depend>gazebo_msgs</depend>
   <depend>ros2_px4_interfaces</depend>
-
+  <depend>uwb_interfaces</depend>
   <depend>sensor_msgs</depend>
+
   <depend>cv_bridge</depend>
   <depend>cv2</depend>
   <depend>dt_apriltags</depend>

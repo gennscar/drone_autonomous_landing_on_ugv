@@ -17,8 +17,10 @@ at_detector = Detector(searchpath=['apriltags'],
                        decode_sharpening=0.25,
                        debug=0)
 
-tags = at_detector.detect(img, estimate_tag_pose=False, camera_params=None, tag_size=None)
-#print(tags)
+camera_params = [1.05, 4, 1, 1]
+tag_size = 1
+
+tags = at_detector.detect(img, estimate_tag_pose=True, camera_params=camera_params, tag_size=tag_size)
 
 img_color = cv2.imread(imagepath)
 
@@ -28,6 +30,9 @@ center_x = int(tags[0].center[0])
 center_y = int(tags[0].center[1])
 img_color = cv2.rectangle(img_color, start_point, end_point, (0, 0, 255), 2)
 img_color = cv2.circle(img_color, (center_x, center_y), 10, (0, 0, 255), -1)
+
+pose_R = tags[0].pose_R
+pose_t = tags[0].pose_t
 
 cv2.imshow('image',img_color)
 cv2.waitKey(0)
