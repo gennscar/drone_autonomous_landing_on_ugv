@@ -76,8 +76,9 @@ def gauss_newton_trilateration(old_pos, anchors):
     anchor_pos, ranges, _ = extract_anchor_data(anchors)
 
     # Calculate Jacobian matrix
-    den = ((old_pos[0] - anchor_pos[:, 0])**2 + (old_pos[1] -
-                                                 anchor_pos[:, 1])**2 + (old_pos[2] - anchor_pos[:, 2])**2)**0.5
+    den = ((old_pos[0] - anchor_pos[:, 0])**2 +
+           (old_pos[1] - anchor_pos[:, 1])**2 +
+           (old_pos[2] - anchor_pos[:, 2])**2)**0.5
     num = np.transpose(old_pos) - anchor_pos
     J = np.divide(num, np.expand_dims(den, 1))
 
