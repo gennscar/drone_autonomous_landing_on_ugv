@@ -1,0 +1,9 @@
+int64[] timestamp
+string[] range_ok
+int32[] range_mes
+int32[] first_peak_pwr
+int32[] rx_pwr
+int16[]  cir_layout
+int64[] cir
+int32[] max_noise
+int32[] std_noise

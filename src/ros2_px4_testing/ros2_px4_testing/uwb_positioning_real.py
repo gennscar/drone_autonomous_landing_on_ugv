@@ -70,7 +70,7 @@ class UwbPositioning(Node):
             msg (UwbSensor): The message received by the plugin
         """
         ranges_ = np.array(msg.range_mes)
-        self.get_logger().info(f"{ranges_}")
+        #self.get_logger().info(f"{ranges_}")
 
         N_ = np.count_nonzero(ranges_)
 

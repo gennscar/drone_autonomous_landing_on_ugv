@@ -26,8 +26,8 @@ setup(
             "kf_positioning = ros2_px4_estimation.kf_loose_positioning:main",
             "video_streamer = ros2_px4_estimation.video_streamer:main",
             "drone_vehicle_uwb_positioning = ros2_px4_estimation.drone_vehicle_uwb_positioning:main",
-            "kf_drone_rover = ros2_px4_estimation.kf_drone_rover:main"
-
+            "kf_drone_rover = ros2_px4_estimation.kf_drone_rover:main",
+            "uwb_driver = ros2_px4_estimation.uwb_driver:main"
         ],
     },
 )
