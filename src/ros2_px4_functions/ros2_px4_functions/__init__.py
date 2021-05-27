@@ -8,5 +8,8 @@ from ros2_px4_functions.control_algorithms import gain_scheduling_optimizer
 from ros2_px4_functions.trilateration import ls_trilateration
 from ros2_px4_functions.trilateration import gauss_newton_trilateration
 
+from ros2_px4_functions.trilateration_real import ls_trilateration_real
+from ros2_px4_functions.trilateration_real import gauss_newton_trilateration_real
+
 # Geo conversion ros2_px4_functions
 from ros2_px4_functions.geo_conversion import lla_to_ecef
