@@ -9,10 +9,10 @@ from geometry_msgs.msg import Point, PointStamped
 from std_msgs.msg import Float64
 
 
-
 class UwbPubSub(Node):
     def __init__(self):
         super().__init__("drone_vehicle_uwb_pub_sub")
+        self.get_logger().info("uwb pub sub has started")
 
         self.uwb_position_wrt_world = [0.0, 0.0, 0.0]
         self.uwb_position_wrt_chassis = [0.0, 0.0, 0.0]
@@ -29,21 +29,26 @@ class UwbPubSub(Node):
             "estimation_mode").get_parameter_value().string_value
         self.estimation_topic = '/' + self.estimation_mode + '/estimated_pos'
 
-        self.drone_position_subscriber = self.create_subscription(
-            Odometry, "/uwb_sensor_iris/odom", self.callback_drone_position, 10)
-        self.chassis_position_subscriber = self.create_subscription(
-            Odometry, "/chassis/odom", self.callback_chassis_position, 10)
-        self.uwb_position_wrt_chassis_position_subscriber = self.create_subscription(
+        self.drone_true_position_subscriber = self.create_subscription(
+            Odometry, "/uwb_sensor_iris/odom", self.callback_drone_true_position, 10)
+       
+        self.chassis_pose_subscriber = self.create_subscription(
+            Odometry, "/chassis/odom", self.callback_chassis_true_pose, 10)
+        self.uwb_position_wrt_chassis = self.create_subscription(
             PointStamped, self.estimation_topic, self.callback_uwb_position_wrt_chassis, 10)
+        
+        
         self.target_coordinates_publisher = self.create_publisher(
             Point, "target_coordinates", 10)
+        self.ground_truth_publisher = self.create_publisher(
+            Point, "ground_truth", 10)
         self.uwb_error_publisher = self.create_publisher(
             Float64, "uwb_error", 10)
-        self.get_logger().info("uwb pub sub has started")
+
         self.timer = self.create_timer(0.1, self.timer_callback)
 
 
-    def callback_chassis_position(self, msg):
+    def callback_chassis_true_pose(self, msg):
         self.chassis_pos = [msg.pose.pose.position.x,
                             msg.pose.pose.position.y,
                             msg.pose.pose.position.z]
@@ -51,13 +56,15 @@ class UwbPubSub(Node):
                                      msg.pose.pose.orientation.y,
                                      msg.pose.pose.orientation.z,
                                      msg.pose.pose.orientation.w]
+
     def callback_uwb_position_wrt_chassis(self, msg):
         self.uwb_position_wrt_chassis = [msg.point.x, msg.point.y, msg.point.z]
 
-    def callback_drone_position(self, msg):
+    def callback_drone_true_position(self, msg):
         self.drone_global_pos = [msg.pose.pose.position.x,
                                  msg.pose.pose.position.y,
                                  msg.pose.pose.position.z]
+
 
     def publish_target_coordinates(self):
         msg = Point()
@@ -70,17 +77,23 @@ class UwbPubSub(Node):
     def timer_callback(self):
 
         self.rot_world_to_chassis = R.from_quat(self.chassis_orientation)
-
         self.uwb_position_wrt_world = - self.rot_world_to_chassis.apply(self.uwb_position_wrt_chassis)
+        self.publish_target_coordinates()
 
         self.true_pos = np.subtract(self.chassis_pos, self.drone_global_pos)
         self.err_vec = np.subtract(self.uwb_position_wrt_world, self.true_pos)
         self.err = np.linalg.norm(self.err_vec, ord=2)
-
-        self.publish_target_coordinates()
         err_ = Float64()
         err_.data = self.err
         self.uwb_error_publisher.publish(err_)
+
+        ground_truth = Point()
+        ground_truth.x = self.true_pos[0]
+        ground_truth.y = self.true_pos[1]
+        ground_truth.z = self.true_pos[2]
+
+        self.ground_truth_publisher.publish(ground_truth)
+
 
 def main(args=None):
 
