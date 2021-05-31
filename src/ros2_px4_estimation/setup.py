@@ -21,9 +21,9 @@ setup(
     entry_points={
         'console_scripts': [
             "uwb_positioning = ros2_px4_estimation.uwb_positioning:main",
-            "ins_positioning = ros2_px4_estimation.ins_positioning:main",
             "px4_positioning = ros2_px4_estimation.px4_positioning:main",
-            "kf_positioning = ros2_px4_estimation.kf_loose_positioning:main",
+            "kf_loose_positioning = ros2_px4_estimation.kf_loose_positioning:main",
+            "kf_tight_positioning = ros2_px4_estimation.kf_tight_positioning:main",
             "video_streamer = ros2_px4_estimation.video_streamer:main",
             "drone_vehicle_uwb_positioning = ros2_px4_estimation.drone_vehicle_uwb_positioning:main",
             "kf_drone_rover = ros2_px4_estimation.kf_drone_rover:main",
