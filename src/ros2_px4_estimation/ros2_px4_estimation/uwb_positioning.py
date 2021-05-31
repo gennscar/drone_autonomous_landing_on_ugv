@@ -58,12 +58,11 @@ class UwbPositioning(Node):
         self.position_mse_publisher_ = self.create_publisher(
             PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
 
-        self.get_logger().info(f"""
-                                Node has started:
-                                  Sensor ID:  {self.sensor_id_}
-                                  Method:     {self.method_}
-                                  Iterations  {self.iterations_}
-                                """)
+        self.get_logger().info(f"""Node has started:
+                               Sensor ID:  {self.sensor_id_}
+                               Method:     {self.method_}
+                               Iterations  {self.iterations_}
+                              """)
 
     def callback_sensor_subscriber(self, msg):
         """
@@ -104,7 +103,7 @@ class UwbPositioning(Node):
                 # Perform N iterations of GN
                 for _ in range(self.iterations_):
                     self.sensor_est_pos_ = ros2_px4_functions.gauss_newton_trilateration(
-                        self.sensor_est_pos_, anchor_pos, ranges, N)
+                        self.sensor_est_pos_, anchor_pos, ranges)
 
             # Sending the estimated position and the name of the node that generated it
             msg = PoseWithCovarianceStamped()
