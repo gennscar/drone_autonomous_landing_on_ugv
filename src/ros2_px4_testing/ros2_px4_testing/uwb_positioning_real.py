@@ -5,7 +5,7 @@ import numpy as np
 from rclpy.node import Node
 
 from geometry_msgs.msg import PointStamped
-from uwb_interfaces.msg import Uwb
+from ros2_px4_interfaces.msg import Uwb
 
 import ros2_px4_functions
 
