@@ -36,7 +36,7 @@ class PositioningError(Node):
                 self.create_subscription(
                     PoseWithCovarianceStamped, topic_name, self.callback_sensor_subscriber, 10)
                 self.estimator_topics_[topic_name] = self.create_publisher(
-                    Error, topic_name.replace("estimated_pos", "") + "mse", 10)
+                    Error, topic_name.replace("estimated_pos", "") + "error", 10)
 
                 self.get_logger().info(f"""
                                        Connected to: {topic_name}
@@ -61,11 +61,29 @@ class PositioningError(Node):
         error = Error()
         error.header.stamp = self.get_clock().now().to_msg()
         error.header.frame_id = msg.header.frame_id
-        if(self.sensor_real_pos_ == []):
-            error.current = float('NaN')
-        else:
-            error.current = np.linalg.norm(
-                sensor_est_pos - self.sensor_real_pos_, ord=2)
+
+        if(self.sensor_real_pos_ != []):
+            diff = sensor_est_pos - self.sensor_real_pos_
+
+            error.mse = np.linalg.norm(diff)
+            error.rmse = np.sqrt(error.mse)
+
+            P = np.array([
+                [
+                    msg.pose.covariance[0], msg.pose.covariance[1], msg.pose.covariance[2]
+                ],
+                [
+                    msg.pose.covariance[3], msg.pose.covariance[4], msg.pose.covariance[5]
+                ],
+                [
+                    msg.pose.covariance[6], msg.pose.covariance[7], msg.pose.covariance[8]
+                ]
+            ])
+
+            if(np.linalg.det(P) > 1e-9):
+                dP = np.matmul(np.transpose(
+                    diff), np.linalg.inv(P))
+                error.nees = np.matmul(dP, diff)
 
         # Sending error message only if the estimator is valid
         if(msg.header.frame_id in self.estimator_topics_.keys()):
