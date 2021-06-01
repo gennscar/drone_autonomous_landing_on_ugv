@@ -65,8 +65,8 @@ class PositioningError(Node):
         if(self.sensor_real_pos_ != []):
             diff = sensor_est_pos - self.sensor_real_pos_
 
-            error.mse = np.linalg.norm(diff)
-            error.rmse = np.sqrt(error.mse)
+            error.rmse = np.linalg.norm(diff)
+            error.mse = error.rmse**2
 
             P = np.array([
                 [

@@ -3,14 +3,14 @@ from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 
 ukf_params = [
-    [{'deltaT': 1e-2}, {'R_uwb': 1e-4},
-        {'R_px4': 1.}, {'Q': 0.1}, {'AdaptG': 1200.}],
-    [{'deltaT': 1e-2}, {'R_uwb': 1e-4},
-        {'R_px4': 1.}, {'Q': 0.1}, {'AdaptG': 1200.}],
-    [{'deltaT': 1e-2}, {'R_uwb': 1e-4},
-        {'R_px4': 1.}, {'Q': 0.1}, {'AdaptG': 1200.}],
-    [{'deltaT': 1e-2}, {'R_uwb': 1e-4},
-        {'R_px4': 1.}, {'Q': 0.1}, {'AdaptG': 1200.}],
+    [{'deltaT': 1e-2}, {'R_uwb': 0.0002},
+        {'R_px4': 5.}, {'Q': 0.05}, {'AdaptG': 0.2}],
+    # [{'deltaT': 1e-2}, {'R_uwb': 0.0002},
+    #    {'R_px4': 5.}, {'Q': 0.05}, {'AdaptG': 0.2}],
+    # [{'deltaT': 1e-2}, {'R_uwb': 0.0002},
+    #    {'R_px4': 5.}, {'Q': 0.05}, {'AdaptG': 0.2}],
+    # [{'deltaT': 1e-2}, {'R_uwb': 0.0002},
+    #    {'R_px4': 5.}, {'Q': 0.05}, {'AdaptG': 0.2}],
 ]
 
 
@@ -29,20 +29,9 @@ def generate_launch_description():
 
     ld.add_entity(Node(
         package='ros2_px4_estimation',
-        executable='uwb_positioning',
-        namespace='LS_uwb_estimator',
-        parameters=[
-                {"sensor_id": "0"},
-                {"method": "LS"}
-        ]
-    ))
-
-    ld.add_entity(Node(
-        package='ros2_px4_estimation',
         executable='px4_positioning',
         namespace='PX4_estimator'
-    )
-    )
+    ))
 
     ld.add_entity(Node(
         package='ros2_px4_testing',

@@ -112,7 +112,7 @@ class UkfPositioning(Node):
             self.kalman_filter_.x[4],
             self.kalman_filter_.x[7]
         ])
-        R_adapt = self.R_uwb_ * (1. + self.AdaptG_ * np.linalg.norm(v))
+        R_adapt = self.R_uwb_ + self.AdaptG_ * np.linalg.norm(v)
 
         # Filter update
         self.kalman_filter_.update(z, R=R_adapt, hx=h_uwb)
