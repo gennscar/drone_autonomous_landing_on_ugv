@@ -33,6 +33,21 @@ def generate_launch_description():
             ]
         ),
         Node(
+            package='ros2_px4_estimation',
+            executable='px4_positioning',
+            namespace='PX4_estimator'
+        ),
+        Node(
+            package='ros2_px4_estimation',
+            executable='kf_tight_positioning',
+            namespace='KF2_estimator'
+        ),
+        Node(
+            package='ros2_px4_estimation',
+            executable='ukf_positioning',
+            namespace='UKF_estimator'
+        ),
+        Node(
             package='ros2_px4_testing',
             executable='positioning_error',
             namespace='positioning_error'
