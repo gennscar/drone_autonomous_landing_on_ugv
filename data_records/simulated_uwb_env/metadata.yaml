@@ -1,0 +1,31 @@
+rosbag2_bagfile_information:
+  version: 4
+  storage_identifier: sqlite3
+  relative_file_paths:
+    - simulated_uwb_env_0.db3
+  duration:
+    nanoseconds: 62900124500
+  starting_time:
+    nanoseconds_since_epoch: 1622551348484320400
+  message_count: 23093
+  topics_with_message_count:
+    - topic_metadata:
+        name: /VehicleLocalPosition_PubSubTopic
+        type: px4_msgs/msg/VehicleLocalPosition
+        serialization_format: cdr
+        offered_qos_profiles: ""
+      message_count: 6178
+    - topic_metadata:
+        name: /uwb_sensor_0
+        type: gazebo_msgs/msg/UwbSensor
+        serialization_format: cdr
+        offered_qos_profiles: "- history: 1\n  depth: 100\n  reliability: 1\n  durability: 2\n  deadline:\n    sec: 9223372036\n    nsec: 854775807\n  lifespan:\n    sec: 9223372036\n    nsec: 854775807\n  liveliness: 1\n  liveliness_lease_duration:\n    sec: 9223372036\n    nsec: 854775807\n  avoid_ros_namespace_conventions: false"
+      message_count: 1252
+    - topic_metadata:
+        name: /uwb_sensor_iris/odom
+        type: nav_msgs/msg/Odometry
+        serialization_format: cdr
+        offered_qos_profiles: "- history: 1\n  depth: 5\n  reliability: 1\n  durability: 2\n  deadline:\n    sec: 9223372036\n    nsec: 854775807\n  lifespan:\n    sec: 9223372036\n    nsec: 854775807\n  liveliness: 1\n  liveliness_lease_duration:\n    sec: 9223372036\n    nsec: 854775807\n  avoid_ros_namespace_conventions: false"
+      message_count: 15663
+  compression_format: ""
+  compression_mode: ""
