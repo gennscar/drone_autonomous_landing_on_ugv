@@ -8,12 +8,12 @@ import scipy
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from gazebo_msgs.msg import UwbSensor
 from px4_msgs.msg import VehicleLocalPosition
 
 
-class UwbEfk(Node):
+class KfTightPositioning(Node):
     """
     EKF
     """
@@ -37,11 +37,11 @@ class UwbEfk(Node):
         self.kalman_filter_.F = scipy.linalg.block_diag(*[f]*3)
 
         # Covariance matrix
-        self.kalman_filter_.P *= 1000.
+        self.kalman_filter_.P *= 100.
 
         # Process noise
         self.kalman_filter_.Q = Q_discrete_white_noise(
-            dim=3, dt=dT, var=1e-3, block_size=3)
+            dim=3, dt=dT, var=1e-2, block_size=3)
 
         # Setting up sensors subscribers
         self.sensor_subscriber_ = self.create_subscription(
@@ -51,7 +51,7 @@ class UwbEfk(Node):
 
         # Setting up position publisher
         self.est_pos_publisher_ = self.create_publisher(
-            PointStamped, self.get_namespace() + "/estimated_pos", 10)
+            PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
 
         # Prediction timer
         self.timer = self.create_timer(dT, self.predict_callback)
@@ -86,7 +86,7 @@ class UwbEfk(Node):
         )
 
         # Filter update
-        self.kalman_filter_.update(z, R=0.1, H=H)
+        self.kalman_filter_.update(z, R=1e-3, H=H)
 
     def callback_px4_subscriber(self, msg):
         # Storing measurement in a np.array
@@ -97,26 +97,39 @@ class UwbEfk(Node):
         ])
 
         # Filter update
-        self.kalman_filter_.update(z, R=0.01, H=np.eye(9))
+        self.kalman_filter_.update(z, R=0.1, H=np.eye(9))
 
     def predict_callback(self):
         if(np.linalg.norm(self.kalman_filter_.P) < 1):
             # Sending the estimated position
-            msg = PointStamped()
+            msg = PoseWithCovarianceStamped()
             msg.header.frame_id = self.get_namespace() + "/estimated_pos"
             msg.header.stamp = self.get_clock().now().to_msg()
-            msg.point.x = self.kalman_filter_.x[0]
-            msg.point.y = self.kalman_filter_.x[3]
-            msg.point.z = self.kalman_filter_.x[6]
+
+            msg.pose.pose.position.x = self.kalman_filter_.x[0]
+            msg.pose.pose.position.y = self.kalman_filter_.x[3]
+            msg.pose.pose.position.z = self.kalman_filter_.x[6]
+
+            '''
+            msg.pose.covariance[0] = self.kalman_filter_.P[0][0]
+            msg.pose.covariance[1] = self.kalman_filter_.P[0][1]
+            msg.pose.covariance[2] = self.kalman_filter_.P[0][2]
+            msg.pose.covariance[6] = self.kalman_filter_.P[1][0]
+            msg.pose.covariance[7] = self.kalman_filter_.P[1][1]
+            msg.pose.covariance[8] = self.kalman_filter_.P[1][2]
+            msg.pose.covariance[12] = self.kalman_filter_.P[2][0]
+            msg.pose.covariance[13] = self.kalman_filter_.P[2][1]
+            msg.pose.covariance[14] = self.kalman_filter_.P[2][2]
+            '''
             self.est_pos_publisher_.publish(msg)
 
-        # Filter predict
-        self.kalman_filter_.predict()
+            # Filter predict
+            self.kalman_filter_.predict()
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = UwbEfk()
+    node = KfTightPositioning()
     rclpy.spin(node)
     rclpy.shutdown()
 
