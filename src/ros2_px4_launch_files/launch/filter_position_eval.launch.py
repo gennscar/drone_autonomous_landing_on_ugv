@@ -1,16 +1,13 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
+from launch.actions import Shutdown
 
 ukf_params = [
-    [{'deltaT': 1e-2}, {'R_uwb': 0.0002},
-        {'R_px4': 5.}, {'Q': 0.05}, {'AdaptG': 0.2}],
-    # [{'deltaT': 1e-2}, {'R_uwb': 0.0002},
-    #    {'R_px4': 5.}, {'Q': 0.05}, {'AdaptG': 0.2}],
-    # [{'deltaT': 1e-2}, {'R_uwb': 0.0002},
-    #    {'R_px4': 5.}, {'Q': 0.05}, {'AdaptG': 0.2}],
-    # [{'deltaT': 1e-2}, {'R_uwb': 0.0002},
-    #    {'R_px4': 5.}, {'Q': 0.05}, {'AdaptG': 0.2}],
+    [{'deltaT': 1e-2}, {'R_uwb': 2e-4}, {'R_px4': 0.01}, {'Q': 0.02}],
+    [{'deltaT': 1e-2}, {'R_uwb': 1e-4}, {'R_px4': 0.01}, {'Q': 0.02}],
+    [{'deltaT': 1e-2}, {'R_uwb': 5e-5}, {'R_px4': 0.01}, {'Q': 0.02}],
+    [{'deltaT': 1e-2}, {'R_uwb': 2e-5}, {'R_px4': 0.01}, {'Q': 0.02}],
 ]
 
 
@@ -48,8 +45,9 @@ def generate_launch_description():
         ))
 
     ld.add_action(ExecuteProcess(
-        cmd=['ros2', 'bag', 'play', 'data_records/simulated_uwb_env'],
-        output='screen'
+        cmd=['ros2', 'bag', 'play', 'data_records/simulated_uwb_gazebo'],
+        output='screen',
+        on_exit=Shutdown()
     ))
 
     return ld

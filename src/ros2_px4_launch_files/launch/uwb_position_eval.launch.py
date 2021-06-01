@@ -39,13 +39,13 @@ def generate_launch_description():
         ),
         Node(
             package='ros2_px4_estimation',
-            executable='kf_tight_positioning',
-            namespace='KF2_estimator'
-        ),
-        Node(
-            package='ros2_px4_estimation',
             executable='ukf_positioning',
-            namespace='UKF_estimator'
+            namespace='UKF_estimator',
+            parameters=[{'deltaT': 1e-2},
+                        {'R_uwb': 0.0002},
+                        {'R_px4': 5.},
+                        {'Q': 0.05},
+                        {'AdaptG': 0.2}]
         ),
         Node(
             package='ros2_px4_testing',

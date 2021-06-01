@@ -26,7 +26,6 @@ class UkfPositioning(Node):
         self.declare_parameter('R_uwb', 1.)
         self.declare_parameter('R_px4', 1.)
         self.declare_parameter('Q', 1.)
-        self.declare_parameter('AdaptG', 1.)
 
         self.deltaT_ = self.get_parameter(
             'deltaT').get_parameter_value().double_value
@@ -35,8 +34,6 @@ class UkfPositioning(Node):
         self.R_px4_ = self.get_parameter(
             'R_px4').get_parameter_value().double_value
         self.Q_ = self.get_parameter('Q').get_parameter_value().double_value
-        self.AdaptG_ = self.get_parameter(
-            'AdaptG').get_parameter_value().double_value
 
         self.predicted_ = False
 
@@ -63,7 +60,7 @@ class UkfPositioning(Node):
         # State transition matrix
 
         # Covariance matrix
-        self.kalman_filter_.P *= 100.
+        self.kalman_filter_.P *= 10.
 
         # Process noise
         self.kalman_filter_.Q = Q_discrete_white_noise(
@@ -107,15 +104,8 @@ class UkfPositioning(Node):
             r = np.linalg.norm(x[[0, 3, 6]] - anc_pos)
             return np.array([r, 0., 0., 0., 0., 0., 0., 0., 0.])
 
-        v = np.array([
-            self.kalman_filter_.x[1],
-            self.kalman_filter_.x[4],
-            self.kalman_filter_.x[7]
-        ])
-        R_adapt = self.R_uwb_ + self.AdaptG_ * np.linalg.norm(v)
-
         # Filter update
-        self.kalman_filter_.update(z, R=R_adapt, hx=h_uwb)
+        self.kalman_filter_.update(z, R=self.R_uwb_, hx=h_uwb)
 
     def callback_px4_subscriber(self, msg):
         if(not self.predicted_):
