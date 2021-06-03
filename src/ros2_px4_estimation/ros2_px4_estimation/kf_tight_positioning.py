@@ -3,145 +3,133 @@
 import rclpy
 from rclpy.node import Node
 import numpy as np
+import scipy
 
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from gazebo_msgs.msg import UwbSensor
+from px4_msgs.msg import VehicleLocalPosition
 
 
-class UwbEfk(Node):
+class KfTightPositioning(Node):
     """
     EKF
     """
 
     def __init__(self):
-        super().__init__("uwb_ekf")
+        super().__init__("kf_tight_positioning")
 
-        dT = 0.2
-        self.anchors_ = []
+        dT = 0.01
 
         # Kalman Filter
-        self.kalman_filter_ = KalmanFilter(dim_x=6, dim_z=4)
-
-        # Initial state x dx y dy z dz
-        self.kalman_filter_.x = np.array([0.1, 0., 0.1, 0., 0.1, 0.])
+        self.kalman_filter_ = KalmanFilter(dim_x=9, dim_z=9)
+        self.kalman_filter_.x = np.array(
+            [1., 0., 0., 1., 0., 0., 1., 0., 0.])
 
         # State transition matrix
-        self.kalman_filter_.F = np.array([
-            [1., dT, 0., 0., 0., 0.],
-            [0., 1., 0., 0., 0., 0.],
-            [0., 0., 1., dT, 0., 0.],
-            [0., 0., 0., 1., 0., 0.],
-            [0., 0., 0., 0., 1., dT],
-            [0., 0., 0., 0., 0., 1.]
+        f = np.array([
+            [1., dT, 0.5*dT**2.],
+            [0., 1.,         dT],
+            [0., 0.,         1.]
         ])
+        self.kalman_filter_.F = scipy.linalg.block_diag(*[f]*3)
 
         # Covariance matrix
-        self.kalman_filter_.P *= 1000.
-
-        # Measurement noise
-        self.kalman_filter_.R = 0.01
+        self.kalman_filter_.P *= 100.
 
         # Process noise
         self.kalman_filter_.Q = Q_discrete_white_noise(
-            dim=2, dt=dT, var=1e-4, block_size=3)
+            dim=3, dt=dT, var=1e-2, block_size=3)
 
         # Setting up sensors subscribers
         self.sensor_subscriber_ = self.create_subscription(
-            UwbSensor, "/uwb_sensor_0", self.callback_sensor_subscriber, 10)
+            UwbSensor, "/uwb_sensor_0", self.callback_uwb_subscriber, 10)
+        self.sensor_subscriber_ = self.create_subscription(
+            VehicleLocalPosition, "/VehicleLocalPosition_PubSubTopic", self.callback_px4_subscriber, 10)
 
         # Setting up position publisher
         self.est_pos_publisher_ = self.create_publisher(
-            PointStamped, self.get_namespace() + "/estimated_pos", 10)
+            PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
+
+        # Prediction timer
+        self.timer = self.create_timer(dT, self.predict_callback)
 
         self.get_logger().info("Node has started")
 
-    def callback_sensor_subscriber(self, msg):
-        # Saving the message in a dict
-        anchor_data = {}
-        anchor_data['timestamp'] = msg.timestamp
-        anchor_data['anchor_pos'] = np.array([
-            msg.anchor_pos.x,
-            msg.anchor_pos.y,
-            msg.anchor_pos.z
-        ])
-        anchor_data['range'] = msg.range
-        self.anchors_.append(anchor_data)
-
-        # Removing old anchors
-        tmp_anchors = [
-            a for a in self.anchors_ if msg.timestamp - a['timestamp'] < 0.01]
-        self.anchors_ = tmp_anchors
-
-        # Initiating update only if 4 ranges are avaiables
-        if len(self.anchors_) < 4:
-            return
+    def callback_uwb_subscriber(self, msg):
+        # Storing measurement in a np.array
+        z = np.array([msg.range, 0., 0., 0., 0., 0., 0., 0., 0.])
 
         # Storing current estimate in a np.array
-        p = np.array([self.kalman_filter_.x[0],
-                      self.kalman_filter_.x[2],
-                      self.kalman_filter_.x[4]])
+        est_pos = np.array([self.kalman_filter_.x[0],
+                            self.kalman_filter_.x[3],
+                            self.kalman_filter_.x[6]])
+
+        # Storing anchor position in a np.array
+        anc_pos = np.array([msg.anchor_pos.x,
+                            msg.anchor_pos.y,
+                            msg.anchor_pos.z])
 
         # Calculating the ranges with the estimated position
-        est_ranges = [np.linalg.norm(p - a['anchor_pos'])
-                      for a in self.anchors_]
-
-        self.get_logger().info(f"""
-                               x          {self.kalman_filter_.x}
-                               p          {p}
-                               est_ranges {est_ranges}
-                               anchors_   {self.anchors_}
-                               """)
+        den = np.linalg.norm(est_pos - anc_pos)
 
         # Deriving H
-        self.kalman_filter_.H = np.array([
-            [
-                (p[0] - self.anchors_[0]['anchor_pos'][0]) / est_ranges[0], 0.,
-                (p[1] - self.anchors_[0]['anchor_pos'][1]) / est_ranges[0], 0.,
-                (p[2] - self.anchors_[0]['anchor_pos'][2]) / est_ranges[0], 0.
-            ],
-            [
-                (p[0] - self.anchors_[1]['anchor_pos'][0]) / est_ranges[1], 0.,
-                (p[1] - self.anchors_[1]['anchor_pos'][1]) / est_ranges[1], 0.,
-                (p[2] - self.anchors_[1]['anchor_pos'][2]) / est_ranges[1], 0.
-            ],
-            [
-                (p[0] - self.anchors_[2]['anchor_pos'][0]) / est_ranges[2], 0.,
-                (p[1] - self.anchors_[2]['anchor_pos'][1]) / est_ranges[2], 0.,
-                (p[2] - self.anchors_[2]['anchor_pos'][2]) / est_ranges[2], 0.
-            ],
-            [
-                (p[0] - self.anchors_[3]['anchor_pos'][0]) / est_ranges[3], 0.,
-                (p[1] - self.anchors_[3]['anchor_pos'][1]) / est_ranges[3], 0.,
-                (p[2] - self.anchors_[3]['anchor_pos'][2]) / est_ranges[3], 0.
-            ]
-        ])  # KINDA SUS
+        H = np.concatenate((
+            np.array([[
+                (est_pos[0]-anc_pos[0]) / den, 0., 0.,
+                (est_pos[1]-anc_pos[1]) / den, 0., 0.,
+                (est_pos[2]-anc_pos[2]) / den, 0., 0.
+            ]]),
+            np.zeros((8, 9)))
+        )
 
-        self.get_logger().info(f"""
-                               H {self.kalman_filter_.H}
-                               """)
+        # Filter update
+        self.kalman_filter_.update(z, R=1e-3, H=H)
 
-        # Filter predict and update
-        self.kalman_filter_.predict()
-        self.kalman_filter_.update([a['range'] for a in self.anchors_])
+    def callback_px4_subscriber(self, msg):
+        # Storing measurement in a np.array
+        z = np.array([
+            msg.y + 1.0,  msg.vy,  msg.ay,
+            msg.x + 1.0,  msg.vx,  msg.ax,
+            -msg.z,      -msg.vz, -msg.az
+        ])
 
-        # Sending the estimated position
-        msg = PointStamped()
-        msg.header.frame_id = self.get_namespace() + "/estimated_pos"
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.point.x = self.kalman_filter_.x[0]
-        msg.point.y = self.kalman_filter_.x[2]
-        msg.point.z = self.kalman_filter_.x[4]
-        self.est_pos_publisher_.publish(msg)
+        # Filter update
+        self.kalman_filter_.update(z, R=0.1, H=np.eye(9))
 
-        self.get_logger().info(f"""{msg}""")
+    def predict_callback(self):
+        if(np.linalg.norm(self.kalman_filter_.P) < 1):
+            # Sending the estimated position
+            msg = PoseWithCovarianceStamped()
+            msg.header.frame_id = self.get_namespace() + "/estimated_pos"
+            msg.header.stamp = self.get_clock().now().to_msg()
+
+            msg.pose.pose.position.x = self.kalman_filter_.x[0]
+            msg.pose.pose.position.y = self.kalman_filter_.x[3]
+            msg.pose.pose.position.z = self.kalman_filter_.x[6]
+
+            '''
+            msg.pose.covariance[0] = self.kalman_filter_.P[0][0]
+            msg.pose.covariance[1] = self.kalman_filter_.P[0][1]
+            msg.pose.covariance[2] = self.kalman_filter_.P[0][2]
+            msg.pose.covariance[6] = self.kalman_filter_.P[1][0]
+            msg.pose.covariance[7] = self.kalman_filter_.P[1][1]
+            msg.pose.covariance[8] = self.kalman_filter_.P[1][2]
+            msg.pose.covariance[12] = self.kalman_filter_.P[2][0]
+            msg.pose.covariance[13] = self.kalman_filter_.P[2][1]
+            msg.pose.covariance[14] = self.kalman_filter_.P[2][2]
+            '''
+            self.est_pos_publisher_.publish(msg)
+
+            # Filter predict
+            self.kalman_filter_.predict()
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = UwbEfk()
+    node = KfTightPositioning()
     rclpy.spin(node)
     rclpy.shutdown()
 
