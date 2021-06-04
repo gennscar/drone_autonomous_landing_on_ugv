@@ -80,10 +80,13 @@ class PositioningError(Node):
                 ]
             ])
 
-            if(np.linalg.det(P) > 1e-9):
-                dP = np.matmul(np.transpose(
-                    diff), np.linalg.inv(P))
-                error.nees = np.matmul(dP, diff)
+            try:
+                Pinv = np.linalg.inv(P)
+            except:
+                pass
+            else:
+                error.nees = np.matmul(
+                    np.matmul(np.transpose(diff), Pinv), diff)
 
         # Sending error message only if the estimator is valid
         if(msg.header.frame_id in self.estimator_topics_.keys()):
