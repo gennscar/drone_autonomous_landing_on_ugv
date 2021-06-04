@@ -8,7 +8,7 @@ import scipy
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
-from geometry_msgs.msg import PointStamped, Point
+from geometry_msgs.msg import PointStamped, PoseWithCovarianceStamped
 from px4_msgs.msg import VehicleLocalPosition, VehicleOdometry
 
 class KfLoosePositioning(Node):
@@ -46,7 +46,7 @@ class KfLoosePositioning(Node):
 
         # Setting up sensors subscribers
         self.uwb_sensor_subscriber_ = self.create_subscription(
-            Point, "/drone_vehicle_uwb_positioning/target_coordinates", self.callback_uwb_subscriber, 10)
+            PoseWithCovarianceStamped, "/LS_uwb_estimator/estimated_pos", self.callback_uwb_subscriber, 10)
         self.px4_sensor_subscriber_ = self.create_subscription(
             VehicleLocalPosition, "/VehicleLocalPosition_PubSubTopic", self.callback_px4_subscriber, 10)
         self.px4_covariance_subscriber_ = self.create_subscription(
@@ -54,7 +54,7 @@ class KfLoosePositioning(Node):
         
         # Setting up position publisher
         self.est_pos_publisher_ = self.create_publisher(
-            PointStamped, "kf_target_coordinates", 10)
+            PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
 
         # Prediction timer
         self.timer = self.create_timer(dT, self.predict_callback)
@@ -64,9 +64,9 @@ class KfLoosePositioning(Node):
     def callback_uwb_subscriber(self, msg):
         # Storing current estimate in a np.array
         z = np.array([
-            msg.x,
-            msg.y,
-            msg.z,
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y,
+            0.,
             0.,
             0.,
             0.,
@@ -84,13 +84,15 @@ class KfLoosePositioning(Node):
             0.
         ])
 
-        R = 0.000625
+        est_vel_ = np.array([self.kalman_filter_.x[10][0] - self.kalman_filter_.x[1][0], self.kalman_filter_.x[13][0] - self.kalman_filter_.x[4][0], self.kalman_filter_.x[16][0] - self.kalman_filter_.x[7][0]])
+        norm_v_ = np.linalg.norm(est_vel_, ord=2)
+        G_adaptive = 1
+        R = 0.000625#*(1+G_adaptive*norm_v_)
 
         H = np.block([
             [-1., np.zeros((1,8)), 1., np.zeros((1,8))],
             [np.zeros((1,3)), -1., np.zeros((1,8)), 1., np.zeros((1,5))],
-            [np.zeros((1,6)), -1., np.zeros((1,8)), 1., np.zeros((1,2))],
-            [np.zeros((15,18))]
+            [np.zeros((16,18))]
         ])
 
         # Filter update
@@ -107,7 +109,7 @@ class KfLoosePositioning(Node):
             0.,           0.,      0.,
         ])
 
-        R = 0.1
+        R = 0.0625
 
         H = np.block([
             [np.eye(9), np.zeros((9,9))],
@@ -121,12 +123,12 @@ class KfLoosePositioning(Node):
 
     def predict_callback(self):
         # Sending the estimated position
-        msg = PointStamped()
+        msg = PoseWithCovarianceStamped()
         msg.header.frame_id = self.get_namespace() + "/estimated_pos"
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.point.x = self.kalman_filter_.x[9][0] - self.kalman_filter_.x[0][0]
-        msg.point.y = self.kalman_filter_.x[12][0] - self.kalman_filter_.x[3][0]
-        msg.point.z = self.kalman_filter_.x[15][0] - self.kalman_filter_.x[6][0]
+        msg.pose.pose.position.x = self.kalman_filter_.x[9][0] - self.kalman_filter_.x[0][0]
+        msg.pose.pose.position.y = self.kalman_filter_.x[12][0] - self.kalman_filter_.x[3][0]
+        msg.pose.pose.position.z = self.kalman_filter_.x[15][0] - self.kalman_filter_.x[6][0]
         self.est_pos_publisher_.publish(msg)
 
         self.kalman_filter_.predict()

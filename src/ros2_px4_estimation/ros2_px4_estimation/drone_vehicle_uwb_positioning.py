@@ -3,106 +3,138 @@
 import rclpy
 import numpy as np
 from rclpy.node import Node
+
 from nav_msgs.msg import Odometry
+from gazebo_msgs.msg import UwbSensor
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from scipy.spatial.transform import Rotation as R
-from geometry_msgs.msg import Point, PointStamped
-from std_msgs.msg import Float64
+
+import ros2_px4_functions
 
 
-class UwbPubSub(Node):
+class UwbPositioning(Node):
+    """
+    Node to estimate the position using only the UWB
+
+    Params:
+      sensor_id (str): The anchor ID of the UWB sensor that need to be tracked
+        is the <anchor_id> param provided @ the UWB gazebo plugin
+
+      method (str): Can be "LS" or "GN":
+        "LS" is the Least-Square method
+        "GN" is for the Gauss-Newton method
+
+      iterations (int): Numbers of iterations, valid only with the GN method
+    """
+
     def __init__(self):
-        super().__init__("drone_vehicle_uwb_pub_sub")
-        self.get_logger().info("uwb pub sub has started")
+        super().__init__("uwb_positioning")
 
-        self.uwb_position_wrt_world = [0.0, 0.0, 0.0]
-        self.uwb_position_wrt_chassis = [0.0, 0.0, 0.0]
-
-        self.drone_global_pos = [0.0, 0.0, 0.0]
-        self.chassis_pos = [0.0, 0.0, 0.0]
-        self.chassis_orientation = [0.0, 0.0, 0.0, 1.0]
+        self.anchors_ = {}
+        self.sensor_est_pos_ = [0.01, 0.01, 0.01]  # @todo Need to be random
 
         # Parameters declaration
-        self.estimation_mode = self.declare_parameter("estimation_mode", "GN_10iter_uwb_estimator")
+        self.sensor_id_ = self.declare_parameter("sensor_id", "0")
+        self.method_ = self.declare_parameter("method", "LS")
+        self.iterations_ = self.declare_parameter("iterations", 1)
 
         # Retrieve parameter values
-        self.estimation_mode = self.get_parameter(
-            "estimation_mode").get_parameter_value().string_value
-        self.estimation_topic = '/' + self.estimation_mode + '/estimated_pos'
+        self.sensor_id_ = self.get_parameter(
+            "sensor_id").get_parameter_value().string_value
+        self.method_ = self.get_parameter(
+            "method").get_parameter_value().string_value
+        self.iterations_ = self.get_parameter(
+            "iterations").get_parameter_value().integer_value
 
-        self.drone_true_position_subscriber = self.create_subscription(
-            Odometry, "/uwb_sensor_iris/odom", self.callback_drone_true_position, 10)
-       
+        # Namespace check
+        if(self.get_namespace() == '/'):
+            self.get_logger().error("uwb_positioning need a namespace")
+            self.destroy_node()
+
+        # Setting up sensors subscriber for the UWB plugin
+        self.sensor_subscriber_ = self.create_subscription(
+            UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
         self.chassis_pose_subscriber = self.create_subscription(
             Odometry, "/chassis/odom", self.callback_chassis_true_pose, 10)
-        self.uwb_position_wrt_chassis = self.create_subscription(
-            PointStamped, self.estimation_topic, self.callback_uwb_position_wrt_chassis, 10)
-        
-        
-        self.target_coordinates_publisher = self.create_publisher(
-            Point, "target_coordinates", 10)
-        self.ground_truth_publisher = self.create_publisher(
-            Point, "ground_truth", 10)
-        self.uwb_error_publisher = self.create_publisher(
-            Float64, "uwb_error", 10)
 
-        self.timer = self.create_timer(0.1, self.timer_callback)
+        # Setting up a publishers to send the estimated position
+        self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
+        self.position_mse_publisher_ = self.create_publisher(
+            PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
 
-
+        self.get_logger().info(f"""Node has started:
+                               Sensor ID:  {self.sensor_id_}
+                               Method:     {self.method_}
+                               Iterations  {self.iterations_}
+                              """)
     def callback_chassis_true_pose(self, msg):
-        self.chassis_pos = [msg.pose.pose.position.x,
-                            msg.pose.pose.position.y,
-                            msg.pose.pose.position.z]
         self.chassis_orientation = [msg.pose.pose.orientation.x,
                                      msg.pose.pose.orientation.y,
                                      msg.pose.pose.orientation.z,
                                      msg.pose.pose.orientation.w]
 
-    def callback_uwb_position_wrt_chassis(self, msg):
-        self.uwb_position_wrt_chassis = [msg.point.x, msg.point.y, msg.point.z]
+    def callback_sensor_subscriber(self, msg):
+        """
+        Receive a pseudorange from the UWB sensor
 
-    def callback_drone_true_position(self, msg):
-        self.drone_global_pos = [msg.pose.pose.position.x,
-                                 msg.pose.pose.position.y,
-                                 msg.pose.pose.position.z]
+        Args:
+            msg (UwbSensor): The message received by the plugin
+        """
 
+        # Saving the message in a dict
+        self.anchors_[msg.anchor_id] = msg
 
-    def publish_target_coordinates(self):
-        msg = Point()
-        msg.x = self.uwb_position_wrt_world[0]
-        msg.y = self.uwb_position_wrt_world[1]
-        msg.z = self.uwb_position_wrt_world[2]
+        # Extract anchor positions and ranges
+        i = 0
+        anchor_pos = np.empty((len(self.anchors_), 3))
+        ranges = np.empty(len(self.anchors_))
 
-        self.target_coordinates_publisher.publish(msg)
+        for _, data in self.anchors_.items():
+            if msg.timestamp - data.timestamp < 0.01:
+                anchor_pos[i, :] = np.array(
+                    [data.anchor_pos.x, data.anchor_pos.y, data.anchor_pos.z])
+                ranges[i] = data.range
+                i = i+1
 
-    def timer_callback(self):
+        N = i
+        anchor_pos = anchor_pos[0:N, :]
+        ranges = ranges[0:N]
 
-        self.rot_world_to_chassis = R.from_quat(self.chassis_orientation)
-        self.uwb_position_wrt_world = - self.rot_world_to_chassis.apply(self.uwb_position_wrt_chassis)
-        self.publish_target_coordinates()
+        # Only if trilateration is possible
+        if N > 3:
+            # Perform Least-Square
+            if(self.method_ == "LS"):
+                self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
+                    anchor_pos, ranges, N)
 
-        self.true_pos = np.subtract(self.chassis_pos, self.drone_global_pos)
-        self.err_vec = np.subtract(self.uwb_position_wrt_world, self.true_pos)
-        self.err = np.linalg.norm(self.err_vec, ord=2)
-        err_ = Float64()
-        err_.data = self.err
-        self.uwb_error_publisher.publish(err_)
+            # Perform Gauss-Newton
+            if(self.method_ == "GN"):
+                # Perform N iterations of GN
+                for _ in range(self.iterations_):
+                    self.sensor_est_pos_ = ros2_px4_functions.gauss_newton_trilateration(
+                        self.sensor_est_pos_, anchor_pos, ranges)
 
-        ground_truth = Point()
-        ground_truth.x = self.true_pos[0]
-        ground_truth.y = self.true_pos[1]
-        ground_truth.z = self.true_pos[2]
+            # Sending the estimated position and the name of the node that generated it
+            msg = PoseWithCovarianceStamped()
+            msg.header.frame_id = self.estimator_topic_name_
+            msg.header.stamp = self.get_clock().now().to_msg()
 
-        self.ground_truth_publisher.publish(ground_truth)
+            self.rot_world_to_chassis = R.from_quat(self.chassis_orientation)
+            self.sensor_est_pos_ = - self.rot_world_to_chassis.apply(self.sensor_est_pos_)
+        
+            msg.pose.pose.position.x = self.sensor_est_pos_[0]
+            msg.pose.pose.position.y = self.sensor_est_pos_[1]
+            msg.pose.pose.position.z = self.sensor_est_pos_[2]
+
+            self.position_mse_publisher_.publish(msg)
 
 
 def main(args=None):
-
     rclpy.init(args=args)
-    node = UwbPubSub()
+    node = UwbPositioning()
     rclpy.spin(node)
     rclpy.shutdown()
 
 
 if __name__ == "main":
     main()
-

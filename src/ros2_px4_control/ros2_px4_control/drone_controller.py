@@ -28,7 +28,7 @@ from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleStatus
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from ros2_px4_interfaces.srv import ControlMode
 
 # Control parameters
@@ -70,8 +70,8 @@ class DroneController(Node):
         self.vz = 0.0
         self.target_global_pos = []
         self.target_local_pos = []
-        self.target_uwb_local_pos = []
-        self.target_uwb_local_pos = []
+        self.target_uwb_local_relative_pos = []
+        self.target_uwb_local_relative_pos = []
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
         
@@ -86,14 +86,13 @@ class DroneController(Node):
         self.offboard_control_mode_publisher_=self.create_publisher(OffboardControlMode,"OffboardControlMode_PubSubTopic",3)
         self.trajectory_setpoint_publisher_=self.create_publisher(TrajectorySetpoint,"TrajectorySetpoint_PubSubTopic",3)
         self.vehicle_command_publisher_=self.create_publisher(VehicleCommand,"VehicleCommand_PubSubTopic",3)
-        self.control_error_publisher_=self.create_publisher(Point,"control_error",3)
 
         # Subscribers
         self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_local_position,3)
         self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,3)
         self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_state,3)
         self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
-        self.target_uwb_position_subscriber = self.create_subscription(Point,"/drone_vehicle_uwb_positioning/target_coordinates",self.callback_target_uwb_position,3)
+        self.target_uwb_position_subscriber = self.create_subscription(PoseWithCovarianceStamped,"/drone_vehicle_uwb_positioning/estimated_pos",self.callback_target_uwb_position,3)
 
         # Services
         self.control_mode_service = self.create_service(ControlMode, "control_mode", self.callback_control_mode)
@@ -137,8 +136,8 @@ class DroneController(Node):
             self.target_global_pos[1]-1, self.target_global_pos[0]-1]
 
     def callback_target_uwb_position(self,msg):
-        self.target_uwb_global_pos = [msg.x, msg.y]
-        self.target_uwb_local_pos = [-msg.y, -msg.x]
+        self.target_uwb_global_relative_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y]
+        self.target_uwb_local_relative_pos = [-msg.pose.pose.position.y, -msg.pose.pose.position.x]
 
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
@@ -233,7 +232,7 @@ class DroneController(Node):
             self.norm_true_err = np.linalg.norm(self.true_err, ord=2)
 
             if UWB_MODE == 1:
-                self.uwb_err = np.array(self.target_uwb_local_pos)
+                self.uwb_err = np.array(self.target_uwb_local_relative_pos)
                 self.e = self.uwb_err
             else:
                 self.e = self.true_err
@@ -244,8 +243,7 @@ class DroneController(Node):
             if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (-self.z < LAND_H_TOLL):
                 self.LANDING_STATE = 1
                 self.get_logger().info("Landing..")
-                #self.publish_vehicle_command(21, 0.0, 0.0)
-                self.publish_vehicle_command(185, 1.0, 0.0)
+                self.publish_vehicle_command(185, 1.0, 0.0) #21 is land
 
             if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and self.LANDING_STATE == 0:
                 self.DESCENDING_STATE = 1
@@ -261,16 +259,8 @@ class DroneController(Node):
                 msg.z = - LAND_HOVERING_HEIGHT
                 msg.vz = - 0.05
             if self.ARMING_STATE == 1:
-                self.get_logger().info(f"Landed, with err:{self.norm_true_err}")
+                self.get_logger().info(f"Landed, with err: {self.norm_true_err}")
                 rclpy.shutdown()
-            try:
-                control_error = Point()
-                control_error.x = self.e[0]
-                control_error.y = self.e[1]
-                control_error.z = - self.z
-                self.control_error_publisher_.publish(control_error)
-            except:
-                pass
 
             return msg
 
@@ -289,7 +279,7 @@ class DroneController(Node):
             self.norm_true_err = np.linalg.norm(self.true_err, ord=2)
 
             if UWB_MODE == 1:
-                self.uwb_err = np.array(self.target_uwb_local_pos)
+                self.uwb_err = np.array(self.target_uwb_local_relative_pos)
                 self.e = self.uwb_err
             else:
                 self.e = self.true_err
