@@ -43,7 +43,7 @@ LAND_VEL_TOLL = 0.8 #0.2 # Maximum velocity error allowed to perform landing
 LAND_DESC_VEL = 0.5 #0.2
 LAND_H_TOLL = 0.9 #0.85 # Turn off motors at this height
 LAND_HOVERING_HEIGHT = 1.5
-UWB_MODE = 1 # Relative target position given by UWB
+UWB_MODE = 0 # Relative target position given by UWB
 
 dt = 0.1
 
@@ -192,7 +192,7 @@ class DroneController(Node):
         msg.position = True
         msg.velocity = True
         msg.acceleration = False
-        msg.attitude = False
+        msg.attitude = True
         msg.body_rate = False
 
         self.offboard_control_mode_publisher_.publish(msg)
@@ -277,8 +277,8 @@ class DroneController(Node):
     def target_follower_mode(self,msg):
             msg.x = float("NaN")
             msg.y = float("NaN")
-            msg.z = - 3.0
-
+            msg.z = - 4.0
+            msg.yaw = 0.0
             if self.TAKEOFF_STATE == 0:
                 if -self.z <= LAND_HOVERING_HEIGHT:
                     msg.z = - LAND_HOVERING_HEIGHT - 0.5

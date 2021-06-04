@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 
-from uwb_interfaces.msg import Uwb
+from ros2_px4_interfaces.msg import Uwb
 
 from rclpy.exceptions import ParameterNotDeclaredException
 from rcl_interfaces.msg import ParameterType

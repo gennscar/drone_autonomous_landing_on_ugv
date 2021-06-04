@@ -18,6 +18,7 @@
   <depend>gazebo_msgs</depend>
 
   <depend>ros2_px4_functions</depend>
+  <depend>ros2_px4_interfaces</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
