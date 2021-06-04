@@ -4,10 +4,10 @@ from launch.actions import ExecuteProcess
 from launch.actions import Shutdown
 
 ukf_params = [
-    [{'deltaT': 1e-2}, {'R_uwb': 2e-4}, {'R_px4': 0.01}, {'Q': 0.02}],
-    [{'deltaT': 1e-2}, {'R_uwb': 1e-4}, {'R_px4': 0.01}, {'Q': 0.02}],
-    [{'deltaT': 1e-2}, {'R_uwb': 5e-5}, {'R_px4': 0.01}, {'Q': 0.02}],
-    [{'deltaT': 1e-2}, {'R_uwb': 2e-5}, {'R_px4': 0.01}, {'Q': 0.02}],
+    [{'deltaT': 5e-3}, {'R_uwb': 1e-3}, {'R_px4': 0.25}, {'Q': 1e-3}],
+    [{'deltaT': 5e-3}, {'R_uwb': 1e-3}, {'R_px4': 0.25}, {'Q': 1e-3}],
+    [{'deltaT': 5e-3}, {'R_uwb': 1e-3}, {'R_px4': 0.25}, {'Q': 1e-3}],
+    [{'deltaT': 5e-3}, {'R_uwb': 1e-3}, {'R_px4': 0.25}, {'Q': 1e-3}],
 ]
 
 
