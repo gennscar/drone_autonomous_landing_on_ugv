@@ -125,26 +125,28 @@ class UkfPositioning(Node):
         self.kalman_filter_.update(z, R=self.R_px4_, hx=h_px4)
 
     def predict_callback(self):
-        # Sending the estimated position
-        msg = PoseWithCovarianceStamped()
-        msg.header.frame_id = self.get_namespace() + "/estimated_pos"
-        msg.header.stamp = self.get_clock().now().to_msg()
 
-        msg.pose.pose.position.x = self.kalman_filter_.x[0]
-        msg.pose.pose.position.y = self.kalman_filter_.x[3]
-        msg.pose.pose.position.z = self.kalman_filter_.x[6]
+        if(np.linalg.norm(self.kalman_filter_.P) < 1.):
+            # Sending the estimated position
+            msg = PoseWithCovarianceStamped()
+            msg.header.frame_id = self.get_namespace() + "/estimated_pos"
+            msg.header.stamp = self.get_clock().now().to_msg()
 
-        msg.pose.covariance[0] = self.kalman_filter_.P[0][0]
-        msg.pose.covariance[1] = self.kalman_filter_.P[0][3]
-        msg.pose.covariance[2] = self.kalman_filter_.P[0][6]
-        msg.pose.covariance[3] = self.kalman_filter_.P[3][0]
-        msg.pose.covariance[4] = self.kalman_filter_.P[3][3]
-        msg.pose.covariance[5] = self.kalman_filter_.P[3][6]
-        msg.pose.covariance[6] = self.kalman_filter_.P[6][0]
-        msg.pose.covariance[7] = self.kalman_filter_.P[6][3]
-        msg.pose.covariance[8] = self.kalman_filter_.P[6][6]
+            msg.pose.pose.position.x = self.kalman_filter_.x[0]
+            msg.pose.pose.position.y = self.kalman_filter_.x[3]
+            msg.pose.pose.position.z = self.kalman_filter_.x[6]
 
-        self.est_pos_publisher_.publish(msg)
+            msg.pose.covariance[0] = self.kalman_filter_.P[0][0]
+            msg.pose.covariance[1] = self.kalman_filter_.P[0][3]
+            msg.pose.covariance[2] = self.kalman_filter_.P[0][6]
+            msg.pose.covariance[3] = self.kalman_filter_.P[3][0]
+            msg.pose.covariance[4] = self.kalman_filter_.P[3][3]
+            msg.pose.covariance[5] = self.kalman_filter_.P[3][6]
+            msg.pose.covariance[6] = self.kalman_filter_.P[6][0]
+            msg.pose.covariance[7] = self.kalman_filter_.P[6][3]
+            msg.pose.covariance[8] = self.kalman_filter_.P[6][6]
+
+            self.est_pos_publisher_.publish(msg)
 
         # Filter predict
         self.kalman_filter_.predict()
