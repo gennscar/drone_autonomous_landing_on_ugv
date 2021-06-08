@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+import rclpy
+from rclpy.node import Node
+
+from px4_msgs.msg import VehicleLocalPosition
+from geometry_msgs.msg import PoseWithCovarianceStamped
+from nav_msgs.msg import Odometry
+
+
+
+class Px4Positioning(Node):
+    """Node to obtain the position estimated by PX4"""
+
+    def __init__(self):
+        super().__init__("px4_positioning")
+        self.chassis_pos = [0., 0., 0.]
+        # Setting up PX4 subscribers
+        self.px4pos_subscriber_ = self.create_subscription(
+            VehicleLocalPosition, "/VehicleLocalPosition_PubSubTopic", self.callback_px4pos_subscriber, 10)
+        self.chassis_pose_subscriber = self.create_subscription(
+            Odometry, "/chassis/odom", self.callback_chassis_true_pose, 10)
+
+        # Setting up position publisher
+        self.est_pos_publisher_ = self.create_publisher(
+            PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
+
+        self.get_logger().info("Node has started")
+
+    def callback_chassis_true_pose(self, msg):
+        self.chassis_pos = [msg.pose.pose.position.x,
+                            msg.pose.pose.position.y,
+                            msg.pose.pose.position.z]
+        self.chassis_orientation = [msg.pose.pose.orientation.x,
+                                     msg.pose.pose.orientation.y,
+                                     msg.pose.pose.orientation.z,
+                                     msg.pose.pose.orientation.w]
+
+    def callback_px4pos_subscriber(self, msg):
+        # Filling estimated point message
+        est_pos = PoseWithCovarianceStamped()
+        est_pos.header.stamp = self.get_clock().now().to_msg()
+        est_pos.header.frame_id = self.get_namespace() + "/estimated_pos"
+        est_pos.pose.pose.position.x = self.chassis_pos[0] - (msg.y + 1.0)
+        est_pos.pose.pose.position.y = self.chassis_pos[1] - (msg.x + 1.0)
+        est_pos.pose.pose.position.z = self.chassis_pos[2] + (msg.z)
+        self.est_pos_publisher_.publish(est_pos)
+
+        self.last_time_ = msg.timestamp
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = Px4Positioning()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+
+if __name__ == "main":
+    main()
