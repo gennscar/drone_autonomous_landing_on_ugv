@@ -20,7 +20,7 @@ class UkfPositioning(Node):
     """
 
     def __init__(self):
-        super().__init__("kf_tight_positioning")
+        super().__init__("ukf_positioning")
 
         self.declare_parameter('deltaT', 1.)
         self.declare_parameter('R_uwb', 1.)
@@ -55,7 +55,7 @@ class UkfPositioning(Node):
 
         # Initial estimate
         self.kalman_filter_.x = np.array(
-            [1., 0., 0., 1., 0., 0., 1., 0., 0.])
+            [1., 0., 0., 1., 0., 0., 0., 0., 0.])
 
         # State transition matrix
 
