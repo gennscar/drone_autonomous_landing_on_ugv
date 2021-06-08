@@ -3,11 +3,8 @@ from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 from launch.actions import Shutdown
 
-ukf_params = [
-    [{'deltaT': 5e-3}, {'R_uwb': 1e-3}, {'R_px4': 0.25}, {'Q': 1e-3}],
-    [{'deltaT': 5e-3}, {'R_uwb': 1e-3}, {'R_px4': 0.25}, {'Q': 1e-3}],
-    [{'deltaT': 5e-3}, {'R_uwb': 1e-3}, {'R_px4': 0.25}, {'Q': 1e-3}],
-    [{'deltaT': 5e-3}, {'R_uwb': 1e-3}, {'R_px4': 0.25}, {'Q': 1e-3}],
+kf_params = [
+    [{'deltaT': 5e-3}, {'R_uwb': 1e-3}, {'R_px4': 0.25}, {'Q': 1e-3}]
 ]
 
 
@@ -36,11 +33,27 @@ def generate_launch_description():
         namespace='positioning_error'
     ))
 
-    for i, param in enumerate(ukf_params):
+    for i, param in enumerate(kf_params):
         ld.add_entity(Node(
             package='ros2_px4_estimation',
             executable='ukf_positioning',
             namespace='UKF_estimator_' + str(i),
+            parameters=param
+        ))
+
+    for i, param in enumerate(kf_params):
+        ld.add_entity(Node(
+            package='ros2_px4_estimation',
+            executable='kf_loose_positioning',
+            namespace='KF_estimator_' + str(i),
+            parameters=param
+        ))
+
+    for i, param in enumerate(kf_params):
+        ld.add_entity(Node(
+            package='ros2_px4_estimation',
+            executable='kf_tight_positioning',
+            namespace='EKF_estimator_' + str(i),
             parameters=param
         ))
 
