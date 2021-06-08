@@ -22,7 +22,8 @@ setup(
         'console_scripts': [
             "positioning_error = ros2_px4_testing.positioning_error:main",
             "test_camera = ros2_px4_testing.test_camera:main",
-            "uwb_positioning_real = ros2_px4_testing.uwb_positioning_real:main"
+            "uwb_positioning_real = ros2_px4_testing.uwb_positioning_real:main",
+            "setpoints_flight = ros2_px4_testing.setpoints_flight:main"
         ],
     },
 )
