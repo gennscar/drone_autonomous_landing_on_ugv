@@ -28,7 +28,7 @@ from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleStatus
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, Point 
 from ros2_px4_interfaces.srv import ControlMode
 
 # Control parameters
@@ -56,7 +56,7 @@ class DroneController(Node):
         self.e_dot = np.array([0, 0])
         self.e_old = np.array([0, 0])
         self.e = np.array([0, 0])
-        self.true_err = np.array([0, 0])
+        self.px4_err = np.array([0, 0])
 
         self.ARMING_STATE = 0
         self.LANDING_STATE = 0
@@ -71,7 +71,7 @@ class DroneController(Node):
         self.target_global_pos = []
         self.target_local_pos = []
         self.target_uwb_local_relative_pos = []
-        self.target_uwb_local_relative_pos = []
+        self.true_err = []
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
         
@@ -91,6 +91,7 @@ class DroneController(Node):
         self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_local_position,3)
         self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,3)
         self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_state,3)
+        self.true_err_subscriber = self.create_subscription(Point,"/drone_vehicle_positioning_error/true_pos",self.callback_true_err,3)
         self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
         self.target_uwb_position_subscriber = self.create_subscription(PoseWithCovarianceStamped,"/drone_vehicle_uwb_positioning/estimated_pos",self.callback_target_uwb_position,3)
 
@@ -138,6 +139,10 @@ class DroneController(Node):
     def callback_target_uwb_position(self,msg):
         self.target_uwb_global_relative_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y]
         self.target_uwb_local_relative_pos = [-msg.pose.pose.position.y, -msg.pose.pose.position.x]
+    
+    def callback_true_err(self,msg):
+        self.true_err_vec = [msg.x, msg.y]
+        self.true_err = np.linalg.norm(self.true_err_vec, ord=2)
 
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
@@ -191,7 +196,7 @@ class DroneController(Node):
         msg.position = True
         msg.velocity = True
         msg.acceleration = False
-        msg.attitude = True
+        msg.attitude = False
         msg.body_rate = False
 
         self.offboard_control_mode_publisher_.publish(msg)
@@ -228,14 +233,14 @@ class DroneController(Node):
                     return msg
                 else:
                     self.TAKEOFF_STATE = 1
-            self.true_err = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
-            self.norm_true_err = np.linalg.norm(self.true_err, ord=2)
+            self.px4_err = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
+            self.norm_px4_err = np.linalg.norm(self.px4_err, ord=2)
 
             if UWB_MODE == 1:
                 self.uwb_err = np.array(self.target_uwb_local_relative_pos)
                 self.e = self.uwb_err
             else:
-                self.e = self.true_err
+                self.e = self.px4_err
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = ros2_px4_functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)
             self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
@@ -259,7 +264,9 @@ class DroneController(Node):
                 msg.z = - LAND_HOVERING_HEIGHT
                 msg.vz = - 0.05
             if self.ARMING_STATE == 1:
-                self.get_logger().info(f"Landed, with err: {self.norm_true_err}")
+                self.get_logger().info(f"""Landed
+                estimated err: {self.norm_e}
+                true err: {self.true_err}""")
                 rclpy.shutdown()
 
             return msg
@@ -268,21 +275,21 @@ class DroneController(Node):
             msg.x = float("NaN")
             msg.y = float("NaN")
             msg.z = - 4.0
-            msg.yaw = 0.0
+            #msg.yaw = 0.0
             if self.TAKEOFF_STATE == 0:
                 if -self.z <= LAND_HOVERING_HEIGHT:
                     msg.z = - LAND_HOVERING_HEIGHT - 0.5
                     return msg
                 else:
                     self.TAKEOFF_STATE = 1
-            self.true_err = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
-            self.norm_true_err = np.linalg.norm(self.true_err, ord=2)
+            self.px4_err = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
+            self.norm_px4_err = np.linalg.norm(self.px4_err, ord=2)
 
             if UWB_MODE == 1:
                 self.uwb_err = np.array(self.target_uwb_local_relative_pos)
                 self.e = self.uwb_err
             else:
-                self.e = self.true_err
+                self.e = self.px4_err
 
             [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = ros2_px4_functions.PID(KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
             self.norm_e = np.linalg.norm(self.e, ord=2)

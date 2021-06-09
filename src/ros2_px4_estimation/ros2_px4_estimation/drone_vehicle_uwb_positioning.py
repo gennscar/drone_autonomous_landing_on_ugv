@@ -6,7 +6,7 @@ from rclpy.node import Node
 
 from nav_msgs.msg import Odometry
 from gazebo_msgs.msg import UwbSensor
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, Point
 from scipy.spatial.transform import Rotation as R
 
 import ros2_px4_functions
@@ -59,8 +59,11 @@ class UwbPositioning(Node):
 
         # Setting up a publishers to send the estimated position
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
-        self.position_mse_publisher_ = self.create_publisher(
+        self.rotated_position_publisher = self.create_publisher(
             PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
+        self.norot_estimator_topic_name_ = self.get_namespace() + "/norot_pos"
+        self.norot_position_publisher = self.create_publisher(
+            Point, self.norot_estimator_topic_name_, 10)
 
         self.get_logger().info(f"""Node has started:
                                Sensor ID:  {self.sensor_id_}
@@ -120,13 +123,20 @@ class UwbPositioning(Node):
             msg.header.stamp = self.get_clock().now().to_msg()
 
             self.rot_world_to_chassis = R.from_quat(self.chassis_orientation)
-            self.sensor_est_pos_ = - self.rot_world_to_chassis.apply(self.sensor_est_pos_)
+            self.rotated_sensor_est_pos_ = - self.rot_world_to_chassis.apply(self.sensor_est_pos_)
         
-            msg.pose.pose.position.x = self.sensor_est_pos_[0]
-            msg.pose.pose.position.y = self.sensor_est_pos_[1]
-            msg.pose.pose.position.z = self.sensor_est_pos_[2]
+            msg.pose.pose.position.x = self.rotated_sensor_est_pos_[0]
+            msg.pose.pose.position.y = self.rotated_sensor_est_pos_[1]
+            msg.pose.pose.position.z = self.rotated_sensor_est_pos_[2]
 
-            self.position_mse_publisher_.publish(msg)
+            self.rotated_position_publisher.publish(msg)
+
+            msg_2 = Point()
+            msg_2.x = self.sensor_est_pos_[0]
+            msg_2.y = self.sensor_est_pos_[1]
+            msg_2.z = self.sensor_est_pos_[2]
+            self.norot_position_publisher.publish(msg_2)
+
 
 
 def main(args=None):
