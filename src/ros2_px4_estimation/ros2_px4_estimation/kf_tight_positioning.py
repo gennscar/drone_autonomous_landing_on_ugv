@@ -21,27 +21,37 @@ class KfTightPositioning(Node):
     def __init__(self):
         super().__init__("kf_tight_positioning")
 
-        dT = 0.01
+        self.declare_parameter('deltaT', 1.)
+        self.declare_parameter('R_uwb', 1.)
+        self.declare_parameter('R_px4', 1.)
+        self.declare_parameter('Q', 1.)
+
+        self.deltaT_ = self.get_parameter(
+            'deltaT').get_parameter_value().double_value
+        self.R_uwb_ = self.get_parameter(
+            'R_uwb').get_parameter_value().double_value
+        self.R_px4_ = self.get_parameter(
+            'R_px4').get_parameter_value().double_value
+        self.Q_ = self.get_parameter('Q').get_parameter_value().double_value
 
         # Kalman Filter
         self.kalman_filter_ = KalmanFilter(dim_x=9, dim_z=9)
-        self.kalman_filter_.x = np.array(
-            [1., 0., 0., 1., 0., 0., 1., 0., 0.])
+        self.kalman_filter_.x = np.array([1., 1., 1., 1., 1., 1., 1., 1., 1.])
 
         # State transition matrix
         f = np.array([
-            [1., dT, 0.5*dT**2.],
-            [0., 1.,         dT],
+            [1., self.deltaT_, 0.5*self.deltaT_**2.],
+            [0., 1.,         self.deltaT_],
             [0., 0.,         1.]
         ])
         self.kalman_filter_.F = scipy.linalg.block_diag(*[f]*3)
 
         # Covariance matrix
-        self.kalman_filter_.P *= 100.
+        self.kalman_filter_.P *= 10.
 
         # Process noise
         self.kalman_filter_.Q = Q_discrete_white_noise(
-            dim=3, dt=dT, var=1e-2, block_size=3)
+            dim=3, dt=self.deltaT_, var=self.Q_, block_size=3)
 
         # Setting up sensors subscribers
         self.sensor_subscriber_ = self.create_subscription(
@@ -54,7 +64,7 @@ class KfTightPositioning(Node):
             PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
 
         # Prediction timer
-        self.timer = self.create_timer(dT, self.predict_callback)
+        self.timer = self.create_timer(self.deltaT_, self.predict_callback)
 
         self.get_logger().info("Node has started")
 
@@ -86,7 +96,7 @@ class KfTightPositioning(Node):
         )
 
         # Filter update
-        self.kalman_filter_.update(z, R=1e-3, H=H)
+        self.kalman_filter_.update(z, R=self.R_uwb_, H=H)
 
     def callback_px4_subscriber(self, msg):
         # Storing measurement in a np.array
@@ -97,7 +107,7 @@ class KfTightPositioning(Node):
         ])
 
         # Filter update
-        self.kalman_filter_.update(z, R=0.1, H=np.eye(9))
+        self.kalman_filter_.update(z, R=self.R_px4_, H=np.eye(9))
 
     def predict_callback(self):
         if(np.linalg.norm(self.kalman_filter_.P) < 1):
@@ -110,17 +120,16 @@ class KfTightPositioning(Node):
             msg.pose.pose.position.y = self.kalman_filter_.x[3]
             msg.pose.pose.position.z = self.kalman_filter_.x[6]
 
-            '''
             msg.pose.covariance[0] = self.kalman_filter_.P[0][0]
             msg.pose.covariance[1] = self.kalman_filter_.P[0][1]
             msg.pose.covariance[2] = self.kalman_filter_.P[0][2]
-            msg.pose.covariance[6] = self.kalman_filter_.P[1][0]
-            msg.pose.covariance[7] = self.kalman_filter_.P[1][1]
-            msg.pose.covariance[8] = self.kalman_filter_.P[1][2]
-            msg.pose.covariance[12] = self.kalman_filter_.P[2][0]
-            msg.pose.covariance[13] = self.kalman_filter_.P[2][1]
-            msg.pose.covariance[14] = self.kalman_filter_.P[2][2]
-            '''
+            msg.pose.covariance[3] = self.kalman_filter_.P[1][0]
+            msg.pose.covariance[4] = self.kalman_filter_.P[1][1]
+            msg.pose.covariance[5] = self.kalman_filter_.P[1][2]
+            msg.pose.covariance[6] = self.kalman_filter_.P[2][0]
+            msg.pose.covariance[7] = self.kalman_filter_.P[2][1]
+            msg.pose.covariance[8] = self.kalman_filter_.P[2][2]
+
             self.est_pos_publisher_.publish(msg)
 
             # Filter predict

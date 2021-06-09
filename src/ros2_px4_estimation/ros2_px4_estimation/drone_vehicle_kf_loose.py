@@ -11,6 +11,7 @@ from filterpy.common import Q_discrete_white_noise
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from px4_msgs.msg import VehicleLocalPosition, VehicleOdometry
 
+
 class KfLoosePositioning(Node):
     """
     EKF
@@ -62,7 +63,7 @@ class KfLoosePositioning(Node):
             VehicleLocalPosition, "/VehicleLocalPosition_PubSubTopic", self.callback_px4_subscriber, 10)
         self.px4_covariance_subscriber_ = self.create_subscription(
             VehicleOdometry, "/VehicleOdometry_PubSubTopic", self.callback_covariance_subscriber, 10)
-        
+
         # Setting up position publisher
         self.est_pos_publisher_ = self.create_publisher(
             PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
@@ -97,9 +98,9 @@ class KfLoosePositioning(Node):
 
 
         H = np.block([
-            [-1., np.zeros((1,8)), 1., np.zeros((1,8))],
-            [np.zeros((1,3)), -1., np.zeros((1,8)), 1., np.zeros((1,5))],
-            [np.zeros((16,18))]
+            [-1., np.zeros((1, 8)), 1., np.zeros((1, 8))],
+            [np.zeros((1, 3)), -1., np.zeros((1, 8)), 1., np.zeros((1, 5))],
+            [np.zeros((16, 18))]
         ])
 
         # Filter update
@@ -117,8 +118,8 @@ class KfLoosePositioning(Node):
         ])
 
         H = np.block([
-            [np.eye(9), np.zeros((9,9))],
-            [np.zeros((9,18))]
+            [np.eye(9), np.zeros((9, 9))],
+            [np.zeros((9, 18))]
         ])
         # Filter update
         self.kalman_filter_.update(z, self.R_px4_, H)
@@ -131,9 +132,12 @@ class KfLoosePositioning(Node):
         msg = PoseWithCovarianceStamped()
         msg.header.frame_id = self.get_namespace() + "/estimated_pos"
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.pose.pose.position.x = self.kalman_filter_.x[9][0] - self.kalman_filter_.x[0][0]
-        msg.pose.pose.position.y = self.kalman_filter_.x[12][0] - self.kalman_filter_.x[3][0]
-        msg.pose.pose.position.z = self.kalman_filter_.x[15][0] - self.kalman_filter_.x[6][0]
+        msg.pose.pose.position.x = self.kalman_filter_.x[9][0] - \
+            self.kalman_filter_.x[0][0]
+        msg.pose.pose.position.y = self.kalman_filter_.x[12][0] - \
+            self.kalman_filter_.x[3][0]
+        msg.pose.pose.position.z = self.kalman_filter_.x[15][0] - \
+            self.kalman_filter_.x[6][0]
         self.est_pos_publisher_.publish(msg)
 
         self.kalman_filter_.predict()
