@@ -8,7 +8,7 @@ import scipy
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
-from geometry_msgs.msg import PointStamped, PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from px4_msgs.msg import VehicleLocalPosition, VehicleOdometry
 
 
@@ -19,16 +19,27 @@ class KfLoosePositioning(Node):
 
     def __init__(self):
         super().__init__("kf_drone_rover")
+        
+        self.declare_parameter('deltaT', 1.)
+        self.declare_parameter('R_uwb', 1.)
+        self.declare_parameter('R_px4', 1.)
+        self.declare_parameter('Q', 1.)
 
-        dT = 0.01
+        self.deltaT_ = self.get_parameter(
+            'deltaT').get_parameter_value().double_value
+        self.R_uwb_ = self.get_parameter(
+            'R_uwb').get_parameter_value().double_value
+        self.R_px4_ = self.get_parameter(
+            'R_px4').get_parameter_value().double_value
+        self.Q_ = self.get_parameter('Q').get_parameter_value().double_value
 
         # Kalman Filter
         self.kalman_filter_ = KalmanFilter(dim_x=18, dim_z=18)
 
         # State transition matrix
         f = np.array([
-            [1., dT, 0.5*dT**2.],
-            [0., 1.,         dT],
+            [1., self.deltaT_, 0.5*self.deltaT_**2.],
+            [0., 1.,         self.deltaT_],
             [0., 0.,         1.]
         ])
         self.kalman_filter_.F = scipy.linalg.block_diag(*[f]*6)
@@ -37,10 +48,10 @@ class KfLoosePositioning(Node):
         self.kalman_filter_.H = np.eye(18)
 
         # Process noise
-        Q1 = Q_discrete_white_noise(dim=3, dt=dT, var=1e-4, block_size=3)
-        Q2 = Q_discrete_white_noise(dim=3, dt=dT, var=1e-4, block_size=3)
-        self.kalman_filter_.Q = np.block([[Q1, np.zeros((9, 9))],
-                                         [np.zeros((9, 9)), Q2]])
+        Q1 = Q_discrete_white_noise(dim=3, dt=self.deltaT_, var=self.Q_, block_size=3)
+        Q2 = Q_discrete_white_noise(dim=3, dt=self.deltaT_, var=self.Q_, block_size=3)
+        self.kalman_filter_.Q = np.block([[Q1,np.zeros((9,9))],
+                                         [np.zeros((9,9)),Q2]])
 
         # Covariance matrix
         self.kalman_filter_.P *= 50.
@@ -58,7 +69,7 @@ class KfLoosePositioning(Node):
             PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
 
         # Prediction timer
-        self.timer = self.create_timer(dT, self.predict_callback)
+        self.timer = self.create_timer(self.deltaT_, self.predict_callback)
 
         self.get_logger().info("Node has started")
 
@@ -85,11 +96,6 @@ class KfLoosePositioning(Node):
             0.
         ])
 
-        est_vel_ = np.array([self.kalman_filter_.x[10][0] - self.kalman_filter_.x[1][0], self.kalman_filter_.x[13]
-                            [0] - self.kalman_filter_.x[4][0], self.kalman_filter_.x[16][0] - self.kalman_filter_.x[7][0]])
-        norm_v_ = np.linalg.norm(est_vel_, ord=2)
-        G_adaptive = 1
-        R = 0.000625  # *(1+G_adaptive*norm_v_)
 
         H = np.block([
             [-1., np.zeros((1, 8)), 1., np.zeros((1, 8))],
@@ -98,27 +104,25 @@ class KfLoosePositioning(Node):
         ])
 
         # Filter update
-        self.kalman_filter_.update(z, R, H)
+        self.kalman_filter_.update(z, self.R_uwb_, H)
 
     def callback_px4_subscriber(self, msg):
         # Storing current estimate in a np.array
         z = np.array([
-            msg.y + 1.0,  msg.vy,  msg.ay,
-            msg.x + 1.0,  msg.vx,  msg.ax,
+            msg.y,  msg.vy,  msg.ay,
+            msg.x,  msg.vx,  msg.ax,
             -msg.z,      -msg.vz, -msg.az,
             0.,           0.,      0.,
             0.,           0.,      0.,
             0.,           0.,      0.,
         ])
 
-        R = 0.0625
-
         H = np.block([
             [np.eye(9), np.zeros((9, 9))],
             [np.zeros((9, 18))]
         ])
         # Filter update
-        self.kalman_filter_.update(z, R, H)
+        self.kalman_filter_.update(z, self.R_px4_, H)
 
     def callback_covariance_subscriber(self, msg):
         pass

@@ -62,13 +62,10 @@ class PositioningError(Node):
     def callback_uwb_position_wrt_world(self, msg):
 
         self.uwb_position_wrt_world = [msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z]
-
         self.true_pos = np.subtract(self.chassis_pos, self.drone_global_pos)
-
         self.err_vec = np.subtract(self.uwb_position_wrt_world, self.true_pos)
         self.err_xy_vec = np.array([self.err_vec[0], self.err_vec[1]])
         self.err = np.linalg.norm(self.err_xy_vec, ord=2)
-        print
         err_ = Float64()
         err_.data = self.err
         

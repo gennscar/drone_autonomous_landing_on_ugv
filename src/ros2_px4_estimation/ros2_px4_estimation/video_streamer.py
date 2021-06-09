@@ -8,7 +8,7 @@ from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Image
 import cv2 # OpenCV library
 import numpy as np
 from dt_apriltags import Detector
-from geometry_msgs.msg import Point, PointStamped
+from geometry_msgs.msg import Point, PoseWithCovarianceStamped
 from px4_msgs.msg import VehicleAttitude
 from nav_msgs.msg import Odometry
 
@@ -49,17 +49,19 @@ class VideoStreamerNode(Node):
        
         # Used to convert between ROS and OpenCV images
         self.br = CvBridge()
-
+        self.rot_global2local = R.from_matrix([[0,1,0],[1,0,0],[0,0,-1]])
         self.drone_orientation = np.array([0,0,0,1])
-        self.uwb_position_wrt_chassis = [0.,0.,0.]
+        self.true_rot_local2chassis = R.from_quat([0,0,0,1])
+        self.estimated_uwb_pos = np.array([0.,0.,0.])
+        self.rot_90 = R.from_matrix([[0,-1,0],[1,0,0],[0,0,1]])
+        self.rot_m90 = R.from_matrix([[0,1,0],[-1,0,0],[0,0,1]])
 
         self.drone_orientation_subscriber = self.create_subscription(VehicleAttitude, "/VehicleAttitude_PubSubTopic", self.callback_drone_orientation, 1) 
-        #self.drone_orientation_subscriber = self.create_subscription(Odometry, "/uwb_sensor_iris/odom", self.callback_drone_orientation, 1)       
-        self.tag_pose_publisher = self.create_publisher(Point, "AprilTag_estimator/estimated_pos", 1)
-        self.uwb_position_wrt_chassis_subscriber = self.create_subscription(
-            PointStamped, "/GN_10iter_uwb_estimator/estimated_pos", self.callback_uwb_position_wrt_chassis, 10)
-        self.apriltag_error_publisher = self.create_publisher(Point, "AprilTag_estimator/error", 10)
-
+        self.estimated_uwb_pos_subscriber = self.create_subscription(Point, "/LS_uwb_estimator/norot_pos", self.callback_estimated_uwb_pos, 1)
+        self.estimator_topic_name_ = "AprilTag_estimator/estimated_pos"
+        self.tag_pose_publisher = self.create_publisher(PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
+        
+        
     def video_callback(self, data):
         """
         Callback function.
@@ -89,23 +91,31 @@ class VideoStreamerNode(Node):
           frame_rgb = cv2.polylines(frame_rgb,[pts],True,(0,0,255), 2)
           frame_rgb = cv2.circle(frame_rgb, (center_x, center_y), 3, (0, 0, 255), -1)
           font = cv2.FONT_HERSHEY_SIMPLEX
-          org = (center_x - 100, center_y - 50)
-          fontScale = 0.9
-          frame_rgb = cv2.putText(frame_rgb, "MATCH", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
+          org = (center_x - 80, center_y - 50)
+          fontScale = 0.7
+          frame_rgb = cv2.putText(frame_rgb, "TAG DETECTED", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
           
           pose_R = tags[0].pose_R
-          pose_t = tags[0].pose_t
-
+          pose_t = np.array([tags[0].pose_t[0][0],tags[0].pose_t[1][0], tags[0].pose_t[2][0]])
+        
           self.rot_camera2chassis = R.from_matrix(pose_R)
           self.rot_local2camera = R.from_quat(self.drone_orientation)
-          self.rot_90 = R.from_matrix([[0,-1,0],[1,0,0],[0,0,1]])
-          self.rot_m90 = R.from_matrix([[0,1,0],[-1,0,0],[0,0,1]])
-          self.rot_local2chassis = self.rot_m90*self.rot_local2camera*self.rot_90*(self.rot_camera2chassis.inv())
-          self.uwb_position_wrt_chassis = - np.array(self.rot_local2chassis.apply(self.uwb_position_wrt_chassis))
-          tag_pose = Point()
-          tag_pose.x = self.uwb_position_wrt_chassis[0]
-          tag_pose.y = self.uwb_position_wrt_chassis[1]
-          tag_pose.z = self.uwb_position_wrt_chassis[2]
+          self.rot_global2chassis = self.rot_global2local*self.rot_m90*self.rot_local2camera*self.rot_90*(self.rot_camera2chassis.inv())
+          self.global_yaw = (self.rot_global2chassis.as_euler('xyz', degrees=True))[2]
+          
+          org = (center_x - 80, center_y + 60)
+          fontScale = 0.7
+          frame_rgb = cv2.putText(frame_rgb, f"yaw: {int(self.global_yaw)} deg", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
+
+          self.estimated_rotation = R.from_euler('z', self.global_yaw, degrees=True)
+          self.uwb_position_wrt_chassis = - np.array(self.estimated_rotation.apply(self.estimated_uwb_pos))
+
+          tag_pose = PoseWithCovarianceStamped()
+          tag_pose.header.frame_id = self.estimator_topic_name_
+          tag_pose.header.stamp = self.get_clock().now().to_msg()
+          tag_pose.pose.pose.position.x = self.uwb_position_wrt_chassis[1]
+          tag_pose.pose.pose.position.y = self.uwb_position_wrt_chassis[0]
+          tag_pose.pose.pose.position.z = - self.uwb_position_wrt_chassis[2]
           self.tag_pose_publisher.publish(tag_pose)         
 
         scale_percent = 200 # percent of original size
@@ -119,12 +129,11 @@ class VideoStreamerNode(Node):
         cv2.imshow("Video", frame_rgb)
         cv2.waitKey(1)    
 
-    def callback_uwb_position_wrt_chassis(self, msg):
-        self.uwb_position_wrt_chassis = [msg.point.x, msg.point.y, msg.point.z]
-
     def callback_drone_orientation(self, msg):
         self.drone_orientation = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
-        #self.drone_orientation = [msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
+
+    def callback_estimated_uwb_pos(self, msg):
+        self.estimated_uwb_pos = np.array([msg.x, msg.y, msg.z])
 
 def main(args=None):
   
