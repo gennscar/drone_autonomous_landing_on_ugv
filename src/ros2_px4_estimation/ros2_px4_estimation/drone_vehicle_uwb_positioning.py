@@ -4,7 +4,7 @@ import rclpy
 import numpy as np
 from rclpy.node import Node
 
-from nav_msgs.msg import Odometry
+from px4_msgs.msg import VehicleAttitude
 from gazebo_msgs.msg import UwbSensor
 from geometry_msgs.msg import PoseWithCovarianceStamped, Point
 from scipy.spatial.transform import Rotation as R
@@ -32,6 +32,10 @@ class UwbPositioning(Node):
 
         self.anchors_ = {}
         self.sensor_est_pos_ = [0.01, 0.01, 0.01]  # @todo Need to be random
+        
+        self.px4_offset_rotation = R.from_matrix([[1,0,0],[0,1,0],[0,0,1]])
+        self.rot_global2local = R.from_matrix([[0,1,0],[1,0,0],[0,0,-1]])
+        self.offset_yaw = 20.
 
         # Parameters declaration
         self.sensor_id_ = self.declare_parameter("sensor_id", "0")
@@ -54,8 +58,8 @@ class UwbPositioning(Node):
         # Setting up sensors subscriber for the UWB plugin
         self.sensor_subscriber_ = self.create_subscription(
             UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
-        self.chassis_pose_subscriber = self.create_subscription(
-            Odometry, "/chassis/odom", self.callback_chassis_true_pose, 10)
+        self.px4_attitude_subscriber = self.create_subscription(
+            VehicleAttitude, "/rover/VehicleAttitude_PubSubTopic", self.callback_px4_attitude, 10)
 
         # Setting up a publishers to send the estimated position
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
@@ -70,11 +74,11 @@ class UwbPositioning(Node):
                                Method:     {self.method_}
                                Iterations  {self.iterations_}
                               """)
-    def callback_chassis_true_pose(self, msg):
-        self.chassis_orientation = [msg.pose.pose.orientation.x,
-                                     msg.pose.pose.orientation.y,
-                                     msg.pose.pose.orientation.z,
-                                     msg.pose.pose.orientation.w]
+    def callback_px4_attitude(self, msg):
+        self.px4_attitude = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
+        self.px4_attitude_rotation = self.rot_global2local*R.from_quat(self.px4_attitude)
+        self.px4_attitude_yaw = - (self.px4_attitude_rotation.as_euler('xyz', degrees = True))[2] + self.offset_yaw
+        self.px4_offset_rotation = (R.from_euler('z', self.px4_attitude_yaw, degrees=True))
 
     def callback_sensor_subscriber(self, msg):
         """
@@ -121,9 +125,7 @@ class UwbPositioning(Node):
             msg = PoseWithCovarianceStamped()
             msg.header.frame_id = self.estimator_topic_name_
             msg.header.stamp = self.get_clock().now().to_msg()
-
-            self.rot_world_to_chassis = R.from_quat(self.chassis_orientation)
-            self.rotated_sensor_est_pos_ = - self.rot_world_to_chassis.apply(self.sensor_est_pos_)
+            self.rotated_sensor_est_pos_ = - self.px4_offset_rotation.apply(self.sensor_est_pos_)
         
             msg.pose.pose.position.x = self.rotated_sensor_est_pos_[0]
             msg.pose.pose.position.y = self.rotated_sensor_est_pos_[1]

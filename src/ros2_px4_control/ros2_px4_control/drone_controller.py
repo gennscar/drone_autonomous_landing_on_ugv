@@ -43,7 +43,6 @@ LAND_VEL_TOLL = 0.8 #0.2 # Maximum velocity error allowed to perform landing
 LAND_DESC_VEL = 0.5 #0.2
 LAND_H_TOLL = 0.9 #0.85 # Turn off motors at this height
 LAND_HOVERING_HEIGHT = 1.5
-UWB_MODE = 0 # Relative target position given by UWB
 
 dt = 0.1
 
@@ -77,24 +76,34 @@ class DroneController(Node):
         
         # Parameters declaration
         self.control_mode = self.declare_parameter("control_mode", 0)
+        self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/')
+        self.vehicle_number = self.declare_parameter("vehicle_number", 1)
+        self.UWB_MODE = self.declare_parameter("uwb_mode", 0)
 
         # Retrieve parameter values
-        self.control_mode = self.get_parameter(
-            "control_mode").get_parameter_value().integer_value
-
+        self.control_mode = self.get_parameter("control_mode").get_parameter_value().integer_value
+        self.vehicle_namespace = self.get_parameter("vehicle_namespace").get_parameter_value().string_value
+        self.vehicle_number = self.get_parameter("vehicle_number").get_parameter_value().integer_value
+        self.UWB_MODE = self.get_parameter("uwb_mode").get_parameter_value().integer_value
+        if self.vehicle_number == 1:
+            self.x0_ = 1.0
+            self.y0_ = 1.0
+        elif self.vehicle_number == 2:
+            self.x0_ = 0.0
+            self.y0_ = 3.0
         # Publishers
-        self.offboard_control_mode_publisher_=self.create_publisher(OffboardControlMode,"OffboardControlMode_PubSubTopic",3)
-        self.trajectory_setpoint_publisher_=self.create_publisher(TrajectorySetpoint,"TrajectorySetpoint_PubSubTopic",3)
-        self.vehicle_command_publisher_=self.create_publisher(VehicleCommand,"VehicleCommand_PubSubTopic",3)
+        self.offboard_control_mode_publisher_=self.create_publisher(OffboardControlMode, self.vehicle_namespace + "OffboardControlMode_PubSubTopic",3)
+        self.trajectory_setpoint_publisher_=self.create_publisher(TrajectorySetpoint, self.vehicle_namespace + "TrajectorySetpoint_PubSubTopic",3)
+        self.vehicle_command_publisher_=self.create_publisher(VehicleCommand, self.vehicle_namespace + "VehicleCommand_PubSubTopic",3)
 
         # Subscribers
-        self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,"VehicleLocalPosition_PubSubTopic",self.callback_local_position,3)
-        self.drone_status_subscriber = self.create_subscription(VehicleStatus,"VehicleStatus_PubSubTopic",self.callback_drone_status,3)
+        self.drone_position_subscriber = self.create_subscription(VehicleLocalPosition,self.vehicle_namespace + "VehicleLocalPosition_PubSubTopic",self.callback_local_position,3)
+        self.drone_status_subscriber = self.create_subscription(VehicleStatus,self.vehicle_namespace + "VehicleStatus_PubSubTopic",self.callback_drone_status,3)
         self.target_position_subscriber = self.create_subscription(Odometry,"/chassis/odom",self.callback_target_state,3)
         self.true_err_subscriber = self.create_subscription(Point,"/drone_vehicle_positioning_error/true_pos",self.callback_true_err,3)
-        self.timesync_sub_=self.create_subscription(Timesync,"Timesync_PubSubTopic",self.callback_timesync,3)
-        self.target_uwb_position_subscriber = self.create_subscription(PoseWithCovarianceStamped,"/drone_vehicle_uwb_positioning/estimated_pos",self.callback_target_uwb_position,3)
-
+        self.timesync_sub_=self.create_subscription(Timesync,self.vehicle_namespace + "Timesync_PubSubTopic",self.callback_timesync,3)
+        self.target_uwb_position_subscriber = self.create_subscription(PoseWithCovarianceStamped,"/LS_uwb_estimator/estimated_pos",self.callback_target_uwb_position,3)
+        
         # Services
         self.control_mode_service = self.create_service(ControlMode, "control_mode", self.callback_control_mode)
 
@@ -134,7 +143,7 @@ class DroneController(Node):
         self.target_global_pos = [
             msg.pose.pose.position.x, msg.pose.pose.position.y]
         self.target_local_pos = [
-            self.target_global_pos[1]-1, self.target_global_pos[0]-1]
+            self.target_global_pos[1]-self.y0_, self.target_global_pos[0]-self.x0_] # 3, 0
 
     def callback_target_uwb_position(self,msg):
         self.target_uwb_global_relative_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y]
@@ -158,7 +167,7 @@ class DroneController(Node):
             self.reset_counters()
             self.control_mode = 4
             try:
-                self.setpoint = [request.y-1, request.x-1, - request.z]
+                self.setpoint = [request.y-self.y0_, request.x-self.x0_, - request.z]
             except:
                 response.success = "Please insert the coordinates"
                 return response
@@ -177,7 +186,7 @@ class DroneController(Node):
         msg.param1 = param1
         msg.param2 = param2
         msg.command = command
-        msg.target_system = 1
+        msg.target_system = self.vehicle_number
         msg.source_system = 1
         msg.source_component = 1
         msg.from_external = True
@@ -236,7 +245,7 @@ class DroneController(Node):
             self.px4_err = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
             self.norm_px4_err = np.linalg.norm(self.px4_err, ord=2)
 
-            if UWB_MODE == 1:
+            if self.UWB_MODE == 1:
                 self.uwb_err = np.array(self.target_uwb_local_relative_pos)
                 self.e = self.uwb_err
             else:
@@ -285,7 +294,7 @@ class DroneController(Node):
             self.px4_err = np.array([self.x - self.target_local_pos[0], self.y - self.target_local_pos[1]])  
             self.norm_px4_err = np.linalg.norm(self.px4_err, ord=2)
 
-            if UWB_MODE == 1:
+            if self.UWB_MODE == 1:
                 self.uwb_err = np.array(self.target_uwb_local_relative_pos)
                 self.e = self.uwb_err
             else:
