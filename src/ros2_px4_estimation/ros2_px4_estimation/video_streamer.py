@@ -10,7 +10,6 @@ import numpy as np
 from dt_apriltags import Detector
 from geometry_msgs.msg import Point, PoseWithCovarianceStamped
 from px4_msgs.msg import VehicleAttitude
-from nav_msgs.msg import Odometry
 
 from scipy.spatial.transform import Rotation as R
 

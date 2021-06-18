@@ -4,7 +4,6 @@ from launch.actions import Shutdown
 
 def generate_launch_description():
     ld = LaunchDescription()
-    #r1_rover:1,
     ld.add_action(ExecuteProcess(
         cmd=['/home/gennscar/PX4-Autopilot/Tools/gazebo_sitl_multiple_run.sh', '-t', 'px4_sitl_rtps','-s', 'r1_rover:1,iris:1,', '-l','rtps'],
         output='screen',

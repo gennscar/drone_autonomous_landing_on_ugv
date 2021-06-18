@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 kf_params = [
-    [{'deltaT': 5e-3}, {'R_uwb': 0.01}, {'R_px4': 0.1}, {'Q': 1e-2}]
+    [{'deltaT': 5e-3}, {'R_uwb': 0.5}, {'R_px4': 0.1}, {'Q': 1e-2}, {'namespace_drone': "/drone"}, {'namespace_rover': "/rover"}],
 ]
 
 def generate_launch_description():
@@ -27,15 +27,9 @@ def generate_launch_description():
         ))
 
     ld.add_entity(Node(
-        package='ros2_px4_estimation',
-        executable='drone_vehicle_px4_positioning',
-        namespace='PX4_estimator'
-    ))
-
-    ld.add_entity(Node(
         package='ros2_px4_testing',
         executable='drone_vehicle_positioning_error',
-        namespace='drone_vehicle_positioning_error'
+        namespace='drone_vehicle_positioning_error',
     ))
 
     return ld
