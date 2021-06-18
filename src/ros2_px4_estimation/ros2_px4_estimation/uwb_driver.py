@@ -26,9 +26,6 @@ class UwbDevice(Node):
         # Topic name where to send ranging data
         self.declare_parameter('topic_name', '/uwb_ranging')
 
-        # Anchor positions
-        self.declare_parameter('anchors')
-
         # Getting UWB connection
         self.uwb_serial()
 
@@ -71,7 +68,7 @@ class UwbDevice(Node):
         if raw_data == serial.to_bytes([]):
             self.get_logger().warn("No data received from serial port")
         else:
-            data = re.split(":\s|\s|:", raw_data.decode())[:-1]
+            data = re.split(':\s|\s|:', raw_data.decode())[:-1]
 
             if data[0] == 'RNG' and data[3] == 'SUCCESS':
                 msg = UwbSensor()
