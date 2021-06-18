@@ -17,29 +17,27 @@ class UwbDevice(Node):
     def __init__(self):
         super().__init__('uwb_driver')
 
-        self.ok = []  # SUCCESS/FAIL
-        self.mes = []    # Ranging measurement (length = nr of anchors)
-        self.fpp = []    # first peak power (length = nr of anchors)
-        self.rxp = []    # received signal strength (length = nr of anchors)
-        self.clay = []   # TO DO!!!!!!!!!!! cir vector layout
-        self.cir = []    # TO DO !!!!!!!!!!!
-        self.mn = []     # max noise
-        self.stn = []    # std noise
+        # Set UART serial port
+        self.declare_parameter('uwbPort', '/dev/ttyACM0')
 
-        self.declare_parameter('uwbPort', '/dev/ttyACM0')  # Set serial port
-        self.declare_parameter('uwbRate', 57600)  # Set baud rate
-        # self.declare_parameter('calibrationOffset', '0') # ADD TO msg.range_mes Can be used to correct biased mesurements
-        self.declare_parameter('timerPeriod', 0.0)  # Acquisition frequency
+        # Set UART baud rate
+        self.declare_parameter('uwbRate', 57600)
+
+        # Acquisition frequency
+        self.declare_parameter('timerPeriod', 0.0)
+
+        # Topic name where to send ranging data
         self.declare_parameter('topic_name', 'uwb_ranging')
 
+        # Getting UWB connection
+        self.uwb_serial()
+
+        # UWB messages publisher
         self.publisher_ = self.create_publisher(Uwb, self.get_parameter(
             'topic_name').get_parameter_value().string_value, 10)
-        timer_period = self.get_parameter(
-            'timerPeriod').get_parameter_value().double_value
-        self.uwb_serial()
-        self.timer = self.create_timer(timer_period, self.timer_callback)
+        self.timer = self.create_timer(self.get_parameter(
+            'timerPeriod').get_parameter_value().double_value, self.timer_callback)
         self.i = 0
-        # print(timer_period)
 
     def uwb_serial(self):
         try:
@@ -52,8 +50,6 @@ class UwbDevice(Node):
                 timeout=10,
                 baudrate=serialRate
             )
-            # print(serialPort)
-            # print(serialRate)
             self.get_logger().info('Connected to: "%s"' % serialPort)
         except SerialException:
             print("Could not open the serial port")
@@ -63,6 +59,14 @@ class UwbDevice(Node):
         msg = Uwb()
 
         index = []
+        ok = []
+        mes = []
+        fpp = []
+        rxp = []
+        clay = []
+        cir = []
+        mn = []
+        stn = []
 
         # After the while loop, the new line (after the control line) will be the "prepare line"
         raw_data = self.ser.readline()
@@ -84,28 +88,28 @@ class UwbDevice(Node):
                         range_ok = data[3]
                         # print(data)
                         if range_ok == 'SUCCESS':
-                            self.ok.append(range_ok)
-                            self.mes.append(data[6])
-                            self.fpp.append(data[8])
-                            self.rxp.append(data[10])
+                            ok.append(range_ok)
+                            mes.append(data[6])
+                            fpp.append(data[8])
+                            rxp.append(data[10])
                             index.append('1')
                             k += 1
-                            #print (self.mes)
+                            # print (self.mes)
                         elif range_ok == 'FAIL':
-                            self.ok.append(range_ok)
-                            self.mes.append('0')
-                            self.fpp.append('0')
-                            self.rxp.append('0')
+                            ok.append(range_ok)
+                            mes.append('0')
+                            fpp.append('0')
+                            rxp.append('0')
                             index.append('0')
                             # print(range_ok)
                     elif data[0] == 'DIAG':
                         # print(index)
                         self.clay = []
                         self.cir = []
-                        self.mn.append(data[10])
-                        self.stn.append(data[12])
+                        mn.append(data[10])
+                        stn.append(data[12])
 
-                    data = re.split(":\s|\s|:", self.ser.readline().decode())[
+                    data = re.split(':\s|\s|:', self.ser.readline().decode())[
                         :-1]  # The last read line is the "control line"
                 # print(self.ok)
                 # print(self.mes)
@@ -144,17 +148,9 @@ class UwbDevice(Node):
                 msg.cir = list(map(int, self.cir))
                 msg.max_noise = list(map(int, mn))
                 msg.std_noise = list(map(int, stn))
-                #self.get_logger().info('Publishing: "%s"' % msg.range_ok)
+                # self.get_logger().info('Publishing: "%s"' % msg.range_ok)
 
                 self.publisher_.publish(msg)
-                self.ok = []
-                self.mes = []
-                self.fpp = []
-                self.rxp = []
-                self.clay = []
-                self.cir = []
-                self.mn = []
-                self.stn = []
 
 
 def main(args=None):
