@@ -81,7 +81,7 @@ class UwbPositioning(Node):
         ranges = np.empty(len(self.anchors_))
 
         for _, data in self.anchors_.items():
-            if msg.timestamp - data.timestamp < 0.01:
+            if msg.timestamp - data.timestamp < 0.1:
                 anchor_pos[i, :] = np.array(
                     [data.anchor_pos.x, data.anchor_pos.y, data.anchor_pos.z])
                 ranges[i] = data.range
