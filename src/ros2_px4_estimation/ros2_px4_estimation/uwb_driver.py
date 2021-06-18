@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 
-from gazebo_msgs.msg import UwbSensor
+from ros2_px4_interfaces.msg import UwbSensor
 
 import serial
 import sys
@@ -79,7 +79,7 @@ class UwbDevice(Node):
                 msg.timestamp = self.get_clock().now().nanoseconds * 1e-9
                 msg.anchor_id = int(data[2].split('->')[1], base=16)
                 msg.range = float(data[6]) * 1e-2
-                
+
                 id = str(msg.anchor_id)
                 msg.anchor_pos.x = self.anchors[id][0]
                 msg.anchor_pos.y = self.anchors[id][1]
