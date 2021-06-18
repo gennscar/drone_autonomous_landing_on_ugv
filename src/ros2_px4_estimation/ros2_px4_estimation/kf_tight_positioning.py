@@ -9,7 +9,7 @@ from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
 from geometry_msgs.msg import PoseWithCovarianceStamped
-from gazebo_msgs.msg import UwbSensor
+from ros2_px4_interfaces.msg import UwbSensor
 from px4_msgs.msg import VehicleLocalPosition
 
 

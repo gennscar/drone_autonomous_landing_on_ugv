@@ -4,7 +4,7 @@ import rclpy
 import numpy as np
 from rclpy.node import Node
 
-from gazebo_msgs.msg import UwbSensor
+from ros2_px4_interfaces.msg import UwbSensor
 from geometry_msgs.msg import PoseWithCovarianceStamped
 
 import ros2_px4_functions
