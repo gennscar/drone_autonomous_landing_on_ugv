@@ -2,7 +2,8 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 kf_params = [
-    [{'deltaT': 5e-3}, {'R_uwb': 0.5}, {'R_px4': 0.1}, {'Q': 1e-2}, {'namespace_drone': "/drone"}, {'namespace_rover': "/rover"}],
+    [{'deltaT': 1e-3}, {'R_uwb': 0.025}, {'R_px4': 0.5}, {'Q': 1e-2}, {'namespace_drone': "/drone"}, {'namespace_rover': "/rover"}, {'include_rover': 0}, {'include_drone': 0}],
+
 ]
 
 def generate_launch_description():
@@ -25,6 +26,11 @@ def generate_launch_description():
             namespace='KF_estimator_' + str(i),
             parameters=param
         ))
+    ld.add_entity(Node(
+        package = "ros2_px4_estimation",
+        executable = "video_streamer",
+        name = "VideoStreamer"
+    ))
 
     ld.add_entity(Node(
         package='ros2_px4_testing',

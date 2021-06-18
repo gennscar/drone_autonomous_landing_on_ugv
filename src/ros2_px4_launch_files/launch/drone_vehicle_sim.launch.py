@@ -16,12 +16,12 @@ def generate_launch_description():
         {"uwb_mode": 1}
         ]
     )
-    vehicle_controller_node = Node(
-        package = "ros2_px4_control",
-        executable = "vehicle_controller",
-        name = "VehicleController"
-    )
+    #vehicle_controller_node = Node(
+    #    package = "ros2_px4_control",
+    #    executable = "vehicle_controller",
+    #    name = "VehicleController"
+    #)
 
     ld.add_action(drone_controller_node)
-    ld.add_action(vehicle_controller_node)
+    #ld.add_action(vehicle_controller_node)
     return ld

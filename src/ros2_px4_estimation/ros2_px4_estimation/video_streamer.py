@@ -13,10 +13,8 @@ from px4_msgs.msg import VehicleAttitude
 
 from scipy.spatial.transform import Rotation as R
 
-k1 = 1.0
-k2 = 1.0
-camera_params = [277.19135641132203*k1, 277.19135641132203*k1, 160.5, 120.5]
-tag_size = 0.793*k2 # act_tag/full tag
+camera_params = [277.19135641132203, 277.19135641132203, 160.5, 120.5]
+tag_size = 0.793 # act_tag/full tag
 
 
 class VideoStreamerNode(Node):
@@ -56,7 +54,6 @@ class VideoStreamerNode(Node):
         self.rot_m90 = R.from_matrix([[0,1,0],[-1,0,0],[0,0,1]])
 
         self.drone_orientation_subscriber = self.create_subscription(VehicleAttitude, "/VehicleAttitude_PubSubTopic", self.callback_drone_orientation, 1) 
-        self.estimated_uwb_pos_subscriber = self.create_subscription(Point, "/LS_uwb_estimator/norot_pos", self.callback_estimated_uwb_pos, 1)
         self.estimator_topic_name_ = "AprilTag_estimator/estimated_pos"
         self.tag_pose_publisher = self.create_publisher(PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
         
@@ -96,7 +93,7 @@ class VideoStreamerNode(Node):
           
           pose_R = tags[0].pose_R
           pose_t = np.array([tags[0].pose_t[0][0],tags[0].pose_t[1][0], tags[0].pose_t[2][0]])
-        
+       
           self.rot_camera2chassis = R.from_matrix(pose_R)
           self.rot_local2camera = R.from_quat(self.drone_orientation)
           self.rot_global2chassis = self.rot_global2local*self.rot_m90*self.rot_local2camera*self.rot_90*(self.rot_camera2chassis.inv())
@@ -106,16 +103,7 @@ class VideoStreamerNode(Node):
           fontScale = 0.7
           frame_rgb = cv2.putText(frame_rgb, f"yaw: {int(self.global_yaw)} deg", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
 
-          self.estimated_rotation = R.from_euler('z', self.global_yaw, degrees=True)
-          self.uwb_position_wrt_chassis = - np.array(self.estimated_rotation.apply(self.estimated_uwb_pos))
-
-          tag_pose = PoseWithCovarianceStamped()
-          tag_pose.header.frame_id = self.estimator_topic_name_
-          tag_pose.header.stamp = self.get_clock().now().to_msg()
-          tag_pose.pose.pose.position.x = self.uwb_position_wrt_chassis[1]
-          tag_pose.pose.pose.position.y = self.uwb_position_wrt_chassis[0]
-          tag_pose.pose.pose.position.z = - self.uwb_position_wrt_chassis[2]
-          self.tag_pose_publisher.publish(tag_pose)         
+   
 
         scale_percent = 200 # percent of original size
         width = int(frame_rgb.shape[1] * scale_percent / 100)

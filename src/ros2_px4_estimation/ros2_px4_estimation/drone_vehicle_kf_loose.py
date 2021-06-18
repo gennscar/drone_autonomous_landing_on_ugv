@@ -26,6 +26,8 @@ class KfLoosePositioning(Node):
         self.declare_parameter('Q', 1.)
         self.declare_parameter('namespace_drone','')
         self.declare_parameter('namespace_rover','')
+        self.declare_parameter('include_rover',1)
+        self.declare_parameter('include_drone',1)
 
         self.deltaT_ = self.get_parameter(
             'deltaT').get_parameter_value().double_value
@@ -36,6 +38,8 @@ class KfLoosePositioning(Node):
         self.Q_ = self.get_parameter('Q').get_parameter_value().double_value
         self.namespace_drone = self.get_parameter('namespace_drone').get_parameter_value().string_value
         self.namespace_rover = self.get_parameter('namespace_rover').get_parameter_value().string_value
+        self.include_rover = self.get_parameter('include_rover').get_parameter_value().integer_value
+        self.include_drone = self.get_parameter('include_drone').get_parameter_value().integer_value
 
         # Kalman Filter
         self.kalman_filter_ = KalmanFilter(dim_x=18, dim_z=18)
@@ -58,7 +62,7 @@ class KfLoosePositioning(Node):
                                          [np.zeros((9,9)),Q2]])
 
         # Covariance matrix
-        self.kalman_filter_.P *= 50.
+        self.kalman_filter_.P *= 10.
 
         # Setting up sensors subscribers
         self.uwb_sensor_subscriber_ = self.create_subscription(
@@ -109,59 +113,62 @@ class KfLoosePositioning(Node):
 
         # Filter update
         self.kalman_filter_.update(z, self.R_uwb_, H)
-
     def callback_drone_px4_subscriber(self, msg):
-        # Storing current estimate in a np.array
-        z = np.array([
-            msg.y,  msg.vy,  msg.ay,
-            msg.x,  msg.vx,  msg.ax,
-            -msg.z,      -msg.vz, -msg.az,
-            0.,           0.,      0.,
-            0.,           0.,      0.,
-            0.,           0.,      0.,
-        ])
+        if self.include_drone == 1:
+            # Storing current estimate in a np.array
+            z = np.array([
+                msg.y,  msg.vy,  msg.ay,
+                msg.x,  msg.vx,  msg.ax,
+                -msg.z,      -msg.vz, -msg.az,
+                0.,           0.,      0.,
+                0.,           0.,      0.,
+                0.,           0.,      0.,
+            ])
 
-        H = np.block([
-            [np.eye(9), np.zeros((9, 9))],
-            [np.zeros((9, 18))]
-        ])
-        # Filter update
-        self.kalman_filter_.update(z, self.R_px4_, H)
+            H = np.block([
+                [np.eye(9), np.zeros((9, 9))],
+                [np.zeros((9, 18))]
+            ])
+            # Filter update
+            self.kalman_filter_.update(z, self.R_px4_, H)
+        else:
+            pass
 
     def callback_rover_px4_subscriber(self, msg):
-        
-        # Storing current estimate in a np.array
-        z = np.array([
-            0.,  msg.vy,  msg.ay,
-            0.,  msg.vx,  msg.ax,
-            0., -msg.vz, -msg.az,
-            0.,  0.,      0.,
-            0.,  0.,      0.,
-            0.,  0.,      0.,
-        ])
-        block_matrix_1 = np.array([[0., 0., 0.],
-                                 [0., 1., 0.],
-                                 [0., 0., 1.]])        
-        block_matrix_2 = np.block([
-                        [block_matrix_1, np.zeros((3,3)), np.zeros((3,3))],
-                        [np.zeros((3,3)), block_matrix_1, np.zeros((3,3))],
-                        [np.zeros((3,3)), np.zeros((3,3)), block_matrix_1]
-        ])
-        H = np.block([
-            [np.zeros((9, 9)), block_matrix_2],
-            [np.zeros((9, 18))]
-        ])
-        # Filter update
-        self.kalman_filter_.update(z, self.R_px4_, H)
+        if self.include_rover == 1:
+            # Storing current estimate in a np.array
+            z = np.array([
+                0.,  msg.vy,  msg.ay,
+                0.,  msg.vx,  msg.ax,
+                0., -msg.vz, -msg.az,
+                0.,  0.,      0.,
+                0.,  0.,      0.,
+                0.,  0.,      0.])      
+            block_matrix_1 = np.array([[0., 0., 0.],
+                                    [0., 1., 0.],
+                                    [0., 0., 1.]])        
+            block_matrix_2 = np.block([
+                            [block_matrix_1, np.zeros((3,3)), np.zeros((3,3))],
+                            [np.zeros((3,3)), block_matrix_1, np.zeros((3,3))],
+                            [np.zeros((3,3)), np.zeros((3,3)), block_matrix_1]
+            ])
+            H = np.block([
+                [np.zeros((9, 9)), block_matrix_2],
+                [np.zeros((9, 18))]
+            ])
+            # Filter update
+            self.kalman_filter_.update(z, self.R_px4_, H)
+        else:
+            pass
 
     def predict_callback(self):
         # Sending the estimated position
         msg = PoseWithCovarianceStamped()
         msg.header.frame_id = self.get_namespace() + "/estimated_pos"
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.pose.pose.position.x = self.kalman_filter_.x[9][0] - self.kalman_filter_.x[0][0]
-        msg.pose.pose.position.y = self.kalman_filter_.x[12][0] - self.kalman_filter_.x[3][0]
-        msg.pose.pose.position.z = self.kalman_filter_.x[15][0] - self.kalman_filter_.x[6][0]
+        msg.pose.pose.position.x = float(self.kalman_filter_.x[9][0] - self.kalman_filter_.x[0][0])
+        msg.pose.pose.position.y = float(self.kalman_filter_.x[12][0] - self.kalman_filter_.x[3][0])
+        msg.pose.pose.position.z = float(self.kalman_filter_.x[15][0] - self.kalman_filter_.x[6][0])
         self.est_pos_publisher_.publish(msg)
 
         self.kalman_filter_.predict()

@@ -35,7 +35,7 @@ class UwbPositioning(Node):
         
         self.px4_offset_rotation = R.from_matrix([[1,0,0],[0,1,0],[0,0,1]])
         self.rot_global2local = R.from_matrix([[0,1,0],[1,0,0],[0,0,-1]])
-        self.offset_yaw = 20.
+        self.offset_yaw = 0.
 
         # Parameters declaration
         self.sensor_id_ = self.declare_parameter("sensor_id", "0")
