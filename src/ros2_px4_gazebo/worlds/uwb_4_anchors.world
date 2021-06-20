@@ -10,31 +10,29 @@
       <uri>model://ground_plane</uri>
     </include>
 
-    <!-- Anchor plugin test -->
-    <model name='uwb_anchor'>
-      <static>1</static>
-      <pose>0 0 0 0 0 0</pose>
-      <link name="uwb_anchor_head">
-        <visual name='uwb_anchor_head_visual'>
-          <pose>0 0 0 0 0 0</pose>
-          <geometry>
-            <sphere>
-              <radius>0.1 0.1 0.1</radius>
-            </sphere>
-          </geometry>
-        </visual>
-      </link>
-      <plugin name="gazebo_ros_uwb" filename="libros2_px4_gazebo_uwb.so">
-        <link_name>uwb_anchor_head</link_name>
-        <update_rate>10</update_rate>
-      </plugin>
-    </model>
-
-    <!-- Anchor model test -->
+    <!-- Anchor 0 -->
     <include>
-      <name>uwb_anchor_included</name>
-      <uri>models//uwb_anchor</uri>
+      <name>uwb_anchor_0</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+    <!-- Anchor 1 -->
+    <include>
+      <name>uwb_anchor_1</name>
+      <uri>model://uwb_anchor</uri>
       <pose>10 0 0 0 0 0</pose>
+    </include>
+    <!-- Anchor 2 -->
+    <include>
+      <name>uwb_anchor_2</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>0 10 0 0 0 0</pose>
+    </include>
+    <!-- Anchor 3 -->
+    <include>
+      <name>uwb_anchor_3</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>10 10 10 0 0 0</pose>
     </include>
 
     <physics name='default_physics' default='0' type='ode'>
