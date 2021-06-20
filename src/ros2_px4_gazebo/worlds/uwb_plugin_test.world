@@ -1,4 +1,4 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
 <sdf version="1.5">
   <world name="default">
     <!-- A global light source -->
@@ -9,35 +9,34 @@
     <include>
       <uri>model://ground_plane</uri>
     </include>
-		<!-- UWB tags -->
+
+    <!-- Anchor plugin test -->
+    <model name='uwb_anchor'>
+      <static>1</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="uwb_anchor_head">
+        <visual name='uwb_anchor_head_visual'>
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <sphere>
+              <radius>0.1 0.1 0.1</radius>
+            </sphere>
+          </geometry>
+        </visual>
+      </link>
+      <plugin name="gazebo_ros_uwb" filename="libros2_px4_gazebo_uwb.so">
+        <link_name>uwb_anchor_head</link_name>
+        <update_rate>10</update_rate>
+      </plugin>
+    </model>
+
+    <!-- Anchor model test -->
     <include>
-			<name>uwb_tag_1</name>
+      <name>uwb_anchor_included</name>
       <uri>models//uwb_anchor</uri>
-			<pose>0 0 0 0 0 0</pose>
-    </include>
-    <include>
-			<name>uwb_tag_2</name>
-      <uri>models//uwb_anchor</uri>
-			<pose>1 1 0 0 0 0</pose>
-    </include>
-    <include>
-			<name>uwb_tag_3</name>
-      <uri>models//uwb_anchor</uri>
-			<pose>0 1 1 0 0 0</pose>
-    </include>
-    <include>
-			<name>uwb_tag_4</name>
-      <uri>models//uwb_anchor</uri>
-			<pose>1 0 1 0 0 0</pose>
-    </include>
-    <!-- UWB sensor -->
-    <include>
-			<name>uwb_sensor_0</name>
-      <uri>models//uwb_sensor</uri>
-			<pose>0.5 0.5 2 0 0 0</pose>
+      <pose>10 0 0 0 0 0</pose>
     </include>
 
-		<!-- Physics -->
     <physics name='default_physics' default='0' type='ode'>
       <gravity>0 0 -9.8066</gravity>
       <ode>
