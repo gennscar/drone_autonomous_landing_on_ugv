@@ -41,11 +41,12 @@ def generate_launch_description():
             package='ros2_px4_estimation',
             executable='ukf_positioning',
             namespace='UKF_estimator',
-            parameters=[{'deltaT': 1e-2},
-                        {'R_uwb': 0.0002},
-                        {'R_px4': 5.},
-                        {'Q': 0.05},
-                        {'AdaptG': 0.2}]
+            parameters=[
+                {"deltaT": 5e-3},
+                {"R_uwb": 1e-3},
+                {'Q': 1e-3},
+                {'R_px4': 10.}
+            ]
         ),
         Node(
             package='ros2_px4_testing',
