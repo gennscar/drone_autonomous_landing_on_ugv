@@ -299,7 +299,7 @@ namespace gazebo
     if (_msg->pose().name() != anchor_id_)
     {
       // Calculate the range between sensor and anchor + gaussian noise
-      range = link_pose_.Pos().Distance(_msg->pose().orientation().x(), _msg->pose().orientation().y(), _msg->pose().orientation().z());
+      range = link_pose_.Pos().Distance(_msg->pose().position().x(), _msg->pose().position().y(), _msg->pose().position().z());
       range += ignition::math::Rand::DblNormal(0, gaussian_noise_);
 
       // Fill ROS range message

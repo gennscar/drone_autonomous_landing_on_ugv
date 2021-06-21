@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-import rclpy
+
 import numpy as np
+import rclpy
 from rclpy.node import Node
+from rclpy.time import Time, Duration
 
 from ros2_px4_interfaces.msg import UwbSensor
 from geometry_msgs.msg import PoseWithCovarianceStamped
@@ -51,7 +53,7 @@ class UwbPositioning(Node):
 
         # Setting up sensors subscriber for the UWB plugin
         self.sensor_subscriber_ = self.create_subscription(
-            UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
+            UwbSensor, "/uwb_sensor/" + self.sensor_id_, self.callback_sensor_subscriber, 10)
 
         # Setting up a publishers to send the estimated position
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
@@ -73,7 +75,7 @@ class UwbPositioning(Node):
         """
 
         # Saving the message in a dict
-        self.anchors_[msg.anchor_id] = msg
+        self.anchors_[msg.anchor_pose.header.frame_id] = msg
 
         # Extract anchor positions and ranges
         i = 0
@@ -81,9 +83,12 @@ class UwbPositioning(Node):
         ranges = np.empty(len(self.anchors_))
 
         for _, data in self.anchors_.items():
-            if msg.timestamp - data.timestamp < 0.1:
+            delta = Time.from_msg(msg.anchor_pose.header.stamp) - \
+                Time.from_msg(data.anchor_pose.header.stamp)
+
+            if delta < Duration(nanoseconds=1e6):
                 anchor_pos[i, :] = np.array(
-                    [data.anchor_pos.x, data.anchor_pos.y, data.anchor_pos.z])
+                    [data.anchor_pose.pose.position.x, data.anchor_pose.pose.position.y, data.anchor_pose.pose.position.z])
                 ranges[i] = data.range
                 i = i+1
 

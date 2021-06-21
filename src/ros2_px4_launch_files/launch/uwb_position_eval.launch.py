@@ -9,7 +9,7 @@ def generate_launch_description():
             executable='uwb_positioning',
             namespace='LS_uwb_estimator',
             parameters=[
-                {"sensor_id": "0"},
+                {"sensor_id": "Iris"},
                 {"method": "LS"}
             ]
         ),
@@ -18,7 +18,7 @@ def generate_launch_description():
             executable='uwb_positioning',
             namespace='GN_uwb_estimator',
             parameters=[
-                {"sensor_id": "0"},
+                {"sensor_id": "Iris"},
                 {"method": "GN"}
             ]
         ),
@@ -27,7 +27,7 @@ def generate_launch_description():
             executable='uwb_positioning',
             namespace='GN_10it_uwb_estimator',
             parameters=[
-                {"sensor_id": "0"},
+                {"sensor_id": "Iris"},
                 {"method": "GN"},
                 {"iterations": 10}
             ]
