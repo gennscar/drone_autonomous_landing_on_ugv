@@ -20,7 +20,7 @@
     <include>
       <name>uwb_anchor_1</name>
       <uri>model://uwb_anchor</uri>
-      <pose>10 0 0 0 0 0</pose>
+      <pose>0 0 10 0 0 0</pose>
     </include>
     <!-- Anchor 2 -->
     <include>
@@ -32,8 +32,55 @@
     <include>
       <name>uwb_anchor_3</name>
       <uri>model://uwb_anchor</uri>
+      <pose>0 10 10 0 0 0</pose>
+    </include>
+    <!-- Anchor 4 -->
+    <include>
+      <name>uwb_anchor_4</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>10 0 0 0 0 0</pose>
+    </include>
+    <!-- Anchor 5 -->
+    <include>
+      <name>uwb_anchor_5</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>10 0 10 0 0 0</pose>
+    </include>
+    <!-- Anchor 6 -->
+    <include>
+      <name>uwb_anchor_6</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>10 10 0 0 0 0</pose>
+    </include>
+    <!-- Anchor 7 -->
+    <include>
+      <name>uwb_anchor_7</name>
+      <uri>model://uwb_anchor</uri>
       <pose>10 10 10 0 0 0</pose>
     </include>
+
+    <!-- Sensor Zero -->
+    <model name='uwb_sensor'>
+      <static>1</static>
+      <pose>5 5 5 0 0 0</pose>
+      <link name="uwb_sensor_head">
+        <visual name='uwb_sensor_head_visual'>
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 0.1 0.1</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+      <plugin name="gazebo_ros_uwb" filename="libros2_px4_gazebo_uwb.so">
+        <pub_range />
+        <anchor_id>test</anchor_id>
+        <link_name>uwb_sensor_head</link_name>
+        <update_rate>20</update_rate>
+        <gaussian_noise>0.02</gaussian_noise>
+      </plugin>
+    </model>
 
     <physics name='default_physics' default='0' type='ode'>
       <gravity>0 0 -9.8066</gravity>

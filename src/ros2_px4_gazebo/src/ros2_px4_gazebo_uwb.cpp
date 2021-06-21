@@ -1,92 +1,88 @@
-// Copyright 2013 Open Source Robotics Foundation, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #include <ros2_px4_gazebo/ros2_px4_gazebo_uwb.hpp>
 
 #include <ignition/math/Rand.hh>
 #include <gazebo_ros/node.hpp>
 #include <gazebo_ros/utils.hpp>
-#include <gazebo_ros/conversions/geometry_msgs.hpp>
+#include <gazebo/transport/transport.hh>
 #include <ros2_px4_interfaces/msg/uwb_sensor.hpp>
-//#include <ros2_px4_interfaces/msg/uwb_anchor.hpp>
 
 #include <rclcpp/rclcpp.hpp>
 
 namespace gazebo
 {
-  class GazeboRosUwbPrivate
+  class RosPx4GazeboUwbPrivate
   {
   public:
     /// Callback to be called at every simulation iteration
     /// \param[in] info Updated simulation info
-    void OnUpdate(const gazebo::common::UpdateInfo &info);
+    void OnUpdate(const common::UpdateInfo &info);
 
     /// Callback to be called at every anchor message received by the sensor
     /// \param[in] msg Incoming anchor message
-    void AnchorCallback(const ros2_px4_interfaces::msg::UwbSensor::SharedPtr msg);
+    void AnchorCallback(ConstPoseStampedPtr &_msg);
 
     /// Pointer to the link, model and world
-    gazebo::physics::LinkPtr link_{nullptr};
-    gazebo::physics::ModelPtr model_{nullptr};
-    gazebo::physics::WorldPtr world_{nullptr};
+    physics::LinkPtr link_{nullptr};
+    physics::ModelPtr model_{nullptr};
+    physics::WorldPtr world_{nullptr};
 
     /// Pose of the link
     ignition::math::Pose3d link_pose_;
 
-    /// The reference model and link to which calculate distances
-    gazebo::physics::ModelPtr reference_model_{nullptr};
-    gazebo::physics::LinkPtr reference_link_{nullptr};
+    /// The reference model and link to which calculate the pose
+    physics::ModelPtr reference_model_{nullptr};
+    physics::LinkPtr reference_link_{nullptr};
+
+    /// Gazebo node
+    transport::NodePtr gazebo_node_{nullptr};
+
+    /// Gazebo pub/sub to anchor broadcast
+    transport::PublisherPtr anchor_pub_{nullptr};
+    transport::SubscriberPtr anchor_sub_{nullptr};
 
     /// Pointer to ros node
     gazebo_ros::Node::SharedPtr ros_node_{nullptr};
 
-    /// PubSub
-    rclcpp::Publisher<ros2_px4_interfaces::msg::UwbSensor>::SharedPtr anchor_pub_{nullptr};
+    /// ROS publisher for sensor ranging data
     rclcpp::Publisher<ros2_px4_interfaces::msg::UwbSensor>::SharedPtr sensor_pub_{nullptr};
-    rclcpp::Subscription<ros2_px4_interfaces::msg::UwbSensor>::SharedPtr anchor_sub_{nullptr};
 
     // Topic names
-    std::string anchor_topic_{"/uwb_anchors_broadcast"};
-    std::string sensor_topic_{"/uwb_sensor_"};
+    std::string anchor_topic_{"/uwb_anchors"};
+    std::string sensor_topic_{"/uwb_sensor/"};
 
     /// Keep track of the last update time.
-    gazebo::common::Time last_time_;
+    common::Time last_time_;
 
     /// Publish rate in Hz.
     double update_rate_{0.0};
 
     /// Anchor unique ID
-    uint64_t anchor_id_;
+    std::string anchor_id_;
 
     /// Gaussian noise
     double gaussian_noise_;
 
     /// Pointer to the update event connection
-    gazebo::event::ConnectionPtr update_connection_{nullptr};
+    event::ConnectionPtr update_connection_{nullptr};
   };
 
-  GazeboRosUwb::GazeboRosUwb()
-      : impl_(std::make_unique<GazeboRosUwbPrivate>())
+  RosPx4GazeboUwb::RosPx4GazeboUwb()
+      : impl_(std::make_unique<RosPx4GazeboUwbPrivate>())
   {
   }
 
-  GazeboRosUwb::~GazeboRosUwb()
+  RosPx4GazeboUwb::~RosPx4GazeboUwb()
   {
+    impl_->ros_node_.reset();
+    if (impl_->gazebo_node_)
+    {
+      impl_->gazebo_node_->Fini();
+    }
+    impl_->gazebo_node_.reset();
   }
 
   // Load the plugin
-  void GazeboRosUwb::Load(gazebo::physics::ModelPtr model, sdf::ElementPtr sdf)
+  void RosPx4GazeboUwb::Load(physics::ModelPtr model, sdf::ElementPtr sdf)
   {
     std::string link_name;
     std::string reference_model_name;
@@ -97,14 +93,18 @@ namespace gazebo
     impl_->world_ = impl_->model_->GetWorld();
     impl_->last_time_ = impl_->world_->SimTime();
 
-    // Configure the plugin from the SDF file
+    // Configure the Gazebo node
+    impl_->gazebo_node_ = boost::make_shared<transport::Node>();
+    impl_->gazebo_node_->Init(impl_->world_->Name());
+
+    // Configure the ROS node from the SDF file
     impl_->ros_node_ = gazebo_ros::Node::Get(sdf);
 
     // <update_rate> is the rate at which publish UWB packets
     if (!sdf->HasElement("update_rate"))
     {
-      RCLCPP_DEBUG(impl_->ros_node_->get_logger(),
-                   "UWB plugin missing <update_rate>, defaults to 0.0 (as fast as possible)");
+      RCLCPP_INFO(impl_->ros_node_->get_logger(),
+                  "UWB plugin missing <update_rate>, defaults to 0.0 (as fast as possible)");
     }
     else
     {
@@ -114,14 +114,14 @@ namespace gazebo
     // <anchor_id> is an unique ID that represent the UWB tag
     if (!sdf->HasElement("anchor_id"))
     {
-      impl_->anchor_id_ = rand();
-      RCLCPP_DEBUG(impl_->ros_node_->get_logger(),
-                   "UWB plugin missing <anchor_id>, assigning random ID: %lld",
-                   (long long)impl_->anchor_id_);
+      impl_->anchor_id_ = std::to_string(rand());
+      RCLCPP_INFO(impl_->ros_node_->get_logger(),
+                  "UWB plugin missing <anchor_id>, assigning random ID: %s",
+                  impl_->anchor_id_.c_str());
     }
     else
     {
-      impl_->anchor_id_ = sdf->GetElement("anchor_id")->Get<uint64_t>();
+      impl_->anchor_id_ = sdf->GetElement("anchor_id")->Get<std::string>();
     }
 
     // <link_name> is the name of the link where the UWB tag is attached
@@ -189,20 +189,19 @@ namespace gazebo
       }
     }
 
-    // Setting up UWB tag position publisher
-    impl_->anchor_pub_ = impl_->ros_node_->create_publisher<ros2_px4_interfaces::msg::UwbSensor>(impl_->anchor_topic_, 100);
+    // Setting up the publisher of the anchor pose
+    impl_->anchor_pub_ = impl_->gazebo_node_->Advertise<msgs::PoseStamped>(impl_->anchor_topic_, 1);
 
-    // This code is valid only for a Sensor UWB tag, that calculates the distances betweeen tags
-    if (sdf->HasElement("is_sensor"))
+    // This code is valid only if we want to publish ranging data
+    if (sdf->HasElement("pub_range"))
     {
+      // Setting up anchors pose subscriber
+      impl_->anchor_sub_ = impl_->gazebo_node_->Subscribe(impl_->anchor_topic_, &RosPx4GazeboUwbPrivate::AnchorCallback, impl_.get());
+
       // Setting up ranges publisher
       impl_->sensor_pub_ = impl_->ros_node_->create_publisher<ros2_px4_interfaces::msg::UwbSensor>(
-          impl_->sensor_topic_ + std::to_string(impl_->anchor_id_), 100);
-
-      // Setting up UWB tag position subscriber
-      impl_->anchor_sub_ = impl_->ros_node_->create_subscription<ros2_px4_interfaces::msg::UwbSensor>(
-          impl_->anchor_topic_, 100,
-          std::bind(&GazeboRosUwbPrivate::AnchorCallback, impl_.get(), std::placeholders::_1));
+          impl_->sensor_topic_ + impl_->anchor_id_,
+          impl_->ros_node_->get_qos().get_publisher_qos(impl_->sensor_topic_ + impl_->anchor_id_));
 
       // <gaussian_noise> is the sigma value of gaussian noise to add to range readings
       if (!sdf->HasElement("gaussian_noise"))
@@ -217,11 +216,11 @@ namespace gazebo
     }
 
     // Listen to the update event. This event is broadcast every simulation iteration
-    impl_->update_connection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
-        std::bind(&GazeboRosUwbPrivate::OnUpdate, impl_.get(), std::placeholders::_1));
+    impl_->update_connection_ = event::Events::ConnectWorldUpdateBegin(
+        std::bind(&RosPx4GazeboUwbPrivate::OnUpdate, impl_.get(), std::placeholders::_1));
   }
 
-  void GazeboRosUwbPrivate::OnUpdate(const gazebo::common::UpdateInfo &info)
+  void RosPx4GazeboUwbPrivate::OnUpdate(const common::UpdateInfo &info)
   {
     // Check if link is destroyed
     if (!link_)
@@ -229,7 +228,7 @@ namespace gazebo
       return;
     }
 
-    gazebo::common::Time current_time = info.simTime;
+    common::Time current_time = info.simTime;
 
     if (current_time < last_time_)
     {
@@ -240,12 +239,6 @@ namespace gazebo
     // Rate control
     if (update_rate_ > 0 &&
         (current_time - last_time_).Double() < (1.0 / update_rate_))
-    {
-      return;
-    }
-
-    // If we don't have any subscribers, don't bother composing and sending the message
-    if (ros_node_->count_subscribers(anchor_topic_) == 0)
     {
       return;
     }
@@ -268,40 +261,71 @@ namespace gazebo
       link_pose_.Pos() = reference_pose.Rot().RotateVectorReverse(link_pose_.Pos());
     }
 
-    // Fill UWB tag message
-    ros2_px4_interfaces::msg::UwbSensor anchor_msg;
-    anchor_msg.timestamp = current_time.Double();
-    anchor_msg.anchor_id = anchor_id_;
-    anchor_msg.anchor_pos = gazebo_ros::Convert<geometry_msgs::msg::Point>(link_pose_.Pos());
+    // Fill UWB message
+    msgs::PoseStamped anchor_msg;
+    msgs::Time *anchor_msg_time = new msgs::Time();
+    msgs::Vector3d *anchor_msg_vec = new msgs::Vector3d();
+    msgs::Quaternion *anchor_msg_qua = new msgs::Quaternion();
+    msgs::Pose *anchor_msg_pose = new msgs::Pose();
 
-    // Publish to ROS
-    anchor_pub_->publish(anchor_msg);
+    anchor_msg_time->set_sec(current_time.sec);
+    anchor_msg_time->set_nsec(current_time.nsec);
+    anchor_msg.set_allocated_time(anchor_msg_time);
+
+    anchor_msg_vec->set_x(link_pose_.Pos().X());
+    anchor_msg_vec->set_y(link_pose_.Pos().Y());
+    anchor_msg_vec->set_z(link_pose_.Pos().Z());
+    anchor_msg_pose->set_allocated_position(anchor_msg_vec);
+
+    // Sending orientation for a future more complex noise model
+    anchor_msg_qua->set_x(0.0);
+    anchor_msg_qua->set_y(0.0);
+    anchor_msg_qua->set_z(0.0);
+    anchor_msg_qua->set_w(0.0);
+    anchor_msg_pose->set_allocated_orientation(anchor_msg_qua);
+
+    anchor_msg_pose->set_name(anchor_id_);
+    anchor_msg.set_allocated_pose(anchor_msg_pose);
+
+    anchor_pub_->Publish(anchor_msg);
     last_time_ = current_time;
   }
 
-  void GazeboRosUwbPrivate::AnchorCallback(const ros2_px4_interfaces::msg::UwbSensor::SharedPtr msg)
+  void RosPx4GazeboUwbPrivate::AnchorCallback(ConstPoseStampedPtr &_msg)
   {
     double range;
 
     // Check if the sensor and the anchor are 2 separate entities
-    if (msg->anchor_id != anchor_id_)
+    if (_msg->pose().name() != anchor_id_)
     {
-      // Calculate the range between sensor and anchor
-      ignition::math::Vector3d anchor_pos = gazebo_ros::Convert<ignition::math::Vector3d>(msg->anchor_pos);
-      range = link_pose_.Pos().Distance(anchor_pos);
+      // Calculate the range between sensor and anchor + gaussian noise
+      range = link_pose_.Pos().Distance(_msg->pose().orientation().x(), _msg->pose().orientation().y(), _msg->pose().orientation().z());
+      range += ignition::math::Rand::DblNormal(0, gaussian_noise_);
 
-      // Fill UWB sensor message
+      // Fill ROS range message
       ros2_px4_interfaces::msg::UwbSensor sensor_msg;
-      sensor_msg.timestamp = msg->timestamp;
-      sensor_msg.anchor_id = msg->anchor_id;
-      sensor_msg.anchor_pos = msg->anchor_pos;
-      sensor_msg.range = range + ignition::math::Rand::DblNormal(0, gaussian_noise_);
+
+      sensor_msg.anchor_pose.header.stamp.sec = _msg->time().sec(); // @todo: Simulate transmission delay anchor->sensor
+      sensor_msg.anchor_pose.header.stamp.nanosec = _msg->time().nsec();
+
+      sensor_msg.anchor_pose.header.frame_id = _msg->pose().name();
+
+      sensor_msg.anchor_pose.pose.position.x = _msg->pose().position().x();
+      sensor_msg.anchor_pose.pose.position.y = _msg->pose().position().y();
+      sensor_msg.anchor_pose.pose.position.z = _msg->pose().position().z();
+
+      sensor_msg.anchor_pose.pose.orientation.x = _msg->pose().orientation().x();
+      sensor_msg.anchor_pose.pose.orientation.y = _msg->pose().orientation().y();
+      sensor_msg.anchor_pose.pose.orientation.z = _msg->pose().orientation().z();
+      sensor_msg.anchor_pose.pose.orientation.w = _msg->pose().orientation().w();
+
+      sensor_msg.range = range;
 
       // Publish to ROS
       sensor_pub_->publish(sensor_msg);
     }
   }
 
-  GZ_REGISTER_MODEL_PLUGIN(GazeboRosUwb)
+  GZ_REGISTER_MODEL_PLUGIN(RosPx4GazeboUwb)
 
 } // namespace gazebo
