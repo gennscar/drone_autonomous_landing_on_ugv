@@ -2,12 +2,14 @@
 
 
 import numpy as np
+from numpy.core.numeric import NaN
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time, Duration
 
 from ros2_px4_interfaces.msg import UwbSensor
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from px4_msgs.msg import VehicleVisualOdometry, Timesync
 
 import ros2_px4_functions
 
@@ -51,20 +53,33 @@ class UwbPositioning(Node):
             self.get_logger().error("uwb_positioning need a namespace")
             self.destroy_node()
 
+        self.timestamp_ = 0
+
         # Setting up sensors subscriber for the UWB plugin
         self.sensor_subscriber_ = self.create_subscription(
             UwbSensor, "/uwb_sensor/" + self.sensor_id_, self.callback_sensor_subscriber, 10)
 
+        self.timesync_subscriber_ = self.create_subscription(
+            Timesync, "/Timesync_PubSubTopic", self.callback_timesync, 10)
+
         # Setting up a publishers to send the estimated position
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
         self.position_mse_publisher_ = self.create_publisher(
-            PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
+            PoseWithCovarianceStamped, self.estimator_topic_name_, 10
+        )
+
+        self.px4_odometry_publisher_ = self.create_publisher(
+            VehicleVisualOdometry, "/VehicleVisualOdometry_PubSubTopic", 10
+        )
 
         self.get_logger().info(f"""Node has started:
                                Sensor ID:  {self.sensor_id_}
                                Method:     {self.method_}
                                Iterations  {self.iterations_}
                               """)
+
+    def callback_timesync(self, msg):
+        self.timestamp_ = msg.timestamp
 
     def callback_sensor_subscriber(self, msg):
         """
@@ -119,6 +134,21 @@ class UwbPositioning(Node):
             msg.pose.pose.position.z = self.sensor_est_pos_[2]
 
             self.position_mse_publisher_.publish(msg)
+
+            # Sending the estimated position to PX4
+            if self.timestamp_ == 0:
+                return
+
+            msg = VehicleVisualOdometry()
+            msg.timestamp = self.timestamp_
+            msg.local_frame = VehicleVisualOdometry.LOCAL_FRAME_FRD
+
+            # From FLU to FRD
+            msg.x = self.sensor_est_pos_[1]
+            msg.y = self.sensor_est_pos_[0]
+            msg.z = -self.sensor_est_pos_[2]
+
+            self.px4_odometry_publisher_.publish(msg)
 
 
 def main(args=None):
