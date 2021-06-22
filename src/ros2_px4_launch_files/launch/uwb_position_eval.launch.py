@@ -42,9 +42,9 @@ def generate_launch_description():
             executable='ukf_positioning',
             namespace='UKF_estimator',
             parameters=[
-                {"deltaT": 5e-3},
-                {"R_uwb": 1e-3},
-                {'Q': 1e-3},
+                {"deltaT": 0.01},
+                {"R_uwb": 0.02},
+                {'Q': 0.01},
                 {'R_px4': 10.}
             ]
         ),

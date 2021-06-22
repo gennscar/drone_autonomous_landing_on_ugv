@@ -55,7 +55,7 @@ class UkfPositioning(Node):
 
         # Initial estimate
         self.kalman_filter_.x = np.array(
-            [1., 0., 0., 1., 0., 0., 0., 0., 0.])
+            [1., 0., 0., 1., 0., 0., 1., 0., 0.])
 
         # State transition matrix
 
@@ -68,7 +68,7 @@ class UkfPositioning(Node):
 
         # Setting up sensors subscribers
         self.sensor_subscriber_ = self.create_subscription(
-            UwbSensor, "/uwb_sensor_0", self.callback_uwb_subscriber, 10)
+            UwbSensor, "/uwb_sensor/Iris", self.callback_uwb_subscriber, 10)
         self.sensor_subscriber_ = self.create_subscription(
             VehicleLocalPosition, "/VehicleLocalPosition_PubSubTopic", self.callback_px4_subscriber, 10)
 
@@ -94,14 +94,14 @@ class UkfPositioning(Node):
         z = np.array([msg.range, 0., 0., 0., 0., 0., 0., 0., 0.])
 
         # Storing anchor position in a np.array
-        anc_pos = np.array([
-            msg.anchor_pos.x,
-            msg.anchor_pos.y,
-            msg.anchor_pos.z
+        anchor_position = np.array([
+            msg.anchor_pose.pose.position.x,
+            msg.anchor_pose.pose.position.y,
+            msg.anchor_pose.pose.position.z
         ])
 
         def h_uwb(x):
-            r = np.linalg.norm(x[[0, 3, 6]] - anc_pos)
+            r = np.linalg.norm(x[[0, 3, 6]] - anchor_position)
             return np.array([r, 0., 0., 0., 0., 0., 0., 0., 0.])
 
         # Filter update
@@ -126,7 +126,7 @@ class UkfPositioning(Node):
 
     def predict_callback(self):
 
-        if(np.linalg.norm(self.kalman_filter_.P) < 1.):
+        if(np.linalg.norm(self.kalman_filter_.P) < 10.):
             # Sending the estimated position
             msg = PoseWithCovarianceStamped()
             msg.header.frame_id = self.get_namespace() + "/estimated_pos"
