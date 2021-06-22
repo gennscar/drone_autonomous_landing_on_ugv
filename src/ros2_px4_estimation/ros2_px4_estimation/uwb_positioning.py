@@ -101,7 +101,7 @@ class UwbPositioning(Node):
             delta = Time.from_msg(msg.anchor_pose.header.stamp) - \
                 Time.from_msg(data.anchor_pose.header.stamp)
 
-            if delta < Duration(nanoseconds=1e6):
+            if delta < Duration(nanoseconds=1e8):
                 anchor_pos[i, :] = np.array(
                     [data.anchor_pose.pose.position.x, data.anchor_pose.pose.position.y, data.anchor_pose.pose.position.z])
                 ranges[i] = data.range
@@ -147,6 +147,21 @@ class UwbPositioning(Node):
             msg.x = self.sensor_est_pos_[1]
             msg.y = self.sensor_est_pos_[0]
             msg.z = -self.sensor_est_pos_[2]
+
+            msg.q[0] = float('NaN')
+            msg.q_offset[0] = float('NaN')
+            msg.pose_covariance[0] = 2.5e-2
+            msg.pose_covariance[6] = 2.5e-2
+            msg.pose_covariance[11] = 2.5e-2
+            msg.pose_covariance[15] = float('NaN')
+            msg.vx = float('NaN')
+            msg.vy = float('NaN')
+            msg.vz = float('NaN')
+            msg.rollspeed = float('NaN')
+            msg.pitchspeed = float('NaN')
+            msg.yawspeed = float('NaN')
+            msg.velocity_covariance[0] = float('NaN')
+            msg.velocity_covariance[15] = float('NaN')
 
             self.px4_odometry_publisher_.publish(msg)
 
