@@ -73,14 +73,14 @@ class UwbDevice(Node):
             if data[0] == 'RNG' and data[3] == 'SUCCESS':
                 msg = UwbSensor()
 
-                msg.timestamp = self.get_clock().now().nanoseconds * 1e-9
-                msg.anchor_id = int(data[2].split('->')[1], base=16)
+                msg.anchor_pose.header.stamp = self.get_clock().now().to_msg()
+                msg.anchor_pose.header.frame_id = data[2]
                 msg.range = float(data[6]) * 1e-2
 
-                id = str(msg.anchor_id)
-                msg.anchor_pos.x = self.anchors[id][0]
-                msg.anchor_pos.y = self.anchors[id][1]
-                msg.anchor_pos.z = self.anchors[id][2]
+                id = msg.anchor_pose.header.frame_id
+                msg.anchor_pose.pose.position.x = self.anchors[id][0]
+                msg.anchor_pose.pose.position.y = self.anchors[id][1]
+                msg.anchor_pose.pose.position.z = self.anchors[id][2]
 
                 self.publisher_.publish(msg)
 
