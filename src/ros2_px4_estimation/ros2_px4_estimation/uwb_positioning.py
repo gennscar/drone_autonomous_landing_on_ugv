@@ -72,7 +72,7 @@ class UwbPositioning(Node):
             VehicleVisualOdometry, "/VehicleVisualOdometry_PubSubTopic", 10
         )
 
-        self.timer_ = self.create_timer(1.0, self.callback_send_odom)
+        self.timer_ = self.create_timer(0.1, self.callback_send_odom)
 
         self.get_logger().info(f"""Node has started:
                                Sensor ID:  {self.sensor_id_}
@@ -84,18 +84,18 @@ class UwbPositioning(Node):
         msg = VehicleVisualOdometry()
         msg.timestamp = self.timestamp_
         msg.timestamp_sample = self.timestamp_
-        msg.local_frame = VehicleVisualOdometry.LOCAL_FRAME_FRD
+        msg.local_frame = VehicleVisualOdometry.LOCAL_FRAME_OTHER
 
         # From FLU to FRD
-        msg.x = self.sensor_est_pos_[1]
-        msg.y = self.sensor_est_pos_[0]
-        msg.z = -self.sensor_est_pos_[2]
+        msg.x = self.sensor_est_pos_[0]
+        msg.y = self.sensor_est_pos_[1]
+        msg.z = self.sensor_est_pos_[2]
 
         msg.q[0] = float('NaN')
         msg.q_offset[0] = float('NaN')
         msg.pose_covariance[0] = 2.5e-2
         msg.pose_covariance[6] = 2.5e-2
-        msg.pose_covariance[11] = 2.5e-2
+        msg.pose_covariance[11] = 1e0
         msg.pose_covariance[15] = float('NaN')
         msg.vx = float('NaN')
         msg.vy = float('NaN')
