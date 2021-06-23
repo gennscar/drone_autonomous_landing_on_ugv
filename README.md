@@ -9,10 +9,10 @@ This is a set of ROS2 packages that work with PX4 Drone Autopilot
 1. Follow [this guide](https://docs.px4.io/master/en/ros/ros2_comm.html) to setup ROS2 and PX4 environment
 2. Clone this repository
 3. Build all the packages with the command `colcon build --symlink-install` inside the ros2-px4-ws folder
-4. Source the ROS2 PX4 WS `source ros2_px4_ws/install/setup.bash`
+4. Source the workspace with `source ros2_px4_ws/install/setup.bash`
 
 ## Packages
-1. [ros2_px4_control](https://github.com/gennscar/ros2_px4_ws/tree/main/src/ros2_px4_control) Controllo il drono
+1. [ros2_px4_control](https://github.com/gennscar/ros2_px4_ws/tree/main/src/ros2_px4_control) *description*
 2. [ros2_px4_estimation](https://github.com/gennscar/ros2_px4_ws/tree/main/src/ros2_px4_estimation) *desrciption*
 3. [ros2_px4_functions](https://github.com/gennscar/ros2_px4_ws/tree/main/src/ros2_px4_functions) *desrciption*
 4. [ros2_px4_gazebo](https://github.com/gennscar/ros2_px4_ws/tree/main/src/ros2_px4_gazebo) *description*
