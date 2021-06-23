@@ -36,7 +36,7 @@ class UwbPositioning(Node):
         self.sensor_est_pos_ = [0.01, 0.01, 0.01]  # @todo Need to be random
 
         # Parameters declaration
-        self.sensor_id_ = self.declare_parameter("sensor_id", "0")
+        self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
         self.method_ = self.declare_parameter("method", "LS")
         self.iterations_ = self.declare_parameter("iterations", 1)
 
@@ -72,11 +72,41 @@ class UwbPositioning(Node):
             VehicleVisualOdometry, "/VehicleVisualOdometry_PubSubTopic", 10
         )
 
+        self.timer_ = self.create_timer(1.0, self.callback_send_odom)
+
         self.get_logger().info(f"""Node has started:
                                Sensor ID:  {self.sensor_id_}
                                Method:     {self.method_}
                                Iterations  {self.iterations_}
                               """)
+
+    def callback_send_odom(self):
+        msg = VehicleVisualOdometry()
+        msg.timestamp = self.timestamp_
+        msg.timestamp_sample = self.timestamp_
+        msg.local_frame = VehicleVisualOdometry.LOCAL_FRAME_FRD
+
+        # From FLU to FRD
+        msg.x = self.sensor_est_pos_[1]
+        msg.y = self.sensor_est_pos_[0]
+        msg.z = -self.sensor_est_pos_[2]
+
+        msg.q[0] = float('NaN')
+        msg.q_offset[0] = float('NaN')
+        msg.pose_covariance[0] = 2.5e-2
+        msg.pose_covariance[6] = 2.5e-2
+        msg.pose_covariance[11] = 2.5e-2
+        msg.pose_covariance[15] = float('NaN')
+        msg.vx = float('NaN')
+        msg.vy = float('NaN')
+        msg.vz = float('NaN')
+        msg.rollspeed = float('NaN')
+        msg.pitchspeed = float('NaN')
+        msg.yawspeed = float('NaN')
+        msg.velocity_covariance[0] = float('NaN')
+        msg.velocity_covariance[15] = float('NaN')
+
+        self.px4_odometry_publisher_.publish(msg)
 
     def callback_timesync(self, msg):
         self.timestamp_ = msg.timestamp
@@ -134,36 +164,6 @@ class UwbPositioning(Node):
             msg.pose.pose.position.z = self.sensor_est_pos_[2]
 
             self.position_mse_publisher_.publish(msg)
-
-            # Sending the estimated position to PX4
-            if self.timestamp_ == 0:
-                return
-
-            msg = VehicleVisualOdometry()
-            msg.timestamp = self.timestamp_
-            msg.local_frame = VehicleVisualOdometry.LOCAL_FRAME_FRD
-
-            # From FLU to FRD
-            msg.x = self.sensor_est_pos_[1]
-            msg.y = self.sensor_est_pos_[0]
-            msg.z = -self.sensor_est_pos_[2]
-
-            msg.q[0] = float('NaN')
-            msg.q_offset[0] = float('NaN')
-            msg.pose_covariance[0] = 2.5e-2
-            msg.pose_covariance[6] = 2.5e-2
-            msg.pose_covariance[11] = 2.5e-2
-            msg.pose_covariance[15] = float('NaN')
-            msg.vx = float('NaN')
-            msg.vy = float('NaN')
-            msg.vz = float('NaN')
-            msg.rollspeed = float('NaN')
-            msg.pitchspeed = float('NaN')
-            msg.yawspeed = float('NaN')
-            msg.velocity_covariance[0] = float('NaN')
-            msg.velocity_covariance[15] = float('NaN')
-
-            self.px4_odometry_publisher_.publish(msg)
 
 
 def main(args=None):
