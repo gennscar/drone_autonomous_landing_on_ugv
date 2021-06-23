@@ -1,14 +1,9 @@
 # ROS2 PX4 WS
 This is a set of ROS2 packages that work with PX4 Drone Autopilot
 
-- [ROS2 PX4 WS](#ros2-px4-ws)
-  - [Authors](#authors)
-  - [Installation](#installation)
-  - [Packages](#packages)
-
 ## Authors
-1. Cosimo Conte @cosmo97
-2. Gennaro Scarati @gennscar
+1. Cosimo Conte [@cosmo97](https://github.com/cosmo97)
+2. Gennaro Scarati [@gennscar](https://github.com/gennscar)
 
 ## Installation
 1. Follow [this guide](https://docs.px4.io/master/en/ros/ros2_comm.html) to setup ROS2 and PX4 environment
