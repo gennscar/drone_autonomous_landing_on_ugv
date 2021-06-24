@@ -29,7 +29,10 @@ class VideoStreamerNode(Node):
         super().__init__('node')
         # Create the publisher. This publisher will publish an Image
         # to the video_frames topic. The queue size is 10 messages.
-    
+        self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '')
+        self.vehicle_namespace = self.get_parameter(
+            "vehicle_namespace").get_parameter_value().string_value
+
         # Create the subscriber
         self.video_subscriber = self.create_subscription(Image, '/camera/image_raw', self.video_callback, 1)
                 
@@ -53,7 +56,7 @@ class VideoStreamerNode(Node):
         self.rot_90 = R.from_matrix([[0,-1,0],[1,0,0],[0,0,1]])
         self.rot_m90 = R.from_matrix([[0,1,0],[-1,0,0],[0,0,1]])
 
-        self.drone_orientation_subscriber = self.create_subscription(VehicleAttitude, "/VehicleAttitude_PubSubTopic", self.callback_drone_orientation, 1) 
+        self.drone_orientation_subscriber = self.create_subscription(VehicleAttitude, self.vehicle_namespace + "/VehicleAttitude_PubSubTopic", self.callback_drone_orientation, 1) 
         self.estimator_topic_name_ = "AprilTag_estimator/estimated_pos"
         self.tag_pose_publisher = self.create_publisher(PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
         

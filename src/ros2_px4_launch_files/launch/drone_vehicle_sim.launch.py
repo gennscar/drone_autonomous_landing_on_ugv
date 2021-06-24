@@ -10,18 +10,19 @@ def generate_launch_description():
         executable = "drone_controller",
         name = "DroneController",
         parameters = [
-        {"control_mode": 2},
-        {"vehicle_namespace": "drone/"},
+        {"control_mode": 0},
+        {"vehicle_namespace": "/drone"},
         {"vehicle_number": 2},
-        {"uwb_mode": 1}
+        {"x0": 0.0},
+        {"y0": 3.0},
         ]
     )
-    #vehicle_controller_node = Node(
-    #    package = "ros2_px4_control",
-    #    executable = "vehicle_controller",
-    #    name = "VehicleController"
-    #)
+    vehicle_controller_node = Node(
+        package = "ros2_px4_control",
+        executable = "vehicle_controller",
+        name = "VehicleController"
+    )
 
     ld.add_action(drone_controller_node)
-    #ld.add_action(vehicle_controller_node)
+    ld.add_action(vehicle_controller_node)
     return ld

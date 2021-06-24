@@ -15,7 +15,9 @@ def generate_launch_description():
         namespace='LS_uwb_estimator',
         parameters=[
             {"sensor_id": "0"},
-            {"method": "LS"}
+            {"method": "LS"},
+            {"vehicle_namespace": "/rover"}
+
         ]
     ))
 
@@ -29,7 +31,8 @@ def generate_launch_description():
     ld.add_entity(Node(
         package = "ros2_px4_estimation",
         executable = "video_streamer",
-        name = "VideoStreamer"
+        name = "VideoStreamer",
+        parameters = [{"vehicle_namespace": "/drone"}]
     ))
 
     ld.add_entity(Node(

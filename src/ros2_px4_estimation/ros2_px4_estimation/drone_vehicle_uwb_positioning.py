@@ -36,11 +36,12 @@ class UwbPositioning(Node):
         self.px4_offset_rotation = R.from_matrix([[1,0,0],[0,1,0],[0,0,1]])
         self.rot_global2local = R.from_matrix([[0,1,0],[1,0,0],[0,0,-1]])
         self.offset_yaw = 0.
-
+        
         # Parameters declaration
         self.sensor_id_ = self.declare_parameter("sensor_id", "0")
         self.method_ = self.declare_parameter("method", "LS")
         self.iterations_ = self.declare_parameter("iterations", 1)
+        self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '')
 
         # Retrieve parameter values
         self.sensor_id_ = self.get_parameter(
@@ -49,6 +50,8 @@ class UwbPositioning(Node):
             "method").get_parameter_value().string_value
         self.iterations_ = self.get_parameter(
             "iterations").get_parameter_value().integer_value
+        self.vehicle_namespace = self.get_parameter(
+            "vehicle_namespace").get_parameter_value().string_value
 
         # Namespace check
         if(self.get_namespace() == '/'):
@@ -59,7 +62,7 @@ class UwbPositioning(Node):
         self.sensor_subscriber_ = self.create_subscription(
             UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
         self.px4_attitude_subscriber = self.create_subscription(
-            VehicleAttitude, "/rover/VehicleAttitude_PubSubTopic", self.callback_px4_attitude, 10)
+            VehicleAttitude, self.vehicle_namespace + "/VehicleAttitude_PubSubTopic", self.callback_px4_attitude, 10)
 
         # Setting up a publishers to send the estimated position
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
