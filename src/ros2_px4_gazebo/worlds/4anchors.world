@@ -1,4 +1,4 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
 <sdf version="1.5">
   <world name="default">
     <!-- A global light source -->
@@ -9,35 +9,32 @@
     <include>
       <uri>model://ground_plane</uri>
     </include>
-		<!-- UWB tags -->
+
+    <!-- Anchor 0 -->
     <include>
-			<name>uwb_tag_1</name>
-      <uri>models//uwb_anchor</uri>
-			<pose>0 0 0 0 0 0</pose>
+      <name>uwb_anchor_0</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>0 0 0 0 0 0</pose>
     </include>
+    <!-- Anchor 1 -->
     <include>
-			<name>uwb_tag_2</name>
-      <uri>models//uwb_anchor</uri>
-			<pose>1 1 0 0 0 0</pose>
+      <name>uwb_anchor_1</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>10 0 0 0 0 0</pose>
     </include>
+    <!-- Anchor 2 -->
     <include>
-			<name>uwb_tag_3</name>
-      <uri>models//uwb_anchor</uri>
-			<pose>0 1 1 0 0 0</pose>
+      <name>uwb_anchor_2</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>0 10 0 0 0 0</pose>
     </include>
+    <!-- Anchor 3 -->
     <include>
-			<name>uwb_tag_4</name>
-      <uri>models//uwb_anchor</uri>
-			<pose>1 0 1 0 0 0</pose>
-    </include>
-    <!-- UWB sensor -->
-    <include>
-			<name>uwb_sensor_0</name>
-      <uri>models//uwb_sensor</uri>
-			<pose>0.5 0.5 2 0 0 0</pose>
+      <name>uwb_anchor_3</name>
+      <uri>model://uwb_anchor</uri>
+      <pose>10 10 10 0 0 0</pose>
     </include>
 
-		<!-- Physics -->
     <physics name='default_physics' default='0' type='ode'>
       <gravity>0 0 -9.8066</gravity>
       <ode>

@@ -1,4 +1,4 @@
-## Fixed Tag 4
+## Fixed Tag 3
 The UWB tag is in a fixed position for nearly 60 seconds
 
 # Tag position [x, y, z]

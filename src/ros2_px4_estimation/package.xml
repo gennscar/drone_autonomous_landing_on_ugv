@@ -15,7 +15,6 @@
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>px4_msgs</depend>
-  <depend>gazebo_msgs</depend>
 
   <depend>ros2_px4_functions</depend>
   <depend>ros2_px4_interfaces</depend>
@@ -24,7 +23,7 @@
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
   <test_depend>python3-pytest</test_depend>
-  
+
   <exec_depend>uwb_interfaces</exec_depend>
 
   <export>

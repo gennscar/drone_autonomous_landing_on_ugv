@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 
-from gazebo_msgs.msg import UwbSensor
+from ros2_px4_interfaces.msg import UwbSensor
 
 import serial
 import sys
@@ -25,9 +25,6 @@ class UwbDevice(Node):
 
         # Topic name where to send ranging data
         self.declare_parameter('topic_name', '/uwb_ranging')
-
-        # Anchor positions
-        self.declare_parameter('anchors')
 
         # Getting UWB connection
         self.uwb_serial()
@@ -71,19 +68,19 @@ class UwbDevice(Node):
         if raw_data == serial.to_bytes([]):
             self.get_logger().warn("No data received from serial port")
         else:
-            data = re.split(":\s|\s|:", raw_data.decode())[:-1]
+            data = re.split(':\s|\s|:', raw_data.decode())[:-1]
 
             if data[0] == 'RNG' and data[3] == 'SUCCESS':
                 msg = UwbSensor()
 
-                msg.timestamp = self.get_clock().now().nanoseconds * 1e-9
-                msg.anchor_id = int(data[2].split('->')[1], base=16)
+                msg.anchor_pose.header.stamp = self.get_clock().now().to_msg()
+                msg.anchor_pose.header.frame_id = data[2]
                 msg.range = float(data[6]) * 1e-2
-                
-                id = str(msg.anchor_id)
-                msg.anchor_pos.x = self.anchors[id][0]
-                msg.anchor_pos.y = self.anchors[id][1]
-                msg.anchor_pos.z = self.anchors[id][2]
+
+                id = msg.anchor_pose.header.frame_id
+                msg.anchor_pose.pose.position.x = self.anchors[id][0]
+                msg.anchor_pose.pose.position.y = self.anchors[id][1]
+                msg.anchor_pose.pose.position.z = self.anchors[id][2]
 
                 self.publisher_.publish(msg)
 

@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 
-import rclpy
-import numpy as np
-from rclpy.node import Node
 
-from gazebo_msgs.msg import UwbSensor
+import numpy as np
+from numpy.core.numeric import NaN
+import rclpy
+from rclpy.node import Node
+from rclpy.time import Time, Duration
+
+from ros2_px4_interfaces.msg import UwbSensor
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from px4_msgs.msg import VehicleVisualOdometry, Timesync
 
 import ros2_px4_functions
 
@@ -32,7 +36,7 @@ class UwbPositioning(Node):
         self.sensor_est_pos_ = [0.01, 0.01, 0.01]  # @todo Need to be random
 
         # Parameters declaration
-        self.sensor_id_ = self.declare_parameter("sensor_id", "0")
+        self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
         self.method_ = self.declare_parameter("method", "LS")
         self.iterations_ = self.declare_parameter("iterations", 1)
 
@@ -49,20 +53,63 @@ class UwbPositioning(Node):
             self.get_logger().error("uwb_positioning need a namespace")
             self.destroy_node()
 
+        self.timestamp_ = 0
+
         # Setting up sensors subscriber for the UWB plugin
         self.sensor_subscriber_ = self.create_subscription(
-            UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
+            UwbSensor, "/uwb_sensor/" + self.sensor_id_, self.callback_sensor_subscriber, 10)
+
+        self.timesync_subscriber_ = self.create_subscription(
+            Timesync, "/Timesync_PubSubTopic", self.callback_timesync, 10)
 
         # Setting up a publishers to send the estimated position
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
         self.position_mse_publisher_ = self.create_publisher(
-            PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
+            PoseWithCovarianceStamped, self.estimator_topic_name_, 10
+        )
+
+        self.px4_odometry_publisher_ = self.create_publisher(
+            VehicleVisualOdometry, "/VehicleVisualOdometry_PubSubTopic", 10
+        )
+
+        self.timer_ = self.create_timer(0.1, self.callback_send_odom)
 
         self.get_logger().info(f"""Node has started:
                                Sensor ID:  {self.sensor_id_}
                                Method:     {self.method_}
                                Iterations  {self.iterations_}
                               """)
+
+    def callback_send_odom(self):
+        msg = VehicleVisualOdometry()
+        msg.timestamp = self.timestamp_
+        msg.timestamp_sample = self.timestamp_
+        msg.local_frame = VehicleVisualOdometry.LOCAL_FRAME_OTHER
+
+        # From FLU to FRD
+        msg.x = self.sensor_est_pos_[0]
+        msg.y = self.sensor_est_pos_[1]
+        msg.z = self.sensor_est_pos_[2]
+
+        msg.q[0] = float('NaN')
+        msg.q_offset[0] = float('NaN')
+        msg.pose_covariance[0] = 2.5e-2
+        msg.pose_covariance[6] = 2.5e-2
+        msg.pose_covariance[11] = 1e0
+        msg.pose_covariance[15] = float('NaN')
+        msg.vx = float('NaN')
+        msg.vy = float('NaN')
+        msg.vz = float('NaN')
+        msg.rollspeed = float('NaN')
+        msg.pitchspeed = float('NaN')
+        msg.yawspeed = float('NaN')
+        msg.velocity_covariance[0] = float('NaN')
+        msg.velocity_covariance[15] = float('NaN')
+
+        self.px4_odometry_publisher_.publish(msg)
+
+    def callback_timesync(self, msg):
+        self.timestamp_ = msg.timestamp
 
     def callback_sensor_subscriber(self, msg):
         """
@@ -73,7 +120,7 @@ class UwbPositioning(Node):
         """
 
         # Saving the message in a dict
-        self.anchors_[msg.anchor_id] = msg
+        self.anchors_[msg.anchor_pose.header.frame_id] = msg
 
         # Extract anchor positions and ranges
         i = 0
@@ -81,9 +128,12 @@ class UwbPositioning(Node):
         ranges = np.empty(len(self.anchors_))
 
         for _, data in self.anchors_.items():
-            if msg.timestamp - data.timestamp < 0.1:
+            delta = Time.from_msg(msg.anchor_pose.header.stamp) - \
+                Time.from_msg(data.anchor_pose.header.stamp)
+
+            if delta < Duration(nanoseconds=1e8):
                 anchor_pos[i, :] = np.array(
-                    [data.anchor_pos.x, data.anchor_pos.y, data.anchor_pos.z])
+                    [data.anchor_pose.pose.position.x, data.anchor_pose.pose.position.y, data.anchor_pose.pose.position.z])
                 ranges[i] = data.range
                 i = i+1
 
