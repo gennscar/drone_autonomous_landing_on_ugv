@@ -9,14 +9,13 @@ from filterpy.kalman import MerweScaledSigmaPoints
 from filterpy.kalman import UnscentedKalmanFilter as UKF
 from filterpy.common import Q_discrete_white_noise
 
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
 from ros2_px4_interfaces.msg import UwbSensor
-from px4_msgs.msg import VehicleLocalPosition
 
 
 class UkfPositioning(Node):
     """
-    EKF
+    UKF
     """
 
     def __init__(self):
@@ -24,15 +23,12 @@ class UkfPositioning(Node):
 
         self.declare_parameter('deltaT', 1.)
         self.declare_parameter('R_uwb', 1.)
-        self.declare_parameter('R_px4', 1.)
         self.declare_parameter('Q', 1.)
 
         self.deltaT_ = self.get_parameter(
             'deltaT').get_parameter_value().double_value
         self.R_uwb_ = self.get_parameter(
             'R_uwb').get_parameter_value().double_value
-        self.R_px4_ = self.get_parameter(
-            'R_px4').get_parameter_value().double_value
         self.Q_ = self.get_parameter('Q').get_parameter_value().double_value
 
         self.predicted_ = False
@@ -57,8 +53,6 @@ class UkfPositioning(Node):
         self.kalman_filter_.x = np.array(
             [1., 0., 0., 1., 0., 0., 1., 0., 0.])
 
-        # State transition matrix
-
         # Covariance matrix
         self.kalman_filter_.P *= 10.
 
@@ -69,12 +63,12 @@ class UkfPositioning(Node):
         # Setting up sensors subscribers
         self.sensor_subscriber_ = self.create_subscription(
             UwbSensor, "/uwb_sensor/Iris", self.callback_uwb_subscriber, 10)
-        self.sensor_subscriber_ = self.create_subscription(
-            VehicleLocalPosition, "/VehicleLocalPosition_PubSubTopic", self.callback_px4_subscriber, 10)
 
-        # Setting up position publisher
+        # Setting up position and velocity publisher
         self.est_pos_publisher_ = self.create_publisher(
             PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
+        self.est_vel_publisher_ = self.create_publisher(
+            TwistWithCovarianceStamped, self.get_namespace() + "/estimated_vel", 10)
 
         # Prediction timer
         self.timer = self.create_timer(self.deltaT_, self.predict_callback)
@@ -82,7 +76,6 @@ class UkfPositioning(Node):
         self.get_logger().info(f"""Node has started
                                deltaT:  {self.deltaT_}
                                R_uwb:   {self.R_uwb_}
-                               R_px4:   {self.R_px4_}
                                Q:       {self.Q_}
                                """)
 
@@ -107,26 +100,10 @@ class UkfPositioning(Node):
         # Filter update
         self.kalman_filter_.update(z, R=self.R_uwb_, hx=h_uwb)
 
-    def callback_px4_subscriber(self, msg):
-        if(not self.predicted_):
-            return
-
-        # Storing measurement in a np.array
-        z = np.array([
-            msg.y + 1.0,  msg.vy,  msg.ay,
-            msg.x + 1.0,  msg.vx,  msg.ax,
-            -msg.z,      -msg.vz, -msg.az
-        ])
-
-        def h_px4(x):
-            return x
-
-        # Filter update
-        self.kalman_filter_.update(z, R=self.R_px4_, hx=h_px4)
-
     def predict_callback(self):
+        cov_norm = np.linalg.norm(self.kalman_filter_.P, ord=np.Inf)
 
-        if(np.linalg.norm(self.kalman_filter_.P) < 10.):
+        if(cov_norm < 10.):
             # Sending the estimated position
             msg = PoseWithCovarianceStamped()
             msg.header.frame_id = self.get_namespace() + "/estimated_pos"
@@ -139,14 +116,35 @@ class UkfPositioning(Node):
             msg.pose.covariance[0] = self.kalman_filter_.P[0][0]
             msg.pose.covariance[1] = self.kalman_filter_.P[0][3]
             msg.pose.covariance[2] = self.kalman_filter_.P[0][6]
-            msg.pose.covariance[3] = self.kalman_filter_.P[3][0]
-            msg.pose.covariance[4] = self.kalman_filter_.P[3][3]
-            msg.pose.covariance[5] = self.kalman_filter_.P[3][6]
-            msg.pose.covariance[6] = self.kalman_filter_.P[6][0]
-            msg.pose.covariance[7] = self.kalman_filter_.P[6][3]
-            msg.pose.covariance[8] = self.kalman_filter_.P[6][6]
+            msg.pose.covariance[6] = self.kalman_filter_.P[3][0]
+            msg.pose.covariance[7] = self.kalman_filter_.P[3][3]
+            msg.pose.covariance[8] = self.kalman_filter_.P[3][6]
+            msg.pose.covariance[12] = self.kalman_filter_.P[6][0]
+            msg.pose.covariance[13] = self.kalman_filter_.P[6][3]
+            msg.pose.covariance[14] = self.kalman_filter_.P[6][6]
 
             self.est_pos_publisher_.publish(msg)
+
+            # Sending the estimated velocity
+            msg = TwistWithCovarianceStamped()
+            msg.header.frame_id = self.get_namespace() + "/estimated_vel"
+            msg.header.stamp = self.get_clock().now().to_msg()
+
+            msg.twist.twist.linear.x = self.kalman_filter_.x[1]
+            msg.twist.twist.linear.y = self.kalman_filter_.x[4]
+            msg.twist.twist.linear.z = self.kalman_filter_.x[7]
+
+            msg.twist.covariance[0] = self.kalman_filter_.P[1][1]
+            msg.twist.covariance[1] = self.kalman_filter_.P[1][4]
+            msg.twist.covariance[2] = self.kalman_filter_.P[1][7]
+            msg.twist.covariance[6] = self.kalman_filter_.P[4][1]
+            msg.twist.covariance[7] = self.kalman_filter_.P[4][4]
+            msg.twist.covariance[8] = self.kalman_filter_.P[4][7]
+            msg.twist.covariance[12] = self.kalman_filter_.P[7][1]
+            msg.twist.covariance[13] = self.kalman_filter_.P[7][4]
+            msg.twist.covariance[14] = self.kalman_filter_.P[7][7]
+
+            self.est_vel_publisher_.publish(msg)
 
         # Filter predict
         self.kalman_filter_.predict()

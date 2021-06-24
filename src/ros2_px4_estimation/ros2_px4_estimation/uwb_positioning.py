@@ -59,57 +59,17 @@ class UwbPositioning(Node):
         self.sensor_subscriber_ = self.create_subscription(
             UwbSensor, "/uwb_sensor/" + self.sensor_id_, self.callback_sensor_subscriber, 10)
 
-        self.timesync_subscriber_ = self.create_subscription(
-            Timesync, "/Timesync_PubSubTopic", self.callback_timesync, 10)
-
         # Setting up a publishers to send the estimated position
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
         self.position_mse_publisher_ = self.create_publisher(
             PoseWithCovarianceStamped, self.estimator_topic_name_, 10
         )
 
-        self.px4_odometry_publisher_ = self.create_publisher(
-            VehicleVisualOdometry, "/VehicleVisualOdometry_PubSubTopic", 10
-        )
-
-        self.timer_ = self.create_timer(0.1, self.callback_send_odom)
-
         self.get_logger().info(f"""Node has started:
                                Sensor ID:  {self.sensor_id_}
                                Method:     {self.method_}
                                Iterations  {self.iterations_}
                               """)
-
-    def callback_send_odom(self):
-        msg = VehicleVisualOdometry()
-        msg.timestamp = self.timestamp_
-        msg.timestamp_sample = self.timestamp_
-        msg.local_frame = VehicleVisualOdometry.LOCAL_FRAME_OTHER
-
-        # From FLU to FRD
-        msg.x = self.sensor_est_pos_[0]
-        msg.y = self.sensor_est_pos_[1]
-        msg.z = self.sensor_est_pos_[2]
-
-        msg.q[0] = float('NaN')
-        msg.q_offset[0] = float('NaN')
-        msg.pose_covariance[0] = 2.5e-2
-        msg.pose_covariance[6] = 2.5e-2
-        msg.pose_covariance[11] = 1e0
-        msg.pose_covariance[15] = float('NaN')
-        msg.vx = float('NaN')
-        msg.vy = float('NaN')
-        msg.vz = float('NaN')
-        msg.rollspeed = float('NaN')
-        msg.pitchspeed = float('NaN')
-        msg.yawspeed = float('NaN')
-        msg.velocity_covariance[0] = float('NaN')
-        msg.velocity_covariance[15] = float('NaN')
-
-        self.px4_odometry_publisher_.publish(msg)
-
-    def callback_timesync(self, msg):
-        self.timestamp_ = msg.timestamp
 
     def callback_sensor_subscriber(self, msg):
         """

@@ -2,17 +2,20 @@
 
 import rclpy
 from rclpy.node import Node
-import numpy as np
+import sys
 
 from ros2_px4_interfaces.srv import ControlMode
 
 setpoints = [
-    {'x': 1.0, 'y': 1.0, 'z': 1.0, 't': 10},
-    {'x': 1.0, 'y': 1.0, 'z': 9.0, 't': 10},
-    {'x': 9.0, 'y': 1.0, 'z': 9.0, 't': 10},
-    {'x': 9.0, 'y': 9.0, 'z': 9.0, 't': 10},
-    {'x': 1.0, 'y': 9.0, 'z': 9.0, 't': 10},
-    {'x': 1.0, 'y': 1.0, 'z': 9.0, 't': 10}
+    {'mode': 'Nope', 't': 10},
+    {'mode': 'setpoint_mode', 'x': 0.0, 'y': 0.0, 'z': 5.0, 't': 5},
+    {'mode': 'setpoint_mode', 'x': 5.0, 'y': 0.0, 'z': 5.0, 't': 5},
+    {'mode': 'setpoint_mode', 'x': 5.0, 'y': 9.0, 'z': 5.0, 't': 5},
+    {'mode': 'setpoint_mode', 'x': 9.0, 'y': 9.0, 'z': 5.0, 't': 5},
+    {'mode': 'setpoint_mode', 'x': 9.0, 'y': 0.0, 'z': 9.0, 't': 5},
+    {'mode': 'setpoint_mode', 'x': 0.0, 'y': 9.0, 'z': 9.0, 't': 5},
+    {'mode': 'setpoint_mode', 'x': 0.0, 'y': 0.0, 'z': 5.0, 't': 5},
+    {'mode': 'landing_mode', 't': 5}
 ]
 
 
@@ -29,7 +32,6 @@ class SetpointsFlight(Node):
         # Client to DroneController service
         self.client_ = self.create_client(ControlMode, '/control_mode')
         self.request_ = ControlMode.Request()
-        self.request_.control_mode = "setpoint_mode"
 
         # Timer to send the setpoints request
         self.timer_ = self.create_timer(1, self.timer_callback)
@@ -46,29 +48,27 @@ class SetpointsFlight(Node):
             # Checking if there are more checkpoints
             if(self.index_ >= len(setpoints)):
                 self.get_logger().info(f"""No more setpoints to reach !!!""")
-                self.destroy_node()
-                return
+                sys.exit()
 
             # Setting up the counter
             self.counter_ = setpoints[self.index_]['t']
 
-        # Sending request
-        self.request_.x = setpoints[self.index_]['x']
-        self.request_.y = setpoints[self.index_]['y']
-        self.request_.z = setpoints[self.index_]['z']
-        self.client_.call_async(self.request_)
+            # Sending request
+            self.request_.control_mode = setpoints[self.index_]['mode']
+            if self.request_.control_mode == 'setpoint_mode':
+                self.request_.x = setpoints[self.index_]['x']
+                self.request_.y = setpoints[self.index_]['y']
+                self.request_.z = setpoints[self.index_]['z']
+            self.client_.call_async(self.request_)
+
+            # Logging
+            self.get_logger().info(f"""Sending request:
+                                   index: {self.index_}
+                                   mode: {self.request_.control_mode}
+                                   """)
 
         # Decreasing counter for current setpoint
         self.counter_ -= 1
-
-        # Logging
-        self.get_logger().info(f"""Sending request...
-                               index: {self.index_}
-                               x:     {self.request_.x}
-                               y:     {self.request_.y}
-                               z:     {self.request_.z}
-                               t:     {self.counter_}
-                               """)
 
 
 def main(args=None):

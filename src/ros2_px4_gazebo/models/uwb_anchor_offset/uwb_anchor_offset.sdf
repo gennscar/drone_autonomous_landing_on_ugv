@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<sdf version='1.6'>
+  <model name='uwb_anchor_offset'>
+    <static>1</static>
+    <pose>0 0 0 0 0 0</pose>
+    <link name="uwb_anchor_head">
+      <visual name='uwb_anchor_head_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.1 0.1 0.1</radius>
+          </sphere>
+        </geometry>
+      </visual>
+    </link>
+    <plugin name="gazebo_ros_uwb" filename="libros2_px4_gazebo_uwb.so">
+      <link_name>uwb_anchor_head</link_name>
+      <update_rate>20</update_rate>
+      <reference_model_name>offset</reference_model_name>
+    </plugin>
+  </model>
+</sdf>

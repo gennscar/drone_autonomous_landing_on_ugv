@@ -73,10 +73,10 @@ class PositioningError(Node):
                     msg.pose.covariance[0], msg.pose.covariance[1], msg.pose.covariance[2]
                 ],
                 [
-                    msg.pose.covariance[3], msg.pose.covariance[4], msg.pose.covariance[5]
+                    msg.pose.covariance[6], msg.pose.covariance[7], msg.pose.covariance[8]
                 ],
                 [
-                    msg.pose.covariance[6], msg.pose.covariance[7], msg.pose.covariance[8]
+                    msg.pose.covariance[12], msg.pose.covariance[13], msg.pose.covariance[14]
                 ]
             ])
 
