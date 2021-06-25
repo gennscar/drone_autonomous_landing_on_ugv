@@ -123,6 +123,16 @@ class UwbPositioning(Node):
             msg.pose.pose.position.y = self.sensor_est_pos_[1]
             msg.pose.pose.position.z = self.sensor_est_pos_[2]
 
+            msg.pose.covariance[0] = 6.25e-4
+            msg.pose.covariance[1] = 0.0
+            msg.pose.covariance[2] = 0.0
+            msg.pose.covariance[6] = 0.0
+            msg.pose.covariance[7] = 6.25e-4
+            msg.pose.covariance[8] = 0.0
+            msg.pose.covariance[12] = 0.0
+            msg.pose.covariance[13] = 0.0
+            msg.pose.covariance[14] = 1e0
+
             self.position_mse_publisher_.publish(msg)
 
 

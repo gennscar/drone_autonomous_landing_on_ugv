@@ -23,6 +23,8 @@ class UwbEstimate2Px4(Node):
         # Position and velocity estimate + covariance matrix
         self.x_ = np.zeros(6)
         self.cov_ = np.eye(6)
+        self.has_pos_ = False
+        self.has_vel_ = False
 
         # Name of the estimator node
         self.estimator_name_ = self.declare_parameter("estimator_name", "")
@@ -70,6 +72,8 @@ class UwbEstimate2Px4(Node):
         self.cov_[2][1] = msg.pose.covariance[13]
         self.cov_[2][2] = msg.pose.covariance[14]
 
+        self.has_pos_ = True
+
     def callback_estimator_vel(self, msg):
         self.x_[3] = msg.twist.twist.linear.x
         self.x_[4] = msg.twist.twist.linear.y
@@ -85,11 +89,13 @@ class UwbEstimate2Px4(Node):
         self.cov_[5][4] = msg.twist.covariance[13]
         self.cov_[5][5] = msg.twist.covariance[14]
 
+        self.has_vel_ = True
+
     def callback_timesync(self, msg):
         self.timestamp_ = msg.timestamp
 
     def callback_send_odom(self):
-        if self.timestamp_ == 0 or self.x_[0] == 0 or self.x_[4] == 0:
+        if self.timestamp_ == 0:
             return
 
         msg = VehicleVisualOdometry()
@@ -98,34 +104,52 @@ class UwbEstimate2Px4(Node):
         msg.local_frame = VehicleVisualOdometry.LOCAL_FRAME_FRD
         msg.velocity_frame = VehicleVisualOdometry.LOCAL_FRAME_FRD
 
-        # Conversion from ENU to NED
-        msg.x = self.x_[1]
-        msg.y = self.x_[0]
-        msg.z = -self.x_[2]
+        # Position estimate
+        if self.has_pos_:
+            # Conversion from ENU to NED
+            msg.x = self.x_[1]
+            msg.y = self.x_[0]
+            msg.z = -self.x_[2]
+
+            msg.pose_covariance[0] = self.cov_[1][1]
+            msg.pose_covariance[1] = self.cov_[1][0]
+            msg.pose_covariance[2] = self.cov_[1][2]
+            msg.pose_covariance[6] = self.cov_[0][0]
+            msg.pose_covariance[7] = self.cov_[0][2]
+            msg.pose_covariance[11] = self.cov_[2][2]
+        else:
+            msg.x = float('NaN')
+            msg.y = float('NaN')
+            msg.z = float('NaN')
+            msg.pose_covariance[0] = float('NaN')
+
+        # Attitude estimate
         msg.q[0] = float('NaN')
         msg.q_offset[0] = float('NaN')
-
-        msg.pose_covariance[0] = self.cov_[1][1]
-        msg.pose_covariance[1] = self.cov_[1][0]
-        msg.pose_covariance[2] = self.cov_[1][2]
-        msg.pose_covariance[6] = self.cov_[0][0]
-        msg.pose_covariance[7] = self.cov_[0][2]
-        msg.pose_covariance[11] = self.cov_[2][2]
         msg.pose_covariance[15] = float('NaN')
 
-        msg.vx = self.x_[4]
-        msg.vy = self.x_[3]
-        msg.vz = -self.x_[5]
+        # Velocity estimate
+        if self.has_vel_:
+            msg.vx = self.x_[4]
+            msg.vy = self.x_[3]
+            msg.vz = -self.x_[5]
+
+            msg.velocity_covariance[0] = self.cov_[4][4]
+            msg.velocity_covariance[1] = self.cov_[4][3]
+            msg.velocity_covariance[2] = self.cov_[4][5]
+            msg.velocity_covariance[6] = self.cov_[3][3]
+            msg.velocity_covariance[7] = self.cov_[3][5]
+            msg.velocity_covariance[11] = self.cov_[5][5]
+        else:
+            msg.vx = float('NaN')
+            msg.vy = float('NaN')
+            msg.vz = float('NaN')
+            msg.velocity_covariance[0] = float('NaN')
+
+        # Rate estimate
         msg.rollspeed = float('NaN')
         msg.pitchspeed = float('NaN')
         msg.yawspeed = float('NaN')
-
-        msg.velocity_covariance[0] = self.cov_[4][4]
-        msg.velocity_covariance[1] = self.cov_[4][3]
-        msg.velocity_covariance[2] = self.cov_[4][5]
-        msg.velocity_covariance[6] = self.cov_[3][3]
-        msg.velocity_covariance[7] = self.cov_[3][5]
-        msg.velocity_covariance[11] = self.cov_[5][5]
         msg.velocity_covariance[15] = float('NaN')
 
         self.px4_odometry_publisher_.publish(msg)
