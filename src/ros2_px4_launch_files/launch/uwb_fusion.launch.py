@@ -47,16 +47,6 @@ def generate_launch_description():
         Node(
             package="ros2_px4_control",
             executable="drone_controller",
-            name="drone_controller",
-            parameters=[
-                {"x0": 0.0},
-                {"y0": 0.0}
-            ]
-        ),
-        Node(
-            package="ros2_px4_testing",
-            executable="setpoints_flight",
-            name="setpoints_flight",
-            on_exit=Shutdown()
-        ),
+            name="drone_controller"
+        )
     ])
