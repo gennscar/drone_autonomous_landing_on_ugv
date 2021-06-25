@@ -45,8 +45,9 @@ class DroneController(Node):
 
         # Drone states
         self.timestamp_ = 0
-        self.arming_state_ = -1
+        self.arming_state_ = False
         self.disarm_reason_ = -1
+        self.takeoff_state_ = False
 
         # Parameters declaration
         self.control_mode_ = self.declare_parameter("control_mode", "idle")
@@ -89,8 +90,9 @@ class DroneController(Node):
         self.timestamp_ = msg.timestamp
 
     def callback_drone_status(self, msg):
-        self.arming_state_ = msg.arming_state
+        self.arming_state_ = msg.arming_state == VehicleStatus.ARMING_STATE_ARMED
         self.disarm_reason_ = msg._latest_disarming_reason
+        self.takeoff_state_ = msg.takeoff_time > 0
 
     def callback_local_position(self, msg):
         self.local_position_ = [msg.y, msg.x, -msg.z]
@@ -131,6 +133,12 @@ class DroneController(Node):
         return response
 
     def idle_controller(self):
+        # Check if flying
+        if self.takeoff_state_:
+            self.get_logger().warn("Can't idle if on air, trying to land")
+            self.control_mode_ = "land"
+            return
+
         # Disarm
         self.disarm()
 
@@ -142,15 +150,15 @@ class DroneController(Node):
         self.start_local_position_ = self.local_position_
 
     def takeoff_controller(self):
-        self.arm()
 
         # Setting standard takeoff heigth of 2.5 meters
-        if self.setpoint_[2] == NULL or self.setpoint_[2] < 1.0:
+        if self.setpoint_[2] == NULL or self.setpoint_[2] < 1.0 or self.setpoint_[2] > 10.0:
             self.get_logger().warn(f"""Setting standard takeoff heigth of 2.5 meters,
-                                   instead of {self.setpoint_[2]}. 1 meter minimum required.
+                                   instead of {self.setpoint_[2]}. Check bounds.
                                    """)
             self.setpoint_[2] = 2.5
 
+        self.arm()
         self.offboard([
             self.start_local_position_[0],
             self.start_local_position_[1],
@@ -158,9 +166,8 @@ class DroneController(Node):
         ])
 
     def land_controller(self):
-        if self.arming_state_ != VehicleStatus.ARMING_STATE_ARMED \
-                and self.disarm_reason_ == VehicleStatus.ARM_DISARM_REASON_AUTO_DISARM_LAND:
-            self.get_logger().info("Disarmed by landing")
+        if not self.arming_state_:
+            self.get_logger().info("Drone not armed, switch to idle")
             self.control_mode_ = "idle"
             return
 
@@ -178,6 +185,12 @@ class DroneController(Node):
             self.get_logger().warn(f"""Setpoint not valid: {self.setpoint_}""")
             self.control_mode_ = "idle"
             return
+
+        if self.setpoint_[2] < 1.0 or self.setpoint_[2] > 10.0:
+            self.get_logger().warn(f"""Setting standard heigth of 2.5 meters,
+                                   instead of {self.setpoint_[2]}. Check bounds.
+                                   """)
+            self.setpoint_[2] = 2.5
 
         self.arm()
         self.offboard([
@@ -201,13 +214,13 @@ class DroneController(Node):
 
     def arm(self):
         # Arm if disarmed
-        if self.arming_state_ != VehicleStatus.ARMING_STATE_ARMED:
+        if not self.arming_state_:
             self.get_logger().info("Arming")
             self.publish_vehicle_command(400, 1.0, 0.0)
 
     def disarm(self):
         # Disarm if armed
-        if self.arming_state_ == VehicleStatus.ARMING_STATE_ARMED:
+        if self.arming_state_:
             self.get_logger().info("Disarming")
             self.publish_vehicle_command(400, 0.0, 1.0)
 

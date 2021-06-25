@@ -25,12 +25,7 @@ def generate_launch_description():
         Node(
             package='ros2_px4_estimation',
             executable='ukf_positioning',
-            namespace='UKF_estimator',
-            parameters=[
-                {"deltaT": 0.005},
-                {"R_uwb": 0.05},
-                {'Q': 0.05}  # 0.05 optimal but px4 does not takeoff
-            ]
+            namespace='UKF_estimator'
         ),
         Node(
             package='ros2_px4_testing',
