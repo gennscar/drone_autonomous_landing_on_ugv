@@ -104,7 +104,7 @@ class DroneController(Node):
             return
 
         # Enable Offboard when at least 10 messages are already published
-        if self.sent_offboard_ > 10:
+        if self.sent_offboard_ == 10:
             self.publish_vehicle_command(176, 1.0, 6.0)
 
         # Call the right controller
@@ -214,6 +214,12 @@ class DroneController(Node):
     def arm(self):
         # Arm if disarmed
         if not self.arming_state_:
+            # Check if disarmed by RC
+            if self.disarm_reason_ == VehicleStatus.ARM_DISARM_REASON_RC_STICK | VehicleStatus.ARM_DISARM_REASON_RC_SWITCH:
+                self.get_logger().info("Disarmed by RC, cannot arm")
+                self.control_mode_ = "idle"
+                return
+
             self.get_logger().info("Arming")
             self.publish_vehicle_command(400, 1.0, 0.0)
 
