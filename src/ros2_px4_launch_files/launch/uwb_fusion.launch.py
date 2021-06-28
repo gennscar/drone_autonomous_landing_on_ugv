@@ -23,16 +23,6 @@ def generate_launch_description():
             ]
         ),
         Node(
-            package='ros2_px4_estimation',
-            executable='ukf_positioning',
-            namespace='UKF_estimator',
-            parameters=[
-                {"deltaT": 0.005},
-                {"R_uwb": 0.05},
-                {'Q': 0.05}  # 0.05 optimal but px4 does not takeoff
-            ]
-        ),
-        Node(
             package='ros2_px4_testing',
             executable='positioning_error',
             namespace='positioning_error'
@@ -41,22 +31,12 @@ def generate_launch_description():
             package='ros2_px4_estimation',
             executable='uwb_estimate_2_px4',
             parameters=[
-                {"estimator_name": "/UKF_estimator"},
+                {"estimator_name": "/LS_estimator"},
             ]
         ),
         Node(
             package="ros2_px4_control",
             executable="drone_controller",
-            name="drone_controller",
-            parameters=[
-                {"x0": 0.0},
-                {"y0": 0.0}
-            ]
-        ),
-        Node(
-            package="ros2_px4_testing",
-            executable="setpoints_flight",
-            name="setpoints_flight",
-            on_exit=Shutdown()
-        ),
+            name="drone_controller"
+        )
     ])
