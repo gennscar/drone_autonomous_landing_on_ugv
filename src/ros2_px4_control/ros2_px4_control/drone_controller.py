@@ -14,174 +14,197 @@ from px4_msgs.msg import VehicleStatus
 from geometry_msgs.msg import PoseWithCovarianceStamped, Point
 from ros2_px4_interfaces.srv import ControlMode
 
-# TO ADD: stop following if no uwb info arrive -> go in take off mode
-# TO MODIFY: remove get logger spamming
-# TO CHECK: what happens if one anchors or more miss
+DT = 0.1
+NULL = float("NaN")
 
-# Control parameters
-KP = 1.15  # 1
-KI = 0.03  # 0.03
-KD = 0.008  # 0.0
-INT_MAX = 250/(KI*100)
-VMAX = 5.0
-VMIN = - VMAX
-LAND_ERR_TOLL = 0.3  # 0.2 Maximum position error allowed to perform landing
-LAND_VEL_TOLL = 0.8  # 0.2 # Maximum velocity error allowed to perform landing
-LAND_DESC_VEL = 0.5  # 0.2
-LAND_H_TOLL = 0.9  # 0.85 # Turn off motors at this height
-LAND_HOVERING_HEIGHT_SWITCH = 10.0
-LAND_HOVERING_HEIGHT = 1.5
-FOLLOW_HOVERING_HEIGHT = 3.0
 
-dt = 0.1
+def check_null(list):
+    ret = []
+    for x in list:
+        ret.append(x == NULL)
+    return ret
 
 
 class DroneController(Node):
     def __init__(self):
-        super().__init__("offboard_control")
+        super().__init__("drone_controller")
 
-        # Initialization to 0 of all parameters
-        self.int_e = np.array([0, 0])
-        self.e_dot = np.array([0, 0])
-        self.e_old = np.array([0, 0])
-        self.e = []
+        # Controller state name map to controllers function
+        self.CONTROLLERS = {
+            "idle": self.idle_controller,
+            "takeoff": self.takeoff_controller,
+            "land": self.land_controller,
+            "setpoint": self.setpoint_controller
+        }
 
-        self.ARMING_STATE = 0
-        self.LANDING_STATE = 0
-        self.DESCENDING_STATE = 0
-        self.TAKEOFF_STATE = 0
-        self.x = 0.0
-        self.y = 0.0
-        self.z = 0.0
-        self.vx = 0.0
-        self.vy = 0.0
-        self.vz = 0.0
-        self.target_global_pos = []
-        self.target_local_pos = []
-        self.target_uwb_local_relative_pos = []
-        self.true_err = []
-        self.timestamp = 0
-        self.offboard_setpoint_counter_ = 0
+        # Control state
+        self.control_mode_old_ = "none"
+        self.sent_offboard_ = 0
+        self.local_position_ = [NULL]*3
+        self.setpoint_ = [NULL]*3
+
+        # Drone states
+        self.timestamp_ = 0
+        self.arming_state_ = False
+        self.disarm_reason_ = -1
+        self.takeoff_state_ = False
 
         # Parameters declaration
-        self.control_mode = self.declare_parameter("control_mode", 0)
-        self.vehicle_namespace = self.declare_parameter(
+        self.control_mode_ = self.declare_parameter("control_mode", "idle")
+        self.vehicle_namespace_ = self.declare_parameter(
             "vehicle_namespace", '')
-        self.vehicle_number = self.declare_parameter("vehicle_number", 1)
-        self.x0_ = self.declare_parameter("x0", 0.0)
-        self.y0_ = self.declare_parameter("y0", 0.0)
+        self.vehicle_number_ = self.declare_parameter("vehicle_number", 1)
 
         # Retrieve parameter values
-        self.control_mode = self.get_parameter(
-            "control_mode").get_parameter_value().integer_value
-        self.vehicle_namespace = self.get_parameter(
+        self.control_mode_ = self.get_parameter(
+            "control_mode").get_parameter_value().string_value
+        self.vehicle_namespace_ = self.get_parameter(
             "vehicle_namespace").get_parameter_value().string_value
-        self.vehicle_number = self.get_parameter(
+        self.vehicle_number_ = self.get_parameter(
             "vehicle_number").get_parameter_value().integer_value
-        self.x0_ = self.get_parameter("x0").get_parameter_value().double_value
-        self.y0_ = self.get_parameter("y0").get_parameter_value().double_value
 
         # Publishers
         self.offboard_control_mode_publisher_ = self.create_publisher(
-            OffboardControlMode, self.vehicle_namespace + "/OffboardControlMode_PubSubTopic", 3)
+            OffboardControlMode, self.vehicle_namespace_ + "/OffboardControlMode_PubSubTopic", 1)
         self.trajectory_setpoint_publisher_ = self.create_publisher(
-            TrajectorySetpoint, self.vehicle_namespace + "/TrajectorySetpoint_PubSubTopic", 3)
+            TrajectorySetpoint, self.vehicle_namespace_ + "/TrajectorySetpoint_PubSubTopic", 1)
         self.vehicle_command_publisher_ = self.create_publisher(
-            VehicleCommand, self.vehicle_namespace + "/VehicleCommand_PubSubTopic", 3)
+            VehicleCommand, self.vehicle_namespace_ + "/VehicleCommand_PubSubTopic", 1)
 
         # Subscribers
-        self.drone_position_subscriber = self.create_subscription(
-            VehicleLocalPosition, self.vehicle_namespace + "/VehicleLocalPosition_PubSubTopic", self.callback_local_position, 3)
         self.drone_status_subscriber = self.create_subscription(
-            VehicleStatus, self.vehicle_namespace + "/VehicleStatus_PubSubTopic", self.callback_drone_status, 3)
-        self.true_err_subscriber = self.create_subscription(
-            Point, "/drone_vehicle_positioning_error/true_pos", self.callback_true_err, 3)
+            VehicleStatus, self.vehicle_namespace_ + "/VehicleStatus_PubSubTopic", self.callback_drone_status, 1)
         self.timesync_sub_ = self.create_subscription(
-            Timesync, self.vehicle_namespace + "/Timesync_PubSubTopic", self.callback_timesync, 3)
-        self.target_uwb_position_subscriber = self.create_subscription(
-            PoseWithCovarianceStamped, "/LS_uwb_estimator/estimated_pos", self.callback_target_uwb_position, 3)
+            Timesync, self.vehicle_namespace_ + "/Timesync_PubSubTopic", self.callback_timesync, 1)
+        self.drone_position_subscriber = self.create_subscription(
+            VehicleLocalPosition, self.vehicle_namespace_ + "/VehicleLocalPosition_PubSubTopic", self.callback_local_position, 1)
 
         # Services
         self.control_mode_service = self.create_service(
-            ControlMode, "control_mode", self.callback_control_mode)
+            ControlMode, self.vehicle_namespace_ + "/control_mode", self.callback_control_mode)
 
         # Control loop timer
-        self.timer = self.create_timer(dt, self.timer_callback)
+        self.timer = self.create_timer(DT, self.timer_callback)
 
     def callback_timesync(self, msg):
-        self.timestamp = msg.timestamp
-
-    def callback_local_position(self, msg):
-        self.x = msg.x
-        self.y = msg.y
-        self.z = msg.z
-        self.vx = msg.vx
-        self.vy = msg.vy
-        self.vz = msg.vz
-
-    def timer_callback(self):
-        if (self.offboard_setpoint_counter_ == 10):
-            self.publish_vehicle_command(176, 1.0, 6.0)
-
-            self.get_logger().info("arming..")
-            self.arm()
-
-        self.publish_offboard_control_mode()
-        self.publish_trajectory_setpoint()
-
-        if (self.offboard_setpoint_counter_ < 30):
-            self.offboard_setpoint_counter_ += 1
-        # elif (-self.z) < 0.5 and self.TAKEOFF_STATE == 0:
-        #    self.restart_drone()
+        self.timestamp_ = msg.timestamp
 
     def callback_drone_status(self, msg):
-        self.ARMING_STATE = msg.arming_state
+        self.arming_state_ = msg.arming_state == VehicleStatus.ARMING_STATE_ARMED
+        self.disarm_reason_ = msg._latest_disarming_reason
+        self.takeoff_state_ = msg.takeoff_time > 0
 
-    def callback_target_uwb_position(self, msg):
-        self.target_uwb_global_relative_pos = [
-            msg.pose.pose.position.x, msg.pose.pose.position.y]
-        self.target_uwb_local_relative_pos = [
-            -msg.pose.pose.position.y, -msg.pose.pose.position.x]
-        self.e = np.array(self.target_uwb_local_relative_pos)
+    def callback_local_position(self, msg):
+        self.local_position_ = [msg.y, msg.x, -msg.z]
 
-    def callback_true_err(self, msg):
-        self.true_err_vec = [msg.x, msg.y]
-        self.true_err = np.linalg.norm(self.true_err_vec, ord=2)
+    def timer_callback(self):
+        # Check synchronization
+        if self.timestamp_ == 0:
+            self.get_logger().warn("Not synched")
+            return
+
+        # Enable Offboard when at least 10 messages are already published
+        if self.sent_offboard_ > 10:
+            self.publish_vehicle_command(176, 1.0, 6.0)
+
+        # Call the right controller
+        self.CONTROLLERS.get(self.control_mode_, self.idle_controller)()
+
+        # Log only on state change
+        if self.control_mode_ != self.control_mode_old_:
+            self.get_logger().info(f"""Using {self.control_mode_} mode""")
+
+        self.control_mode_old_ = self.control_mode_
 
     def callback_control_mode(self, request, response):
-        if request.control_mode == "takeoff_mode":
-            self.reset_counters()
-            self.control_mode = 1
-        elif request.control_mode == "target_follower_mode":
-            self.reset_counters()
-            self.control_mode = 2
-        elif request.control_mode == "land_on_target_mode":
-            self.reset_counters()
-            self.control_mode = 3
-        elif request.control_mode == "setpoint_mode":
-            self.reset_counters()
-            self.control_mode = 4
-            try:
-                self.setpoint = [request.y-self.y0_,
-                                 request.x-self.x0_, - request.z]
-            except:
-                response.success = "Please insert the coordinates"
-                return response
-        elif request.control_mode == "landing_mode":
-            self.reset_counters()
-            self.control_mode = 5
-        elif request.control_mode == "restart_drone":
-            self.reset_counters()
-            self.control_mode = 6
+        if request.control_mode in self.CONTROLLERS.keys():
+            self.control_mode_ = request.control_mode
+            response.success = "Changing control mode into " + self.control_mode_
+        else:
+            response.success = "Control mode " + request.control_mode + " does not exists"
+            self.get_logger().warn(
+                """Control mode {request.control_mode} does not exists""")
+
+        try:
+            self.setpoint_ = [request.x, request.y, request.z]
+        except:
+            self.setpoint_ = [NULL]*3
+
         return response
+
+    def idle_controller(self):
+        # Check if flying
+        if self.takeoff_state_:
+            self.get_logger().warn("Can't idle if on air, trying to land")
+            self.control_mode_ = "land"
+            return
+
+        # Disarm
+        self.disarm()
+
+        # Resetting everything
+        self.disarm_reason_ = -1
+        self.sent_offboard_ = 0
+
+        # Saving last idle position
+        self.start_local_position_ = self.local_position_
+
+    def takeoff_controller(self):
+        # Setting standard takeoff heigth of 2.5 meters
+        if self.setpoint_[2] == NULL or self.setpoint_[2] < 1.0 or self.setpoint_[2] > 10.0:
+            self.get_logger().warn(f"""Setting standard takeoff heigth of 2.5 meters,
+                                   instead of {self.setpoint_[2]}. Check bounds.
+                                   """)
+            self.setpoint_[2] = 2.5
+
+        self.arm()
+        self.offboard([
+            self.start_local_position_[0],
+            self.start_local_position_[1],
+            self.start_local_position_[2] + self.setpoint_[2]
+        ])
+
+    def land_controller(self):
+        if not self.arming_state_:
+            self.get_logger().info("Drone not armed, switch to idle")
+            self.control_mode_ = "idle"
+            return
+
+        self.arm()
+        self.offboard()
+
+        # Call LAND command only if at least 1 meter altitude reached
+        if(self.local_position_[2] > self.start_local_position_[2] + 1.0):
+            self.offboard([NULL, NULL, self.start_local_position_[2] + 0.5])
+        else:
+            self.publish_vehicle_command(21, 0.0, 0.0)
+
+    def setpoint_controller(self):
+        if any(check_null(self.setpoint_)):
+            self.get_logger().warn(f"""Setpoint not valid: {self.setpoint_}""")
+            self.control_mode_ = "idle"
+            return
+
+        if self.setpoint_[2] < 1.0 or self.setpoint_[2] > 10.0:
+            self.get_logger().warn(f"""Setting standard heigth of 2.5 meters,
+                                   instead of {self.setpoint_[2]}. Check bounds.
+                                   """)
+            self.setpoint_[2] = 2.5
+
+        self.arm()
+        self.offboard([
+            self.start_local_position_[0] + self.setpoint_[0],
+            self.start_local_position_[1] + self.setpoint_[1],
+            self.start_local_position_[2] + self.setpoint_[2]
+        ])
 
     def publish_vehicle_command(self, command, param1, param2):
         msg = VehicleCommand()
-        msg.timestamp = self.timestamp
+        msg.timestamp = self.timestamp_
         msg.param1 = param1
         msg.param2 = param2
         msg.command = command
-        msg.target_system = self.vehicle_number
+        msg.target_system = self.vehicle_number_
         msg.source_system = 1
         msg.source_component = 1
         msg.from_external = True
@@ -189,142 +212,42 @@ class DroneController(Node):
         self.vehicle_command_publisher_.publish(msg)
 
     def arm(self):
-        self.publish_vehicle_command(400, 1.0, 0.0)
+        # Arm if disarmed
+        if not self.arming_state_:
+            self.get_logger().info("Arming")
+            self.publish_vehicle_command(400, 1.0, 0.0)
 
     def disarm(self):
-        self.publish_vehicle_command(400, 0.0, 1.0)
+        # Disarm if armed
+        if self.arming_state_:
+            self.get_logger().info("Disarming")
+            self.publish_vehicle_command(400, 0.0, 1.0)
 
-    def publish_offboard_control_mode(self):
+    def offboard(self, position=[NULL]*3, velocity=[NULL]*3):
+        self.sent_offboard_ += 1
+
         msg = OffboardControlMode()
-        msg.timestamp = self.timestamp
-        msg.position = True
-        msg.velocity = True
+        msg.timestamp = self.timestamp_
+        msg.position = not all(check_null(position))
+        msg.velocity = not all(check_null(velocity))
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
 
         self.offboard_control_mode_publisher_.publish(msg)
 
-    def publish_trajectory_setpoint(self):
         msg = TrajectorySetpoint()
-        msg.timestamp = self.timestamp
+        msg.timestamp = self.timestamp_
 
-        if self.control_mode == 1:
-            msg = self.takeoff_mode(msg)
-        elif self.control_mode == 2:
-            if self.e == []:
-                self.get_logger().warn("Waiting for uwb positioning")
-                msg = self.takeoff_mode(msg)
-            else:
-                msg = self.target_follower_mode(msg)
-        elif self.control_mode == 3:
-            if self.e == []:
-                self.get_logger().warn("Waiting for uwb positioning")
-                msg = self.takeoff_mode(msg)
-            else:
-                msg = self.land_on_target_mode(msg)
-        elif self.control_mode == 4:
-            msg = self.setpoint_mode(msg)
-        elif self.control_mode == 5:
-            self.landing_mode()
-        elif self.control_mode == 6:
-            self.restart_drone()
-        else:
-            msg = self.takeoff_mode(msg)
+        # Conversion from NED to ENU
+        msg.x = position[1]
+        msg.y = position[0]
+        msg.z = -position[2]
+        msg.vx = velocity[1]
+        msg.vy = velocity[0]
+        msg.vz = -velocity[2]
 
         self.trajectory_setpoint_publisher_.publish(msg)
-
-    def land_on_target_mode(self, msg):
-        msg.x = float("NaN")
-        msg.y = float("NaN")
-
-        if self.TAKEOFF_STATE == 0:
-            if -self.z <= LAND_HOVERING_HEIGHT:
-                msg.z = - LAND_HOVERING_HEIGHT - 0.5
-                return msg
-            else:
-                self.TAKEOFF_STATE = 1
-
-        [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = ros2_px4_functions.PID(
-            KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
-        self.norm_e = np.linalg.norm(self.e, ord=2)
-        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-
-        if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (-self.z < LAND_H_TOLL):
-            self.LANDING_STATE = 1
-            self.get_logger().info("Landing..")
-            self.publish_vehicle_command(185, 1.0, 0.0)
-        if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and self.LANDING_STATE == 0:
-            self.DESCENDING_STATE = 1
-            self.get_logger().info("Descending on target..")
-            msg.z = float("NaN")
-            msg.vz = LAND_DESC_VEL
-        elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0 and self.norm_e < LAND_HOVERING_HEIGHT_SWITCH:
-            self.get_logger().info("Following target..")
-            msg.z = - LAND_HOVERING_HEIGHT
-            msg.vz = float("NaN")
-        elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0:
-            self.get_logger().info("Following target..")
-            msg.z = - FOLLOW_HOVERING_HEIGHT
-            msg.vz = float("NaN")
-        elif self.LANDING_STATE == 0:
-            self.get_logger().info("Stopped descending..")
-            msg.z = - LAND_HOVERING_HEIGHT
-            msg.vz = - 0.05
-        if self.ARMING_STATE == 1:
-            self.get_logger().info(f"""Landed
-                estimated err: {self.norm_e}
-                true err: {self.true_err}""")
-            rclpy.shutdown()
-
-        return msg
-
-    def target_follower_mode(self, msg):
-        msg.x = float("NaN")
-        msg.y = float("NaN")
-        msg.z = - FOLLOW_HOVERING_HEIGHT
-        if self.TAKEOFF_STATE == 0:
-            if -self.z <= LAND_HOVERING_HEIGHT:
-                msg.z = - LAND_HOVERING_HEIGHT - 0.5
-                return msg
-            else:
-                self.TAKEOFF_STATE = 1
-
-        [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = ros2_px4_functions.PID(
-            KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
-        self.norm_e = np.linalg.norm(self.e, ord=2)
-        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-        self.get_logger().info("Following target..")
-
-        return msg
-
-    def setpoint_mode(self, msg):
-        msg.x = self.setpoint[0]
-        msg.y = self.setpoint[1]
-        msg.z = self.setpoint[2]
-        self.get_logger().info("Reaching setpoint..")
-        return msg
-
-    def takeoff_mode(self, msg):
-        self.get_logger().info("Takeoff..")
-        msg.x = float("NaN")
-        msg.y = float("NaN")
-        msg.z = -2.5
-        return msg
-
-    def landing_mode(self):
-        self.get_logger().info("Landing..")
-        self.publish_vehicle_command(21, 0.0, 0.0)
-
-    def restart_drone(self):
-        self.reset_counters()
-        self.offboard_setpoint_counter_ = 0
-        self.control_mode = 1
-
-    def reset_counters(self):
-        self.LANDING_STATE = 0
-        self.TAKEOFF_STATE = 0
-        self.DESCENDING_STATE = 0
 
 
 def main(args=None):

@@ -21,9 +21,9 @@ class UkfPositioning(Node):
     def __init__(self):
         super().__init__("ukf_positioning")
 
-        self.declare_parameter('deltaT', 1.)
-        self.declare_parameter('R_uwb', 1.)
-        self.declare_parameter('Q', 1.)
+        self.declare_parameter('deltaT', 0.005)
+        self.declare_parameter('R_uwb', 0.05)
+        self.declare_parameter('Q', 0.05)
 
         self.deltaT_ = self.get_parameter(
             'deltaT').get_parameter_value().double_value
@@ -51,7 +51,7 @@ class UkfPositioning(Node):
 
         # Initial estimate
         self.kalman_filter_.x = np.array(
-            [1., 0., 0., 1., 0., 0., 1., 0., 0.])
+            [0., 0., 0., 0., 0., 0., 0., 0., 0.])
 
         # Covariance matrix
         self.kalman_filter_.P *= 10.
@@ -103,7 +103,7 @@ class UkfPositioning(Node):
     def predict_callback(self):
         cov_norm = np.linalg.norm(self.kalman_filter_.P, ord=np.Inf)
 
-        if(cov_norm < 10.):
+        if(cov_norm > 10 or True):
             # Sending the estimated position
             msg = PoseWithCovarianceStamped()
             msg.header.frame_id = self.get_namespace() + "/estimated_pos"
