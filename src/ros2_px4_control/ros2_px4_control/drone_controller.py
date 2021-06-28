@@ -215,8 +215,10 @@ class DroneController(Node):
         # Arm if disarmed
         if not self.arming_state_:
             # Check if disarmed by RC
-            if self.disarm_reason_ == VehicleStatus.ARM_DISARM_REASON_RC_STICK | VehicleStatus.ARM_DISARM_REASON_RC_SWITCH:
-                self.get_logger().info("Disarmed by RC, cannot arm")
+            if self.disarm_reason_ == VehicleStatus.ARM_DISARM_REASON_RC_STICK or \
+                    self.disarm_reason_ == VehicleStatus.ARM_DISARM_REASON_RC_SWITCH:
+                self.get_logger().info(
+                    f"""Disarmed by {self.disarm_reason_}, cannot arm""")
                 self.control_mode_ = "idle"
                 return
 
