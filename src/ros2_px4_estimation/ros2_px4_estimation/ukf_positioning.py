@@ -51,7 +51,7 @@ class UkfPositioning(Node):
 
         # Initial estimate
         self.kalman_filter_.x = np.array(
-            [1., 0., 0., 1., 0., 0., 1., 0., 0.])
+            [0., 0., 0., 0., 0., 0., 0., 0., 0.])
 
         # Covariance matrix
         self.kalman_filter_.P *= 10.
@@ -103,7 +103,7 @@ class UkfPositioning(Node):
     def predict_callback(self):
         cov_norm = np.linalg.norm(self.kalman_filter_.P, ord=np.Inf)
 
-        if(cov_norm < 10.):
+        if(cov_norm > 10 or True):
             # Sending the estimated position
             msg = PoseWithCovarianceStamped()
             msg.header.frame_id = self.get_namespace() + "/estimated_pos"

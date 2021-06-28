@@ -150,7 +150,6 @@ class DroneController(Node):
         self.start_local_position_ = self.local_position_
 
     def takeoff_controller(self):
-
         # Setting standard takeoff heigth of 2.5 meters
         if self.setpoint_[2] == NULL or self.setpoint_[2] < 1.0 or self.setpoint_[2] > 10.0:
             self.get_logger().warn(f"""Setting standard takeoff heigth of 2.5 meters,
@@ -176,7 +175,7 @@ class DroneController(Node):
 
         # Call LAND command only if at least 1 meter altitude reached
         if(self.local_position_[2] > self.start_local_position_[2] + 1.0):
-            self.offboard([NULL, NULL, 0.5])
+            self.offboard([NULL, NULL, self.start_local_position_[2] + 0.5])
         else:
             self.publish_vehicle_command(21, 0.0, 0.0)
 
