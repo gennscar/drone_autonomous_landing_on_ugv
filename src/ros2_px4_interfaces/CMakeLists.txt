@@ -23,7 +23,6 @@ find_package(geometry_msgs REQUIRED)
 
 set(msg_files
   "msg/Error.msg"
-  "msg/UwbSensor.msg"
 )
 
 set(srv_files

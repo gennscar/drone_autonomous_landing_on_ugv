@@ -5,7 +5,7 @@ import numpy as np
 from rclpy.node import Node
 
 from px4_msgs.msg import VehicleAttitude
-from ros2_px4_interfaces.msg import UwbSensor
+from gazebo_msgs.msg import UwbSensor
 from geometry_msgs.msg import PoseWithCovarianceStamped, Point
 from scipy.spatial.transform import Rotation as R
 
@@ -107,7 +107,7 @@ class UwbPositioning(Node):
         ranges = np.empty(len(self.anchors_))
 
         for _, data in self.anchors_.items():
-            if msg.timestamp - data.timestamp < 0.01:
+            if msg.timestamp - data.timestamp < 1e-6:
                 anchor_pos[i, :] = np.array(
                     [data.anchor_pos.x, data.anchor_pos.y, data.anchor_pos.z])
                 ranges[i] = data.range

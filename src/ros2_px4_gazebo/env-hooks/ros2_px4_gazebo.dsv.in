@@ -1,4 +1,0 @@
-prepend-non-duplicate;GAZEBO_MODEL_PATH;share/ros2_px4_gazebo/models
-prepend-non-duplicate;GAZEBO_RESOURCE_PATH;share/ros2_px4_gazebo/worlds
-prepend-non-duplicate;GAZEBO_RESOURCE_PATH;share/ros2_px4_gazebo/media
-prepend-non-duplicate;GAZEBO_PLUGIN_PATH;share/ros2_px4_gazebo/plugins

@@ -131,8 +131,8 @@ class DroneController(Node):
 
         if (self.offboard_setpoint_counter_ < 30):
             self.offboard_setpoint_counter_ += 1
-        # elif (-self.z) < 0.5 and self.TAKEOFF_STATE == 0:
-        #    self.restart_drone()
+        elif (-self.z) < 0.5 and self.TAKEOFF_STATE == 0:
+            self.restart_drone()
 
     def callback_drone_status(self, msg):
         self.ARMING_STATE = msg.arming_state
