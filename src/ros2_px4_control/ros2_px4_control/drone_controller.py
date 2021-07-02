@@ -117,6 +117,10 @@ class DroneController(Node):
         self.control_mode_old_ = self.control_mode_
 
     def callback_control_mode(self, request, response):
+        if request.control_mode == "idle":
+            self.get_logger().warn("""Cannot reach idle manually""")
+            request.control_mode = "land"
+
         if request.control_mode in self.CONTROLLERS.keys():
             self.control_mode_ = request.control_mode
             response.success = "Changing control mode into " + self.control_mode_
@@ -133,15 +137,6 @@ class DroneController(Node):
         return response
 
     def idle_controller(self):
-        # Check if flying
-        if self.takeoff_state_:
-            self.get_logger().warn("Can't idle if on air, trying to land")
-            self.control_mode_ = "land"
-            return
-
-        # Disarm
-        self.disarm()
-
         # Resetting everything
         self.disarm_reason_ = -1
         self.sent_offboard_ = 0
@@ -170,14 +165,8 @@ class DroneController(Node):
             self.control_mode_ = "idle"
             return
 
-        self.arm()
         self.offboard()
-
-        # Call LAND command only if at least 1 meter altitude reached
-        if(self.local_position_[2] > self.start_local_position_[2] + 1.0):
-            self.offboard([NULL, NULL, self.start_local_position_[2] + 0.5])
-        else:
-            self.publish_vehicle_command(21, 0.0, 0.0)
+        self.publish_vehicle_command(21, 0.0, 0.0)
 
     def setpoint_controller(self):
         if any(check_null(self.setpoint_)):
