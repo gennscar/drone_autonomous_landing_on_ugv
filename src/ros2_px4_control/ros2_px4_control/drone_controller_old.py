@@ -40,8 +40,8 @@ class DroneController(Node):
     def __init__(self):
         super().__init__("offboard_control")
 
-        # Initialization to 0 of all parameters
-        self.e_dot = np.array([0, 0])
+        # Initialization of all parameters
+        self.e_dot = []
         self.e = []
 
         self.ARMING_STATE = 0
@@ -59,6 +59,7 @@ class DroneController(Node):
 
         self.PID_1 = ros2_px4_functions.PID_controller(
             KP, KI, KD, VMAX, VMIN, INT_MAX, dt)
+
         # Parameters declaration
         self.control_mode = self.declare_parameter("control_mode", 0)
         self.vehicle_namespace = self.declare_parameter(
@@ -72,7 +73,6 @@ class DroneController(Node):
             "vehicle_namespace").get_parameter_value().string_value
         self.vehicle_number = self.get_parameter(
             "vehicle_number").get_parameter_value().integer_value
-
 
         # Publishers
         self.offboard_control_mode_publisher_ = self.create_publisher(
@@ -103,12 +103,11 @@ class DroneController(Node):
         self.timestamp = msg.timestamp
 
     def callback_local_position(self, msg):
-
         self.z = msg.z
 
 
     def timer_callback(self):
-        if (self.offboard_setpoint_counter_ == 10):
+        if (self.offboard_setpoint_counter_ > 10):
             self.publish_vehicle_command(176, 1.0, 6.0)
 
             self.get_logger().info("arming..")
@@ -128,7 +127,7 @@ class DroneController(Node):
         self.target_uwb_global_relative_pos = [
             msg.pose.pose.position.x, msg.pose.pose.position.y]
         self.target_uwb_local_relative_pos = [
-            -msg.pose.pose.position.y, -msg.pose.pose.position.x]
+            msg.pose.pose.position.y, msg.pose.pose.position.x]
         self.e = np.array(self.target_uwb_local_relative_pos)
 
 
@@ -209,7 +208,7 @@ class DroneController(Node):
                 self.TAKEOFF_STATE = 1
 
 
-        [msg.vx, msg.vy], self.e_dot = self.PID_1.PID(self.e)
+        [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e)
         
         self.norm_e = np.linalg.norm(self.e, ord=2)
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
@@ -253,7 +252,7 @@ class DroneController(Node):
             else:
                 self.TAKEOFF_STATE = 1
 
-        [msg.vx, msg.vy] = self.PID_1.PID(self.e)
+        [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e)
 
         self.norm_e = np.linalg.norm(self.e, ord=2)
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)

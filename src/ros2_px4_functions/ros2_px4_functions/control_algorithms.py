@@ -27,11 +27,11 @@ class PID_controller:
         self.e_int_ = np.clip(self.e_int_, - self.int_max_, self.int_max_)
 
         self.e_old_ = e_
-        uk_ = - np.multiply(self.kp_, e_) - np.multiply(self.ki_, self.e_int_) - np.multiply(self.kd_, self.e_dot_)
+        uk_ = np.multiply(self.kp_, e_) + np.multiply(self.ki_, self.e_int_) + np.multiply(self.kd_, self.e_dot_)
 
         uk_ = np.clip(uk_, self.u_min_, self.u_max_)
 
-        return uk_, self.e_dot_
+        return uk_, self.e_dot_, self.e_int_
 
 
 def DLQR_optimizer(A, B, Q, R):
