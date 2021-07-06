@@ -232,6 +232,12 @@ namespace gazebo
       return;
     }
 
+    // Check if the buffer is empty
+    if (anchor_pub_->GetOutgoingCount() > 0)
+    {
+      return;
+    }
+
     // Get world pose of the linked model
     link_pose_ = link_->WorldPose();
 
