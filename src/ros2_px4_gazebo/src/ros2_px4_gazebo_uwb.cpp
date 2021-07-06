@@ -97,14 +97,10 @@ namespace gazebo
     impl_->gazebo_node_ = boost::make_shared<transport::Node>();
     impl_->gazebo_node_->Init(impl_->world_->Name());
 
-    // Configure the ROS node from the SDF file
-    impl_->ros_node_ = gazebo_ros::Node::Get(sdf);
-
     // <update_rate> is the rate at which publish UWB packets
     if (!sdf->HasElement("update_rate"))
     {
-      RCLCPP_INFO(impl_->ros_node_->get_logger(),
-                  "UWB plugin missing <update_rate>, defaults to 1.0Hz");
+      gzwarn << "UWB plugin missing <update_rate>, defaults to 1.0Hz" << std::endl;
     }
     else
     {
@@ -115,9 +111,7 @@ namespace gazebo
     if (!sdf->HasElement("anchor_id"))
     {
       impl_->anchor_id_ = std::to_string(rand());
-      RCLCPP_INFO(impl_->ros_node_->get_logger(),
-                  "UWB plugin missing <anchor_id>, assigning random ID: %s",
-                  impl_->anchor_id_.c_str());
+      gzdbg << "UWB plugin missing <anchor_id>, assigning random ID: " << impl_->anchor_id_ << std::endl;
     }
     else
     {
@@ -127,7 +121,7 @@ namespace gazebo
     // <link_name> is the name of the link where the UWB tag is attached
     if (!sdf->HasElement("link_name"))
     {
-      RCLCPP_ERROR(impl_->ros_node_->get_logger(), "Missing <link_name>, cannot proceed");
+      gzerr << "Missing <link_name>, cannot proceed" << std::endl;
       return;
     }
     else
@@ -139,17 +133,14 @@ namespace gazebo
     impl_->link_ = model->GetLink(link_name);
     if (!impl_->link_)
     {
-      RCLCPP_ERROR(
-          impl_->ros_node_->get_logger(), "link_name: %s does not exist\n",
-          link_name.c_str());
+      gzerr << "link_name: " << link_name << " does not exist" << std::endl;
       return;
     }
 
     // <reference_model_name> is the model to be taken as reference frame, defaults to world
     if (!sdf->HasElement("reference_model_name"))
     {
-      RCLCPP_DEBUG(
-          impl_->ros_node_->get_logger(), "Missing <reference_model_name>, defaults to world");
+      gzdbg << "Missing <reference_model_name>, defaults to world" << std::endl;
       reference_model_name = "world";
     }
     else
@@ -160,8 +151,7 @@ namespace gazebo
     // <reference_link_name> is the link of <reference_model_name> to be taken as reference frame
     if (!sdf->HasElement("reference_link_name"))
     {
-      RCLCPP_DEBUG(
-          impl_->ros_node_->get_logger(), "Missing <reference_link_name>, using model as reference");
+      gzdbg << "Missing <reference_link_name>, using model as reference" << std::endl;
     }
     else
     {
@@ -175,17 +165,13 @@ namespace gazebo
       impl_->reference_model_ = impl_->world_->ModelByName(reference_model_name);
       if (!impl_->reference_model_)
       {
-        RCLCPP_WARN(
-            impl_->ros_node_->get_logger(), "<reference_model_name> [%s] does not exist.",
-            reference_model_name.c_str());
+        gzwarn << "<reference_model_name> [" << reference_model_name << "] does not exist" << std::endl;
       }
 
       impl_->reference_link_ = impl_->reference_model_->GetLink(reference_link_name);
       if (!impl_->reference_link_)
       {
-        RCLCPP_WARN(
-            impl_->ros_node_->get_logger(), "<reference_link_name> [%s] does not exist.",
-            reference_link_name.c_str());
+        gzwarn << "<reference_link_name> [" << reference_link_name << "] does not exist" << std::endl;
       }
     }
 
@@ -195,6 +181,9 @@ namespace gazebo
     // This code is valid only if we want to publish ranging data
     if (sdf->HasElement("pub_range"))
     {
+      // Configure the ROS node from the SDF file
+      impl_->ros_node_ = gazebo_ros::Node::Get(sdf);
+
       // Setting up anchors pose subscriber
       impl_->anchor_sub_ = impl_->gazebo_node_->Subscribe(impl_->anchor_topic_, &RosPx4GazeboUwbPrivate::AnchorCallback, impl_.get());
 
@@ -206,7 +195,7 @@ namespace gazebo
       // <gaussian_noise> is the sigma value of gaussian noise to add to range readings
       if (!sdf->HasElement("gaussian_noise"))
       {
-        RCLCPP_WARN(impl_->ros_node_->get_logger(), "Missing <gassian_noise>, defaults to 0.0");
+        gzwarn << "Missing <gassian_noise>, defaults to 1.0Hz" << std::endl;
         impl_->gaussian_noise_ = 0;
       }
       else
@@ -232,7 +221,7 @@ namespace gazebo
 
     if (current_time < last_time_)
     {
-      RCLCPP_WARN(ros_node_->get_logger(), "Negative update time difference detected.");
+      gzwarn << "Negative update time difference detected" << std::endl;
       last_time_ = current_time;
     }
 
@@ -262,32 +251,32 @@ namespace gazebo
     }
 
     // Fill UWB message
-    msgs::PoseStamped anchor_msg;
-    msgs::Time anchor_msg_time;
-    msgs::Vector3d anchor_msg_vec;
-    msgs::Quaternion anchor_msg_qua;
-    msgs::Pose anchor_msg_pose;
+    msgs::PoseStamped *anchor_msg = new msgs::PoseStamped;
+    msgs::Time *anchor_msg_time = new msgs::Time;
+    msgs::Vector3d *anchor_msg_vec = new msgs::Vector3d;
+    msgs::Quaternion *anchor_msg_qua = new msgs::Quaternion;
+    msgs::Pose *anchor_msg_pose = new msgs::Pose;
 
-    anchor_msg_time.set_sec(current_time.sec);
-    anchor_msg_time.set_nsec(current_time.nsec);
-    anchor_msg.set_allocated_time(&anchor_msg_time);
+    anchor_msg_time->set_sec(current_time.sec);
+    anchor_msg_time->set_nsec(current_time.nsec);
+    anchor_msg->set_allocated_time(anchor_msg_time);
 
-    anchor_msg_vec.set_x(link_pose_.Pos().X());
-    anchor_msg_vec.set_y(link_pose_.Pos().Y());
-    anchor_msg_vec.set_z(link_pose_.Pos().Z());
-    anchor_msg_pose.set_allocated_position(&anchor_msg_vec);
+    anchor_msg_vec->set_x(link_pose_.Pos().X());
+    anchor_msg_vec->set_y(link_pose_.Pos().Y());
+    anchor_msg_vec->set_z(link_pose_.Pos().Z());
+    anchor_msg_pose->set_allocated_position(anchor_msg_vec);
 
     // Sending orientation for a future more complex noise model
-    anchor_msg_qua.set_x(0.0);
-    anchor_msg_qua.set_y(0.0);
-    anchor_msg_qua.set_z(0.0);
-    anchor_msg_qua.set_w(0.0);
-    anchor_msg_pose.set_allocated_orientation(&anchor_msg_qua);
+    anchor_msg_qua->set_x(0.0);
+    anchor_msg_qua->set_y(0.0);
+    anchor_msg_qua->set_z(0.0);
+    anchor_msg_qua->set_w(0.0);
+    anchor_msg_pose->set_allocated_orientation(anchor_msg_qua);
 
-    anchor_msg_pose.set_name(anchor_id_);
-    anchor_msg.set_allocated_pose(&anchor_msg_pose);
+    anchor_msg_pose->set_name(anchor_id_);
+    anchor_msg->set_allocated_pose(anchor_msg_pose);
 
-    anchor_pub_->Publish(anchor_msg);
+    anchor_pub_->Publish(*anchor_msg);
     last_time_ = current_time;
   }
 
