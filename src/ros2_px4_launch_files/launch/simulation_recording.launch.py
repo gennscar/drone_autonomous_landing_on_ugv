@@ -17,7 +17,7 @@ def generate_launch_description():
         ),
         ExecuteProcess(
             cmd=['ros2', 'bag', 'record', '-o',
-                 'data_records/simulated_uwb_gazebo', '--all'],
+                 'rosbags/simulated_uwb_gazebo', '--all'],
             output='screen'
         )
     ])
