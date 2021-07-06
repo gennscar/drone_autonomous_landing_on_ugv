@@ -11,7 +11,6 @@ from px4_msgs.msg import Timesync
 from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleStatus
-from geometry_msgs.msg import PoseWithCovarianceStamped, Point
 from ros2_px4_interfaces.srv import ControlMode
 
 DT = 0.1
