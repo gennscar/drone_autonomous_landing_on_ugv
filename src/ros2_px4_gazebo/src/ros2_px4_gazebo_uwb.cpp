@@ -54,7 +54,7 @@ namespace gazebo
     common::Time last_time_;
 
     /// Publish rate in Hz.
-    double update_rate_{0.0};
+    double update_rate_{1.0};
 
     /// Anchor unique ID
     std::string anchor_id_;
@@ -104,7 +104,7 @@ namespace gazebo
     if (!sdf->HasElement("update_rate"))
     {
       RCLCPP_INFO(impl_->ros_node_->get_logger(),
-                  "UWB plugin missing <update_rate>, defaults to 0.0 (as fast as possible)");
+                  "UWB plugin missing <update_rate>, defaults to 1.0Hz");
     }
     else
     {
@@ -263,29 +263,29 @@ namespace gazebo
 
     // Fill UWB message
     msgs::PoseStamped anchor_msg;
-    msgs::Time *anchor_msg_time = new msgs::Time();
-    msgs::Vector3d *anchor_msg_vec = new msgs::Vector3d();
-    msgs::Quaternion *anchor_msg_qua = new msgs::Quaternion();
-    msgs::Pose *anchor_msg_pose = new msgs::Pose();
+    msgs::Time anchor_msg_time;
+    msgs::Vector3d anchor_msg_vec;
+    msgs::Quaternion anchor_msg_qua;
+    msgs::Pose anchor_msg_pose;
 
-    anchor_msg_time->set_sec(current_time.sec);
-    anchor_msg_time->set_nsec(current_time.nsec);
-    anchor_msg.set_allocated_time(anchor_msg_time);
+    anchor_msg_time.set_sec(current_time.sec);
+    anchor_msg_time.set_nsec(current_time.nsec);
+    anchor_msg.set_allocated_time(&anchor_msg_time);
 
-    anchor_msg_vec->set_x(link_pose_.Pos().X());
-    anchor_msg_vec->set_y(link_pose_.Pos().Y());
-    anchor_msg_vec->set_z(link_pose_.Pos().Z());
-    anchor_msg_pose->set_allocated_position(anchor_msg_vec);
+    anchor_msg_vec.set_x(link_pose_.Pos().X());
+    anchor_msg_vec.set_y(link_pose_.Pos().Y());
+    anchor_msg_vec.set_z(link_pose_.Pos().Z());
+    anchor_msg_pose.set_allocated_position(&anchor_msg_vec);
 
     // Sending orientation for a future more complex noise model
-    anchor_msg_qua->set_x(0.0);
-    anchor_msg_qua->set_y(0.0);
-    anchor_msg_qua->set_z(0.0);
-    anchor_msg_qua->set_w(0.0);
-    anchor_msg_pose->set_allocated_orientation(anchor_msg_qua);
+    anchor_msg_qua.set_x(0.0);
+    anchor_msg_qua.set_y(0.0);
+    anchor_msg_qua.set_z(0.0);
+    anchor_msg_qua.set_w(0.0);
+    anchor_msg_pose.set_allocated_orientation(&anchor_msg_qua);
 
-    anchor_msg_pose->set_name(anchor_id_);
-    anchor_msg.set_allocated_pose(anchor_msg_pose);
+    anchor_msg_pose.set_name(anchor_id_);
+    anchor_msg.set_allocated_pose(&anchor_msg_pose);
 
     anchor_pub_->Publish(anchor_msg);
     last_time_ = current_time;
