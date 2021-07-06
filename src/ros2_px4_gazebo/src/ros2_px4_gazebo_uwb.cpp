@@ -189,8 +189,8 @@ namespace gazebo
 
       // Setting up ranges publisher
       impl_->sensor_pub_ = impl_->ros_node_->create_publisher<ros2_px4_interfaces::msg::UwbSensor>(
-          impl_->sensor_topic_ + impl_->anchor_id_,
-          impl_->ros_node_->get_qos().get_publisher_qos(impl_->sensor_topic_ + impl_->anchor_id_));
+          impl_->sensor_topic_ + "R" + impl_->anchor_id_,
+          impl_->ros_node_->get_qos().get_publisher_qos(impl_->sensor_topic_ + "R" + impl_->anchor_id_));
 
       // <gaussian_noise> is the sigma value of gaussian noise to add to range readings
       if (!sdf->HasElement("gaussian_noise"))
