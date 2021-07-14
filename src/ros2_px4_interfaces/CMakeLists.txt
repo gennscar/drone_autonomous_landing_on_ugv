@@ -22,12 +22,20 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 set(msg_files
+  "msg/DistanceStamped.msg"
+  "msg/DistanceStampedArray.msg"
   "msg/Error.msg"
+  "msg/UnitVector.msg"
+  "msg/UnitVectorArray.msg"
   "msg/UwbSensor.msg"
+  "msg/VelocityVector.msg"
 )
 
 set(srv_files
   "srv/ControlMode.srv"
+  "srv/TargetCustomCommand.srv"
+  "srv/DroneCustomCommand.srv"
+  "srv/SwarmCommand.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
