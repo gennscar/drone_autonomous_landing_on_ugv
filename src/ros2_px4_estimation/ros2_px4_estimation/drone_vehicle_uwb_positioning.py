@@ -3,6 +3,7 @@
 import rclpy
 import numpy as np
 from rclpy.node import Node
+from rclpy.time import Time, Duration
 
 from px4_msgs.msg import VehicleAttitude
 from ros2_px4_interfaces.msg import UwbSensor
@@ -40,7 +41,7 @@ class UwbPositioning(Node):
         self.offset_yaw = 0.
         
         # Parameters declaration
-        self.sensor_id_ = self.declare_parameter("sensor_id", "0")
+        self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
         self.method_ = self.declare_parameter("method", "LS")
         self.iterations_ = self.declare_parameter("iterations", 1)
         self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '')
@@ -99,7 +100,7 @@ class UwbPositioning(Node):
         """
 
         # Saving the message in a dict
-        self.anchors_[msg.anchor_id] = msg
+        self.anchors_[msg.anchor_pose.header.frame_id] = msg
 
         # Extract anchor positions and ranges
         i = 0
@@ -107,9 +108,12 @@ class UwbPositioning(Node):
         ranges = np.empty(len(self.anchors_))
 
         for _, data in self.anchors_.items():
-            if msg.timestamp - data.timestamp < 0.01:
+            delta = Time.from_msg(msg.anchor_pose.header.stamp) - \
+                Time.from_msg(data.anchor_pose.header.stamp)
+
+            if delta < Duration(nanoseconds=1e2):
                 anchor_pos[i, :] = np.array(
-                    [data.anchor_pos.x, data.anchor_pos.y, data.anchor_pos.z])
+                    [data.anchor_pose.pose.position.x, data.anchor_pose.pose.position.y, data.anchor_pose.pose.position.z])
                 ranges[i] = data.range
                 i = i+1
 
@@ -144,11 +148,11 @@ class UwbPositioning(Node):
 
             self.rotated_position_publisher.publish(msg)
 
-            msg_2 = Point()
-            msg_2.x = self.sensor_est_pos_[0]
-            msg_2.y = self.sensor_est_pos_[1]
-            msg_2.z = self.sensor_est_pos_[2]
-            self.norot_position_publisher.publish(msg_2)
+            msg = Point()
+            msg.x = self.sensor_est_pos_[0]
+            msg.y = self.sensor_est_pos_[1]
+            msg.z = self.sensor_est_pos_[2]
+            self.norot_position_publisher.publish(msg)
 
 
 def main(args=None):

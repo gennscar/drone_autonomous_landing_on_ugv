@@ -8,7 +8,7 @@ from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Image
 import cv2 # OpenCV library
 import numpy as np
 from dt_apriltags import Detector
-from geometry_msgs.msg import Point, PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from px4_msgs.msg import VehicleAttitude
 
 from scipy.spatial.transform import Rotation as R
