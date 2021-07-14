@@ -19,9 +19,9 @@ from ros2_px4_interfaces.srv import ControlMode
 # TO CHECK: what happens if one anchors or more miss
 
 # Control parameters
-KP = 1.15  # 1
-KI = 0.03  # 0.03
-KD = 0.008  # 0.0
+KP = 1.1  # 1.15
+KI = 0.01  # 0.03
+KD = 0.01  # 0.008
 INT_MAX = 250/(KI*100)
 VMAX = 5.0
 VMIN = - VMAX

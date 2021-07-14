@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 kf_params = [
-    [{'deltaT': 1e-3}, {'R_uwb': 0.025}, {'R_px4': 0.5}, {'Q': 1e-2}, {'namespace_drone': "/drone"}, {'namespace_rover': "/rover"}, {'include_rover': 0}, {'include_drone': 0}],
+    [{'deltaT': 1e-3}, {'R_uwb': 0.0025}, {'R_px4': 0.5}, {'Q': 1e-3}, {'namespace_drone': "/drone"}, {'namespace_rover': "/rover"}, {'include_rover': 1}, {'include_drone': 1}],
 
 ]
 
@@ -14,7 +14,7 @@ def generate_launch_description():
         executable='drone_vehicle_uwb_positioning',
         namespace='LS_uwb_estimator',
         parameters=[
-            {"sensor_id": "0"},
+            {"sensor_id": "Iris"},
             {"method": "LS"},
             {"vehicle_namespace": "/rover"}
 

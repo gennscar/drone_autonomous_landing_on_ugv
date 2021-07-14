@@ -7,7 +7,7 @@ def generate_launch_description():
 
     drone_controller_node = Node(
         package = "ros2_px4_control",
-        executable = "drone_controller",
+        executable = "drone_controller_old",
         name = "DroneController",
         parameters = [
         {"control_mode": 0},
