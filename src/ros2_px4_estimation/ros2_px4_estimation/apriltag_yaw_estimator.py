@@ -8,7 +8,7 @@ from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Image
 import cv2 # OpenCV library
 import numpy as np
 from dt_apriltags import Detector
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from ros2_px4_interfaces.msg import Yaw
 from px4_msgs.msg import VehicleAttitude
 
 from scipy.spatial.transform import Rotation as R
@@ -52,13 +52,13 @@ class VideoStreamerNode(Node):
         self.rot_global2local = R.from_matrix([[0,1,0],[1,0,0],[0,0,-1]])
         self.drone_orientation = np.array([0,0,0,1])
         self.true_rot_local2chassis = R.from_quat([0,0,0,1])
-        self.estimated_uwb_pos = np.array([0.,0.,0.])
         self.rot_90 = R.from_matrix([[0,-1,0],[1,0,0],[0,0,1]])
+        self.rot_inv = R.from_matrix([[1,0,0],[0,1,0],[0,0,-1]])
         self.rot_m90 = R.from_matrix([[0,1,0],[-1,0,0],[0,0,1]])
 
         self.drone_orientation_subscriber = self.create_subscription(VehicleAttitude, self.vehicle_namespace + "/VehicleAttitude_PubSubTopic", self.callback_drone_orientation, 1) 
-        self.estimator_topic_name_ = "AprilTag_estimator/estimated_pos"
-        self.tag_pose_publisher = self.create_publisher(PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
+        self.estimator_topic_name_ = "/AprilTag_estimator/estimated_yaw"
+        self.tag_yaw_publisher = self.create_publisher(Yaw, self.estimator_topic_name_, 10)
         
         
     def video_callback(self, data):
@@ -99,9 +99,16 @@ class VideoStreamerNode(Node):
        
           self.rot_camera2chassis = R.from_matrix(pose_R)
           self.rot_local2camera = R.from_quat(self.drone_orientation)
-          self.rot_global2chassis = self.rot_global2local*self.rot_m90*self.rot_local2camera*self.rot_90*(self.rot_camera2chassis.inv())
+          self.rot_global2chassis = self.rot_m90*self.rot_inv*self.rot_local2camera*self.rot_90*(self.rot_camera2chassis.inv())          
           self.global_yaw = (self.rot_global2chassis.as_euler('xyz', degrees=True))[2]
           
+          msg = Yaw()
+          msg.yaw = self.global_yaw
+          msg.header.frame_id = self.estimator_topic_name_
+          msg.header.stamp = self.get_clock().now().to_msg()
+
+          self.tag_yaw_publisher.publish(msg)
+
           org = (center_x - 80, center_y + 60)
           fontScale = 0.7
           frame_rgb = cv2.putText(frame_rgb, f"yaw: {int(self.global_yaw)} deg", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
@@ -122,8 +129,6 @@ class VideoStreamerNode(Node):
     def callback_drone_orientation(self, msg):
         self.drone_orientation = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
 
-    def callback_estimated_uwb_pos(self, msg):
-        self.estimated_uwb_pos = np.array([msg.x, msg.y, msg.z])
 
 def main(args=None):
   

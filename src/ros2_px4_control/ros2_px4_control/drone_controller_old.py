@@ -120,7 +120,7 @@ class DroneController(Node):
         self.vz = msg.vz
 
     def timer_callback(self):
-        if (self.offboard_setpoint_counter_ == 10):
+        if (self.offboard_setpoint_counter_ >= 10):
             self.publish_vehicle_command(176, 1.0, 6.0)
 
             self.get_logger().info("arming..")
