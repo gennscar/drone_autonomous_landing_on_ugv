@@ -28,6 +28,7 @@ set(msg_files
   "msg/UnitVector.msg"
   "msg/UnitVectorArray.msg"
   "msg/UwbSensor.msg"
+  "msg/Yaw.msg"
   "msg/VelocityVector.msg"
 )
 
