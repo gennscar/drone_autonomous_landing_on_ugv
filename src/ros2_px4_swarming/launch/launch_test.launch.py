@@ -32,20 +32,6 @@ def generate_launch_description():
         'bagfiles'
     )
 
-    if numDrones > 0:
-        # Launch node publishing numDrones
-        numDronesNode = Node(
-            package='ros2_px4_swarming',
-            namespace='numAnchorsNode',
-            executable='numAnchorsNode',
-            name='numAnchorsNode',
-            parameters=[
-                params,
-                {'N': numDrones}
-            ]
-        )
-        ld.add_action(numDronesNode)
-
     if numTarget == 1:
         # Launch target
         targetRover = Node(
@@ -57,65 +43,27 @@ def generate_launch_description():
         )
         ld.add_action(targetRover)
 
-    for i in range(numDrones):
-        # Launch drone
-        anchorDrone = Node(
+    if numDrones > 1:
+        # Launch unitVectorsCalculator
+        unitVectorsCalculator = Node(
             package='ros2_px4_swarming',
-            namespace='X500_' + str(i),
-            executable='anchorDrone',
-            name='X500_' + str(i),
+            namespace='unitVectorsCalculator',
+            executable='unitVectorsCalculator',
+            name='unitVectorsCalculator',
             parameters=[
                 params,
                 {'N': numDrones}
             ],
             remappings=[
-                ('/X500_' + str(i) + '/uwb_sensor_' + str(i), '/uwb_sensor_' + str(i)),
-                ('/X500_' + str(i) + '/unitVectorsCalculator/unitVectors', '/unitVectorsCalculator/unitVectors'),
-                ('/X500_' + str(i) + '/trackingVelocityCalculator/trackingVelocity', '/trackingVelocityCalculator/trackingVelocity'),
-                ('/X500_' + str(i) + '/numAnchorsNode/N', '/numAnchorsNode/N'),
-                ('/X500_' + str(i) + '/X500_0/readyForSwarming', '/X500_0/readyForSwarming'),
-                ('/X500_' + str(i) + '/X500_1/readyForSwarming', '/X500_1/readyForSwarming'),
-                ('/X500_' + str(i) + '/X500_2/readyForSwarming', '/X500_2/readyForSwarming'),
-                ('/X500_' + str(i) + '/X500_3/readyForSwarming', '/X500_3/readyForSwarming'),
-                ('/X500_' + str(i) + '/X500_4/readyForSwarming', '/X500_4/readyForSwarming'),
-                ('/X500_' + str(i) + '/X500_5/readyForSwarming', '/X500_5/readyForSwarming'),
-                ('/X500_' + str(i) + '/X500_0/readyForTakeoff', '/X500_0/readyForTakeoff'),
-                ('/X500_' + str(i) + '/X500_1/readyForTakeoff', '/X500_1/readyForTakeoff'),
-                ('/X500_' + str(i) + '/X500_2/readyForTakeoff', '/X500_2/readyForTakeoff'),
-                ('/X500_' + str(i) + '/X500_3/readyForTakeoff', '/X500_3/readyForTakeoff'),
-                ('/X500_' + str(i) + '/X500_4/readyForTakeoff', '/X500_4/readyForTakeoff'),
-                ('/X500_' + str(i) + '/X500_5/readyForTakeoff', '/X500_5/readyForTakeoff'),
-                ('/X500_' + str(i) + '/X500_0/VehicleGlobalPosition_PubSubTopic', '/X500_0/VehicleGlobalPosition_PubSubTopic'),
-                ('/X500_' + str(i) + '/X500_1/VehicleGlobalPosition_PubSubTopic', '/X500_1/VehicleGlobalPosition_PubSubTopic'),
-                ('/X500_' + str(i) + '/X500_2/VehicleGlobalPosition_PubSubTopic', '/X500_2/VehicleGlobalPosition_PubSubTopic'),
-                ('/X500_' + str(i) + '/X500_3/VehicleGlobalPosition_PubSubTopic', '/X500_3/VehicleGlobalPosition_PubSubTopic'),
-                ('/X500_' + str(i) + '/X500_4/VehicleGlobalPosition_PubSubTopic', '/X500_4/VehicleGlobalPosition_PubSubTopic'),
-                ('/X500_' + str(i) + '/X500_5/VehicleGlobalPosition_PubSubTopic', '/X500_5/VehicleGlobalPosition_PubSubTopic')
+                ('/unitVectorsCalculator/X500_0/VehicleGlobalPosition_PubSubTopic', '/X500_0/VehicleGlobalPosition_PubSubTopic'),
+                ('/unitVectorsCalculator/X500_1/VehicleGlobalPosition_PubSubTopic', '/X500_1/VehicleGlobalPosition_PubSubTopic'),
+                ('/unitVectorsCalculator/X500_2/VehicleGlobalPosition_PubSubTopic', '/X500_2/VehicleGlobalPosition_PubSubTopic'),
+                ('/unitVectorsCalculator/X500_3/VehicleGlobalPosition_PubSubTopic', '/X500_3/VehicleGlobalPosition_PubSubTopic'),
+                ('/unitVectorsCalculator/X500_4/VehicleGlobalPosition_PubSubTopic', '/X500_4/VehicleGlobalPosition_PubSubTopic'),
+                ('/unitVectorsCalculator/X500_5/VehicleGlobalPosition_PubSubTopic', '/X500_5/VehicleGlobalPosition_PubSubTopic')
             ]
         )
-        ld.add_action(anchorDrone)
-
-    if numDrones > 1:
-        # # Launch unitVectorsCalculator
-        # unitVectorsCalculator = Node(
-        #     package='ros2_px4_swarming',
-        #     namespace='unitVectorsCalculator',
-        #     executable='unitVectorsCalculator',
-        #     name='unitVectorsCalculator',
-        #     parameters=[
-        #         params,
-        #         {'N': numDrones}
-        #     ],
-        #     remappings=[
-        #         ('/unitVectorsCalculator/X500_0/VehicleGlobalPosition_PubSubTopic', '/X500_0/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_1/VehicleGlobalPosition_PubSubTopic', '/X500_1/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_2/VehicleGlobalPosition_PubSubTopic', '/X500_2/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_3/VehicleGlobalPosition_PubSubTopic', '/X500_3/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_4/VehicleGlobalPosition_PubSubTopic', '/X500_4/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_5/VehicleGlobalPosition_PubSubTopic', '/X500_5/VehicleGlobalPosition_PubSubTopic')
-        #     ]
-        # )
-        # ld.add_action(unitVectorsCalculator)
+        ld.add_action(unitVectorsCalculator)
 
         # Launch trackingVelocityCalculator
         trackingVelocityCalculator = Node(

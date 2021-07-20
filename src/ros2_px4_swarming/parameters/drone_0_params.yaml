@@ -11,5 +11,3 @@
         EARTH_RADIUS: 6371000
         TARGET_ID: 200
         MAX_SWARMING_SPEED: 1.0
-        N: 1
-        NUM_TARGET: 0

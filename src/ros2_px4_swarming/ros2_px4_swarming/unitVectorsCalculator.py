@@ -6,6 +6,8 @@ from rclpy.node import Node
 from px4_msgs.msg import Timesync, VehicleGlobalPosition
 from ros2_px4_interfaces.msg import UnitVector, UnitVectorArray
 
+# TODO: check the case of a drone disconnecting
+
 
 class UnitVectorsCalculator(Node):
     def __init__(self):
@@ -30,10 +32,12 @@ class UnitVectorsCalculator(Node):
         self.timestamp = 0
         self.anchorsPosition = {}
         self.anchorsPositionSubs = list()
+        self.lastPositionReceivedTimer = {}
 
         # Subscribers initialization
         for i in range(self.N):
             self.anchorsPositionSubs.append(self.create_subscription(VehicleGlobalPosition, "X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
+            self.lastPositionReceivedTimer[i] = 0
 
         # Publishers initialization
         self.unitVectorsPub = self.create_publisher(UnitVectorArray, "unitVectors", self.QUEUE_SIZE)
@@ -59,9 +63,12 @@ class UnitVectorsCalculator(Node):
             return
 
         unitVectors = []
+
         for i in range(self.N):
+            self.lastPositionReceivedTimer[i] += 1
             for j in range(i + 1, self.N):
-                unitVectors.append(self.computeUnitVector(i, j, self.get_clock().now().to_msg()))
+                if self.lastPositionReceivedTimer[i] < 5 * self.RATE and self.lastPositionReceivedTimer[j] < 5 * self.RATE:
+                    unitVectors.append(self.computeUnitVector(i, j, self.get_clock().now().to_msg()))
 
         msg = UnitVectorArray()
         msg.data = unitVectors
@@ -69,6 +76,7 @@ class UnitVectorsCalculator(Node):
 
     def anchorsPositionCallback(self, msg, droneId):
         self.anchorsPosition[droneId] = msg
+        self.lastPositionReceivedTimer[droneId] = 0
 
 
 def main():

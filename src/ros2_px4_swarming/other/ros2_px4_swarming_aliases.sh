@@ -8,7 +8,7 @@ if [[ -f "$HOME/gazebo_ros_pkgs/install/setup.bash" ]]; then
 fi
 source $HOME/ros2_px4_ws/install/setup.bash
 
-#region Build, launch simulation and other
+# region Build, launch and other
 function buildpackage() {
   cd $HOME/ros2_px4_ws || exec $SHELL
   colcon build --symlink-install
@@ -18,7 +18,7 @@ function buildpackage() {
 function killgazebosimulation() {
   echo ""
   echo "Stopping the RTPS agents, gazebo, PX4."
-  pkill -x px4
+  pkill px4
   pkill gzclient
   pkill gzserver
   pkill micrortps_agent
@@ -107,6 +107,43 @@ function launchsimulation() {
   fg 1
 }
 
+function launchtest() {
+#  cd $HOME/ros2_px4_ws || exec $SHELL
+#  colcon build --packages-select ros2_px4_swarming
+#  cd || exec $SHELL
+
+#  Count the vehicles spawned
+  fileName="$HOME/ros2_px4_ws/src/ros2_px4_swarming/other/launchedVehicles.txt"
+  n=0
+  while read -r val; do
+    if [ $n -eq 0 ]
+    then
+      numDrones=$val
+    elif [ $n -eq 1 ]
+    then
+      numTarget=$val
+    fi
+    n=$((n + 1))
+  done < $fileName
+
+  export NUM_DRONES=$numDrones
+  export NUM_TARGET=$numTarget
+
+  swarmrestart
+
+  sleep 5
+
+  ros2 launch ros2_px4_swarming launch_test.launch.py &
+
+  sleep 10
+  cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles || exec $SHELL
+  fileName=$(ls -1 | tail -n 1)
+  cp $HOME/ros2_px4_ws/src/ros2_px4_swarming/parameters/params.yaml $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles/$fileName
+  cd || exec $SHELL
+
+  fg 1
+}
+
 # Plot data from bag
 function plotbag() {
   bagFileName=${1:fileName}
@@ -120,9 +157,9 @@ function plotlastbag() {
   python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/plotBag.py $fileName
   cd || exec $SHELL
 }
-#endregion
+# endregion
 
-#region Swarming commands
+# region Swarming commands
 function swarmtakeoff() {
 #  Count the vehicles spawned
   fileName="$HOME/ros2_px4_ws/src/ros2_px4_swarming/other/launchedVehicles.txt"
@@ -193,9 +230,30 @@ function swarmland() {
 
   fg 1
 }
-#endregion
 
-#region Drones commands
+function swarmrestart() {
+#  Count the vehicles spawned
+  fileName="$HOME/ros2_px4_ws/src/ros2_px4_swarming/other/launchedVehicles.txt"
+  n=0
+  while read -r val; do
+    if [ $n -eq 0 ]
+    then
+      numDrones=$val
+    fi
+    n=$((n + 1))
+  done < $fileName
+
+  n=0
+  while [ $n -lt $numDrones ]; do
+    dronerestart $n &
+    n=$((n + 1))
+  done
+
+  fg 1
+}
+# endregion
+
+# region Drones commands
 function dronetakeoff() {
   n=${1:-0}
   eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'takeoff'}'"
@@ -235,9 +293,9 @@ function dronerestart() {
   n=${1:-0}
   eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'restart'}'"
 }
-#endregion
+# endregion
 
-#region Target commands
+# region Target commands
 function targetroverhold() {
   eval "ros2 service call /targetRover/targetCustomCommand ros2_px4_interfaces/srv/TargetCustomCommand '{operation: 'hold'}'"
 }
@@ -276,12 +334,12 @@ function targetroverturn() {
 function targetroversquare() {
   eval "ros2 service call /targetRover/targetCustomCommand ros2_px4_interfaces/srv/TargetCustomCommand '{operation: 'square'}'"
 }
-#endregion
+# endregion
 
-#region Test commands
+# region Test commands
 function launchdrone() {
   id=${1:-0}
   vehicle=${2:-0}
-  eval "ros2 run ros2_px4_swarming anchorDrone --ros-args --params-file $HOME/ros2_px4_ws/src/ros2_px4_swarming/parameters/anchor_params.yaml -p ID:=$id -r __ns:=/X500_$vehicle -r /X500_$vehicle/uwb_sensor_$id:=/uwb_sensor_$id -r /X500_$vehicle/unitVectorsCalculator/unitVectors:=/unitVectorsCalculator/unitVectors -r /X500_$vehicle/trackingVelocityCalculator/trackingVelocity:=/trackingVelocityCalculator/trackingVelocity"
+  eval "ros2 run ros2_px4_swarming anchorDrone --ros-args --params-file $HOME/ros2_px4_ws/src/ros2_px4_swarming/parameters/drone_$id\_params.yaml -p ID:=$id -r __ns:=/X500_$vehicle -r /X500_$vehicle/uwb_sensor_$id:=/uwb_sensor_$id -r /X500_$vehicle/unitVectorsCalculator/unitVectors:=/unitVectorsCalculator/unitVectors -r /X500_$vehicle/trackingVelocityCalculator/trackingVelocity:=/trackingVelocityCalculator/trackingVelocity"
 }
-#endregion
+# endregion

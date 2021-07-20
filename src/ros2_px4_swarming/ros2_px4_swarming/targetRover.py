@@ -131,7 +131,7 @@ class Target(Node):
         return [throttle, rotation]
     # endregion
 
-    # region Services' handling functions
+    # region Services' handling methods
     def hold(self):
         self.setVelocitySetpoint(vx=0, yawrate=0)
 

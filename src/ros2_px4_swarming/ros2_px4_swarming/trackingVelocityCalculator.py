@@ -3,12 +3,16 @@ import math
 from functools import partial
 import statistics
 import numpy.linalg
+from itertools import combinations, permutations
 import rclpy
 from rclpy.node import Node
 from px4_msgs.msg import Timesync, VehicleGlobalPosition
 from std_msgs.msg import Bool
 from ros2_px4_interfaces.srv import SwarmCommand
-from ros2_px4_interfaces.msg import UnitVector, UnitVectorArray, UwbSensor, VelocityVector
+from ros2_px4_interfaces.msg import UnitVector, UwbSensor, VelocityVector
+from ros2_px4_functions import swarming_functions
+
+# TODO: check the case of a drone disconnecting
 
 
 class TrackingVelocityCalculator(Node):
@@ -54,20 +58,21 @@ class TrackingVelocityCalculator(Node):
         self.anchorsPositionSubs = list()
         self.targetUwbDistances = {}
         self.unitVectors = [[None] * self.N] * self.N
-        self.unitVectorsReceived = False
+        self.anchorsPositionReceived = False
         self.trackingVelocityIntegral = [0.0, 0.0]
         self.lastTrackingVelocity = {0: self.FILTER_WINDOW * [0.0], 1: self.FILTER_WINDOW * [0.0]}
         self.firstIteration = True
         self.anchorsReadyForSwarming = {}
+        self.anchorsReadyForSwarming = {}
+        self.lastPositionReceivedTimer = {}
+        for i in range(self.N):
+            self.lastPositionReceivedTimer[i] = 0
 
         # Subscribers initialization
-        if self.NUM_TARGET == 0:
-            for i in range(self.N):
-                self.anchorsPositionSubs.append(self.create_subscription(VehicleGlobalPosition, "X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
-        elif self.NUM_TARGET == 1:
+        if self.NUM_TARGET == 1:
             self.targetUwbSensorSub = self.create_subscription(UwbSensor, "uwb_sensor_" + str(self.TARGET_ID), self.targetUwbSensorCallback, self.QUEUE_SIZE)
-            self.unitVectorsSub = self.create_subscription(UnitVectorArray, "unitVectorsCalculator/unitVectors", self.unitVectorsCallback, self.QUEUE_SIZE)
         for i in range(self.N):
+            self.anchorsPositionSubs.append(self.create_subscription(VehicleGlobalPosition, "X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
             self.create_subscription(Bool, "X500_" + str(i) + "/readyForSwarming", partial(self.anchorReadyForSwarmingCallback, droneId=i), self.QUEUE_SIZE)
 
         # Services initialization
@@ -85,11 +90,14 @@ class TrackingVelocityCalculator(Node):
     def computeSwarmCenter(self):
         centerLatitude = 0.0
         centerLongitude = 0.0
-        for i in range(self.N):
-            centerLatitude += self.anchorsPosition[i].lat
-            centerLongitude += self.anchorsPosition[i].lon
-        centerLatitude /= self.N
-        centerLongitude /= self.N
+        activeDrones = 0
+        for key in self.lastPositionReceivedTimer.keys():
+            if self.lastPositionReceivedTimer[key] < 5 * self.RATE:
+                activeDrones += 1
+                centerLatitude += self.anchorsPosition[key].lat
+                centerLongitude += self.anchorsPosition[key].lon
+        centerLatitude /= activeDrones
+        centerLongitude /= activeDrones
         return [centerLatitude, centerLongitude]
 
     def computeTrackingVelocity(self):
@@ -126,23 +134,37 @@ class TrackingVelocityCalculator(Node):
             result.north = distance * direction[1] * self.K_P
 
         elif self.NUM_TARGET == 1:
-            if len(self.targetUwbDistances) < self.N or not self.unitVectorsReceived:
+            if len(self.targetUwbDistances) < self.N or not self.anchorsPositionReceived:
                 result.east = 0.0
                 result.north = 0.0
                 return result
 
+            activeDrones = 0
+            dronesToRemove = []
+            for key in self.anchorsPosition.keys():
+                if self.lastPositionReceivedTimer[key] >= 5 * self.RATE:
+                    dronesToRemove.append(key)
+                else:
+                    activeDrones += 1
+
+            for i in range(len(dronesToRemove)):
+                self.anchorsPosition.pop(dronesToRemove[i])
+
+            for couple in permutations(self.anchorsPosition, 2):
+                self.unitVectors[couple[0]][couple[1]] = swarming_functions.computeUnitVector(couple[0], self.anchorsPosition[couple[0]], couple[1], self.anchorsPosition[couple[1]], self.get_clock().now().to_msg())
+
             # Compute the tracking velocity (with target)
             velEast = 0.0
             velNorth = 0.0
-            for i in range(self.N):
-                for j in range(i + 1, self.N):
-                    componentEast = (self.targetUwbDistances[j] - self.targetUwbDistances[i]) * self.unitVectors[i][j].east
-                    componentNorth = (self.targetUwbDistances[j] - self.targetUwbDistances[i]) * self.unitVectors[i][j].north
-                    velEast += componentEast
-                    velNorth += componentNorth
 
-            velEast *= (self.K_P / self.N)
-            velNorth *= (self.K_P / self.N)
+            for couple in permutations(self.anchorsPosition, 2):
+                componentEast = (self.targetUwbDistances[couple[1]] - self.targetUwbDistances[couple[0]]) * self.unitVectors[couple[0]][couple[1]].east
+                componentNorth = (self.targetUwbDistances[couple[1]] - self.targetUwbDistances[couple[0]]) * self.unitVectors[couple[0]][couple[1]].north
+                velEast += componentEast
+                velNorth += componentNorth
+
+            velEast *= (self.K_P / activeDrones)
+            velNorth *= (self.K_P / activeDrones)
 
             # Da cancellare
             msgTmp = VelocityVector()
@@ -210,6 +232,8 @@ class TrackingVelocityCalculator(Node):
 
     # Callbacks
     def timerCallback(self):
+        for key in self.lastPositionReceivedTimer.keys():
+            self.lastPositionReceivedTimer[key] += 1
         msg = self.computeTrackingVelocity()
         self.trackingVelocityPub.publish(msg)
 
@@ -238,6 +262,9 @@ class TrackingVelocityCalculator(Node):
 
     def anchorsPositionCallback(self, msg, droneId):
         self.anchorsPosition[droneId] = msg
+        self.lastPositionReceivedTimer[droneId] = 0
+        if not self.anchorsPositionReceived and len(self.anchorsPosition) == self.N:
+            self.anchorsPositionReceived = True
 
     def targetUwbSensorCallback(self, msg):
         self.targetUwbDistances[int(msg.anchor_pose.header.frame_id)] = msg.range
@@ -245,13 +272,6 @@ class TrackingVelocityCalculator(Node):
         # self.get_logger().info(msg)
         # for dis in self.uwbDistances.values():
         #     self.get_logger().info(str(dis))
-
-    def unitVectorsCallback(self, msg):
-        for uv in msg.data:
-            self.unitVectors[uv.destination_drone_id][uv.start_drone_id] = uv
-
-        if not self.unitVectorsReceived:
-            self.unitVectorsReceived = True
 
     def anchorReadyForSwarmingCallback(self, msg, droneId):
         self.anchorsReadyForSwarming[droneId] = msg.data
