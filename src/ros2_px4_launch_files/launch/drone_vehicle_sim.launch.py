@@ -10,7 +10,7 @@ def generate_launch_description():
         executable = "drone_controller_old",
         name = "DroneController",
         parameters = [
-        {"control_mode": 0},
+        {"control_mode": 2},
         {"vehicle_namespace": "/drone"},
         {"vehicle_number": 2},
         {"x0": 0.0},

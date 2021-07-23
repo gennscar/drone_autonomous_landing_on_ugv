@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 kf_params = [
-    [{'deltaT': 1e-3}, {'R_uwb': 0.0025}, {'R_px4': 0.5}, {'Q': 1e-3}, {'namespace_drone': "/drone"}, {'namespace_rover': "/rover"}, {'include_rover': 1}, {'include_drone': 1}],
+    [{'deltaT': 1e-1}, {'R_apriltag': 1e-1}, {'R_px4_yaw': 1.}, {'Q': 1e2}, {'namespace_rover': "/rover"}]
 
 ]
 
@@ -34,14 +34,21 @@ def generate_launch_description():
         parameters = [{"vehicle_namespace": "/rover"}]
     ))
 
-    #for i, param in enumerate(kf_params):
-    #    ld.add_entity(Node(
-    #        package='ros2_px4_estimation',
-    #        executable='drone_vehicle_kf_loose',
-    #        namespace='KF_estimator_' + str(i),
-    #        parameters=param
-    #    ))
+    for i, param in enumerate(kf_params):
+        ld.add_entity(Node(
+            package='ros2_px4_estimation',
+            executable='drone_vehicle_kf_yaw',
+            namespace='KF_yaw_estimator_' + str(i),
+            parameters=param
+        ))
 
+    """for i, param in enumerate(kf_params):
+        ld.add_entity(Node(
+            package='ros2_px4_estimation',
+            executable='drone_vehicle_kf_yaw_bias',
+            namespace='KF_yaw_bias_estimator_' + str(i),
+            parameters=param
+        ))"""
     ld.add_entity(Node(
         package='ros2_px4_testing',
         executable='drone_vehicle_positioning_error',
@@ -52,6 +59,7 @@ def generate_launch_description():
         package='ros2_px4_testing',
         executable='yaw_error',
         namespace='yaw_error',
+        parameters = [{"noise": 1}]
     ))
 
 

@@ -21,6 +21,7 @@ class YawError(Node):
         # Sensor subscriber to the real position
         self.true_yaw_subscriber = self.create_subscription(Odometry, "/rover_uwb/odom", self.callback_true_yaw, 1) 
 
+        self.true_yaw_publisher = self.create_publisher(Yaw, "/rover/true_yaw",10)
         # Timer to check the creation of new estimators
         self.timer_ = self.create_timer(1, self.timer_callback)
 
@@ -46,9 +47,9 @@ class YawError(Node):
 
         # Filling error message
         error = Float64()
-        error.data = self.true_yaw - msg.yaw
+        error.data = float(self.true_yaw - msg.yaw)**2
 
-        # Sending error message only if the estimator is valid
+        # Sending error message only if the estimat)or is valid
         if(msg.header.frame_id in self.estimator_topics_.keys()):
             self.estimator_topics_[msg.header.frame_id].publish(error)
 
@@ -58,8 +59,13 @@ class YawError(Node):
         self.true_attitude = np.array([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
         self.true_rotation = R.from_quat(self.true_attitude)
         self.true_yaw = (self.true_rotation.as_euler(
-                'xyz', degrees=True))[2] + 90 
+                'xyz', degrees=True))[2]
+        msg = Yaw()
+        msg.yaw = self.true_yaw 
+        msg.header.frame_id = "/rover/true_yaw"
+        msg.header.stamp = self.get_clock().now().to_msg()
 
+        self.true_yaw_publisher.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)
