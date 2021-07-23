@@ -6,8 +6,6 @@ from rclpy.node import Node
 from px4_msgs.msg import Timesync, VehicleGlobalPosition
 from ros2_px4_interfaces.msg import UnitVector, UnitVectorArray
 
-# TODO: check the case of a drone disconnecting
-
 
 class UnitVectorsCalculator(Node):
     def __init__(self):

@@ -108,28 +108,17 @@ function launchsimulation() {
 }
 
 function launchtest() {
-#  cd $HOME/ros2_px4_ws || exec $SHELL
-#  colcon build --packages-select ros2_px4_swarming
-#  cd || exec $SHELL
-
-#  Count the vehicles spawned
-  fileName="$HOME/ros2_px4_ws/src/ros2_px4_swarming/other/launchedVehicles.txt"
-  n=0
-  while read -r val; do
-    if [ $n -eq 0 ]
-    then
-      numDrones=$val
-    elif [ $n -eq 1 ]
-    then
-      numTarget=$val
-    fi
-    n=$((n + 1))
-  done < $fileName
+  numDrones=${1:-1}
+  numTarget=${2:-0}
 
   export NUM_DRONES=$numDrones
   export NUM_TARGET=$numTarget
 
-  swarmrestart
+  n=0
+  while [ $n -lt $numDrones ]; do
+    dronerestart $n &
+    n=$((n + 1))
+  done
 
   sleep 5
 
@@ -256,7 +245,8 @@ function swarmrestart() {
 # region Drones commands
 function dronetakeoff() {
   n=${1:-0}
-  eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'takeoff'}'"
+  z=${2:--3}
+  eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'takeoff', z: $z}'"
 }
 
 function dronehover() {
@@ -337,9 +327,17 @@ function targetroversquare() {
 # endregion
 
 # region Test commands
+function ddsserver() {
+  fastdds discovery -i 0 -l 192.168.1.99 -p 11811
+}
+
+function rds() {
+  export ROS_DISCOVERY_SERVER=192.168.1.99:11811
+}
+
 function launchdrone() {
   id=${1:-0}
-  vehicle=${2:-0}
-  eval "ros2 run ros2_px4_swarming anchorDrone --ros-args --params-file $HOME/ros2_px4_ws/src/ros2_px4_swarming/parameters/drone_$id\_params.yaml -p ID:=$id -r __ns:=/X500_$vehicle -r /X500_$vehicle/uwb_sensor_$id:=/uwb_sensor_$id -r /X500_$vehicle/unitVectorsCalculator/unitVectors:=/unitVectorsCalculator/unitVectors -r /X500_$vehicle/trackingVelocityCalculator/trackingVelocity:=/trackingVelocityCalculator/trackingVelocity"
+  export DRONE_ID=$id
+  ros2 launch ros2_px4_swarming launch_drone.launch.py
 }
 # endregion

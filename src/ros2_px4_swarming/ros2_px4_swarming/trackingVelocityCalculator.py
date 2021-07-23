@@ -12,8 +12,6 @@ from ros2_px4_interfaces.srv import SwarmCommand
 from ros2_px4_interfaces.msg import UnitVector, UwbSensor, VelocityVector
 from ros2_px4_functions import swarming_functions
 
-# TODO: check the case of a drone disconnecting
-
 
 class TrackingVelocityCalculator(Node):
     def __init__(self):

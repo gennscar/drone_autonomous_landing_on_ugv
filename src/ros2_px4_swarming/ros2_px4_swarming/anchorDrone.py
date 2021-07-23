@@ -10,9 +10,8 @@ from ros2_px4_interfaces.msg import DistanceStampedArray, UnitVector, UnitVector
 from ros2_px4_interfaces.srv import DroneCustomCommand
 from ros2_px4_functions import swarming_functions
 
-# TODO: handle the case of a drone disconnecting
 
-UWB_ON = True
+UWB_ON = False
 
 
 class Drone(Node):
@@ -251,10 +250,11 @@ class Drone(Node):
 
     def armVehicle(self):
         if self.vehicleStatus.arming_state == VehicleStatus.ARMING_STATE_ARMED:
-            self.publishVehicleCommand(176, 1.0, 6.0)
+            # self.publishVehicleCommand(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 1.0, 6.0)
+            return
         elif self.authorizedForOffboard:
-            self.publishVehicleCommand(176, 1.0, 6.0)
-            self.publishVehicleCommand(400, 1.0, 0.0)
+            self.publishVehicleCommand(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 1.0, 6.0)
+            self.publishVehicleCommand(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0, 0.0)
             self.setTrajectorySetpoint()
         else:
             self.get_logger().warn("Disarmed by RC, impossible to arm")
@@ -313,7 +313,7 @@ class Drone(Node):
 
     def swarming(self):
         if (UWB_ON and (not self.anchorsPositionReceived or not self.uwbDistancesReceived)) or \
-                (not UWB_ON and self.anchorsPositionReceived):
+                (not UWB_ON and not self.anchorsPositionReceived):
             # Complete info from the other anchors has not arrived yet
             self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
             return
@@ -478,11 +478,11 @@ class Drone(Node):
     def vehicleStatusCallback(self, msg):
         self.vehicleStatus = msg
 
-        if self.authorizedForOffboard and \
-                self.vehicleStatus.arming_state == VehicleStatus.ARMING_STATE_ARMED and \
-                (self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_STICK or
-                 self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_SWITCH):
+        if self.authorizedForOffboard and self.vehicleStatus.arming_state == VehicleStatus.ARMING_STATE_ARMED and self.vehicleStatus.nav_state != VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            # (self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_STICK or
+            #  self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_SWITCH):
             self.authorizedForOffboard = False
+            self.droneMode = "idle"
 
     def anchorReadyForTakeoffCallback(self, msg, droneId):
         self.anchorsReadyForTakeoff[droneId] = msg.data

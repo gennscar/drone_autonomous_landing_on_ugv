@@ -32,6 +32,20 @@ def generate_launch_description():
         'bagfiles'
     )
 
+    if numDrones > 0:
+        # Launch node publishing numDrones
+        numDronesNode = Node(
+            package='ros2_px4_swarming',
+            namespace='numAnchorsNode',
+            executable='numAnchorsNode',
+            name='numAnchorsNode',
+            parameters=[
+                params,
+                {'N': numDrones}
+            ]
+        )
+        ld.add_action(numDronesNode)
+
     if numTarget == 1:
         # Launch target
         targetRover = Node(
