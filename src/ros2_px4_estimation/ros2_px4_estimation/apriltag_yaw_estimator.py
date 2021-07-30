@@ -99,8 +99,8 @@ class VideoStreamerNode(Node):
        
           self.rot_camera2chassis = R.from_matrix(pose_R)
           self.rot_local2camera = R.from_quat(self.drone_orientation)
-          self.rot_global2chassis = self.rot_m90*self.rot_inv*self.rot_local2camera*self.rot_90*(self.rot_camera2chassis.inv())          
-          self.global_yaw = (self.rot_global2chassis.as_euler('xyz', degrees=True))[2]
+          self.rot_global2chassis = self.rot_global2local*self.rot_m90*self.rot_inv*self.rot_local2camera*self.rot_90*(self.rot_camera2chassis.inv())          
+          self.global_yaw = - (self.rot_global2chassis.as_euler('xyz', degrees=True))[2]
           
           msg = Yaw()
           msg.yaw = self.global_yaw

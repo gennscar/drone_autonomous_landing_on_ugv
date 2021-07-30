@@ -34,7 +34,7 @@ class KFYawEstimator(Node):
         self.namespace_rover = self.get_parameter('namespace_rover').get_parameter_value().string_value
 
         # Kalman Filter
-        self.kalman_filter_ = KalmanFilter(dim_x=3, dim_z=3)
+        self.kalman_filter_ = KalmanFilter(dim_x=4, dim_z=4)
 
         # State transition matrix
         f = np.array([
@@ -42,13 +42,15 @@ class KFYawEstimator(Node):
             [0., 1.,         self.deltaT_],
             [0., 0.,         1.]
         ])
-        self.kalman_filter_.F = f
-        # Observation matrix
-        self.kalman_filter_.H = np.eye(3)
+        self.kalman_filter_.F = np.block([[f,0.],
+                                          [0.,1]])
+       # Observation matrix
+        self.kalman_filter_.H = np.eye(4)
 
         # Process noise
         Q1 = Q_discrete_white_noise(dim=3, dt=self.deltaT_, var=self.Q_, block_size=1)
-        self.kalman_filter_.Q = Q1
+        self.kalman_filter_.Q = np.block([[Q1,0.],
+                                        [0.,self.Q_]])
         # Covariance matrix
         self.kalman_filter_.P *= 1.
 
@@ -70,12 +72,13 @@ class KFYawEstimator(Node):
     def callback_apriltag_subscriber(self, msg):
         # Storing current estimate in a np.array
         z = np.array([
-            msg.yaw,  0., 0.
+            msg.yaw,  0., 0., 0.
         ])
 
-        H = np.array([[1., 0., 0.],
-                     [0., 0., 0.],
-                     [0., 0., 0.]])
+        H = np.array([[1., 0., 0., 0.],
+                     [0., 0., 0., 0.],
+                     [0., 0., 0., 0.],
+                     [0., 0., 0., 0.]])
 
         # Filter update
         self.kalman_filter_.update(z, self.R_apriltag_, H)
@@ -85,12 +88,13 @@ class KFYawEstimator(Node):
 
         # Storing current estimate in a np.array
         z = np.array([
-            msg.yaw,  0., 0.
+            msg.yaw,  0., 0., 0.
         ])
 
-        H = np.array([[1., 0., 0.],
-                     [0., 0., 0.],
-                     [0., 0., 0.]])
+        H = np.array([[1., 0., 0., 1.],
+                     [0., 0., 0., 0.],
+                     [0., 0., 0., 0.],
+                     [0., 0., 0., 0.]])
 
         R_px4_yaw = self.R_px4_yaw_
         # Filter update

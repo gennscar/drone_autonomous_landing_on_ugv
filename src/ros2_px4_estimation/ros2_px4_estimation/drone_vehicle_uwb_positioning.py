@@ -5,10 +5,10 @@ import numpy as np
 from rclpy.node import Node
 from rclpy.time import Time, Duration
 
-from px4_msgs.msg import VehicleAttitude
 from ros2_px4_interfaces.msg import UwbSensor
 from geometry_msgs.msg import PoseWithCovarianceStamped, Point
 from scipy.spatial.transform import Rotation as R
+from ros2_px4_interfaces.msg import Yaw
 
 import ros2_px4_functions
 
@@ -65,8 +65,7 @@ class UwbPositioning(Node):
         self.sensor_subscriber_ = self.create_subscription(
             UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
         self.px4_attitude_subscriber = self.create_subscription(
-            VehicleAttitude, self.vehicle_namespace + "/VehicleAttitude_PubSubTopic", self.callback_px4_attitude, 10)
-
+            Yaw, "/KF_yaw_estimator_0/estimated_yaw", self.callback_px4_attitude, 10)
         # Setting up a publishers to send the estimated position
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
         self.rotated_position_publisher = self.create_publisher(
@@ -82,14 +81,9 @@ class UwbPositioning(Node):
                               """)
 
     def callback_px4_attitude(self, msg):
-        self.px4_attitude = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
-        self.px4_attitude_rotation = self.rot_global2local * \
-            R.from_quat(self.px4_attitude)
-        self.px4_attitude_yaw = - \
-            (self.px4_attitude_rotation.as_euler(
-                'xyz', degrees=True))[2] + self.offset_yaw
+
         self.px4_offset_rotation = (R.from_euler(
-            'z', self.px4_attitude_yaw, degrees=True))
+            'z', msg.yaw, degrees=True))
 
     def callback_sensor_subscriber(self, msg):
         """

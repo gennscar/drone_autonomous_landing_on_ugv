@@ -29,6 +29,8 @@ setup(
             "px4_yaw_estimator = ros2_px4_estimation.px4_yaw_estimator:main",
             "drone_vehicle_uwb_positioning = ros2_px4_estimation.drone_vehicle_uwb_positioning:main",
             "drone_vehicle_kf_loose = ros2_px4_estimation.drone_vehicle_kf_loose:main",
+            "drone_vehicle_kf_yaw = ros2_px4_estimation.drone_vehicle_kf_yaw:main",
+            "drone_vehicle_kf_yaw_bias = ros2_px4_estimation.drone_vehicle_kf_yaw:main",
             "uwb_driver = ros2_px4_estimation.uwb_driver:main",
             "drone_vehicle_px4_positioning = ros2_px4_estimation.drone_vehicle_px4_positioning:main"
         ],
