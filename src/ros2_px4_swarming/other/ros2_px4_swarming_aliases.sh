@@ -9,9 +9,15 @@ fi
 source $HOME/ros2_px4_ws/install/setup.bash
 
 # region Build, launch and other
-function buildpackage() {
+function buildws() {
   cd $HOME/ros2_px4_ws || exec $SHELL
   colcon build --symlink-install
+  cd || exec $SHELL
+}
+
+function buildswarming() {
+  cd $HOME/ros2_px4_ws || exec $SHELL
+  colcon build --symlink-install --packages-select ros2_px4_swarming
   cd || exec $SHELL
 }
 
@@ -172,6 +178,25 @@ function swarmhover() {
   eval "ros2 service call /trackingVelocityCalculator/SwarmCommand ros2_px4_interfaces/srv/SwarmCommand '{operation: 'hover'}'"
 }
 
+function swarmswarming() {
+#  Count the vehicles spawned
+  fileName="$HOME/ros2_px4_ws/src/ros2_px4_swarming/other/launchedVehicles.txt"
+  n=0
+  while read -r val; do
+    if [ $n -eq 0 ]
+    then
+      numDrones=$val
+    fi
+    n=$((n + 1))
+  done < $fileName
+
+  n=0
+  while [ $n -lt $numDrones ]; do
+    droneswarming $n &
+    n=$((n + 1))
+  done
+}
+
 function swarmgoto() {
   lat=${1:-0.0}
   lon=${2:-0.0}
@@ -254,6 +279,11 @@ function dronehover() {
   eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'hover'}'"
 }
 
+function droneswarming() {
+  n=${1:-0}
+  eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'swarming'}'"
+}
+
 function dronegoto() {
   n=${1:-0}
   x=${2:-0}
@@ -333,6 +363,13 @@ function ddsserver() {
 
 function rds() {
   export ROS_DISCOVERY_SERVER=192.168.1.99:11811
+}
+
+function sendpackage() {
+  n=${1:-0}
+  ipEnd=$((10 + n))
+  ip="192.168.1.$ipEnd"
+  rsync -vrh --exclude={'build','install','log','rosbags','.git','.gitignore','src/ros2_px4_gazebo','src/ros2_px4_swarming/bagfiles'} $HOME/ros2_px4_ws ubuntu@$ip:/home/ubuntu
 }
 
 function launchdrone() {

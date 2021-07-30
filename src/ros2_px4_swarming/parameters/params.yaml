@@ -11,6 +11,7 @@
         EARTH_RADIUS: 6371000
         TARGET_ID: 200
         MAX_SWARMING_SPEED: 1.0
+        TIMEOUT: 5
 
 targetRover:
     targetRover:
@@ -28,9 +29,6 @@ trackingVelocityCalculator:
             K_P: 1.2
             K_I: 0.01
             K_D: 0.7
-#            K_P: 0.0
-#            K_I: 0.0
-#            K_D: 0.0
             FILTER_WINDOW: 1
             MAX_ERROR_FOR_INTEGRAL_AND_DERIVATIVE: 2.0
 
