@@ -105,11 +105,11 @@ class BagFileParser:
         targetUwbDistances = self.getMessages("/uwb_sensor_200")
         dronesTargetUwbDistances = {}
         for message in targetUwbDistances:
-            if int(message[1].anchor_id) in dronesTargetUwbDistances.keys():
-                dronesTargetUwbDistances[int(message[1].anchor_id)].append(message)
+            if int(message[1].anchor_pose.header.frame_id) in dronesTargetUwbDistances.keys():
+                dronesTargetUwbDistances[int(message[1].anchor_pose.header.frame_id)].append(message)
             else:
-                dronesTargetUwbDistances[int(message[1].anchor_id)] = list()
-                dronesTargetUwbDistances[int(message[1].anchor_id)].append(message)
+                dronesTargetUwbDistances[int(message[1].anchor_pose.header.frame_id)] = list()
+                dronesTargetUwbDistances[int(message[1].anchor_pose.header.frame_id)].append(message)
 
         plt.figure()
         legend = list()
