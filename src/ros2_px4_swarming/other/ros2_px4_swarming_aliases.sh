@@ -147,7 +147,7 @@ function plotbag() {
 }
 
 function plotlastbag() {
-  cd $HOME/swarm_flight_ws/src/swarm_flight/bagfiles || exec $SHELL
+  cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles || exec $SHELL
   fileName=$(ls -1 | tail -n 1)
   python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/plotBag.py $fileName
   cd || exec $SHELL

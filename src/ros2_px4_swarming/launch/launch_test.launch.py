@@ -5,6 +5,8 @@ from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 from ament_index_python.packages import get_package_share_directory, get_package_prefix
 
+RECORD_ON = True
+
 
 def generate_launch_description():
     ld = LaunchDescription()
@@ -145,13 +147,14 @@ def generate_launch_description():
         # )
         # ld.add_action(rqtPlot)
 
-        # # Launch ros2bag
-        # bagName = datetime.datetime.now().strftime('rosbag2_%Y_%m_%d-%H_%M_%S')
-        # cmdVector = ['ros2', 'bag', 'record', '-a', '-o', bagfiles + '/' + bagName]
-        # ros2Record = ExecuteProcess(
-        #     cmd=cmdVector,
-        #     output='screen'
-        # )
-        # ld.add_action(ros2Record)
+        if RECORD_ON:
+            # Launch ros2bag
+            bagName = datetime.datetime.now().strftime('rosbag2_%Y_%m_%d-%H_%M_%S')
+            cmdVector = ['ros2', 'bag', 'record', '-a', '-o', bagfiles + '/' + bagName]
+            ros2Record = ExecuteProcess(
+                cmd=cmdVector,
+                output='screen'
+            )
+            ld.add_action(ros2Record)
 
     return ld
