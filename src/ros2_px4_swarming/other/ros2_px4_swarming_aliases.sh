@@ -120,13 +120,18 @@ function launchtest() {
   export NUM_DRONES=$numDrones
   export NUM_TARGET=$numTarget
 
-  n=0
-  while [ $n -lt $numDrones ]; do
-    dronerestart $n &
-    n=$((n + 1))
-  done
+#  Save the number of drones and target in a file
+  fileName="$HOME/ros2_px4_ws/src/ros2_px4_swarming/other/launchedVehicles.txt"
+  echo "$numDrones" > $fileName
+  echo "$numTarget" >> $fileName
 
-  sleep 5
+#  n=0
+#  while [ $n -lt $numDrones ]; do
+#    dronerestart $n &
+#    n=$((n + 1))
+#  done
+
+#  sleep 5
 
   ros2 launch ros2_px4_swarming launch_test.launch.py &
 
@@ -270,7 +275,7 @@ function swarmrestart() {
 # region Drones commands
 function dronetakeoff() {
   n=${1:-0}
-  z=${2:--3}
+  z=${2:--1}
   eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'takeoff', z: $z}'"
 }
 
@@ -370,6 +375,22 @@ function sendpackage() {
   ipEnd=$((10 + n))
   ip="192.168.1.$ipEnd"
   rsync -vrh --exclude={'build','install','log','rosbags','.git','.gitignore','src/ros2_px4_gazebo','src/ros2_px4_swarming/bagfiles'} $HOME/ros2_px4_ws ubuntu@$ip:/home/ubuntu
+}
+
+function sendparams() {
+  n=${1:-0}
+  ipEnd=$((10 + n))
+  ip="192.168.1.$ipEnd"
+  rsync -vrh $HOME/ros2_px4_ws/src/ros2_px4_swarming/parameters/drone_params.yaml ubuntu@$ip:/home/ubuntu/ros2_px4_ws/src/ros2_px4_swarming/parameters
+}
+
+function connectssh() {
+  n=${1:-0}
+  ipEnd=$((10 + n))
+  ip="192.168.1.$ipEnd"
+  user="ubuntu"
+  password="swarm1234"
+  sshpass -p $password ssh $user@$ip
 }
 
 function launchdrone() {

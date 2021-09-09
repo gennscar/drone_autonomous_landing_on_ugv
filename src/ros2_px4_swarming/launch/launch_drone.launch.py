@@ -42,7 +42,8 @@ def generate_launch_description():
             ('/X500_' + str(ID) + '/X500_2/readyForTakeoff', '/X500_2/readyForTakeoff'),
             ('/X500_' + str(ID) + '/X500_3/readyForTakeoff', '/X500_3/readyForTakeoff'),
             ('/X500_' + str(ID) + '/X500_4/readyForTakeoff', '/X500_4/readyForTakeoff'),
-            ('/X500_' + str(ID) + '/X500_5/readyForTakeoff', '/X500_5/readyForTakeoff')
+            ('/X500_' + str(ID) + '/X500_5/readyForTakeoff', '/X500_5/readyForTakeoff'),
+            ('/X500_' + str(ID) + '/vehiclesInfo', '/vehiclesInfo')
         ]
     )
     ld.add_action(anchorDrone)

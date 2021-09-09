@@ -5,13 +5,10 @@ from functools import partial
 from rclpy.node import Node
 from px4_msgs.msg import Timesync, OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleGlobalPosition, VehicleStatus
 from geometry_msgs.msg import Point, Twist
-from std_msgs.msg import Bool, UInt64
+from std_msgs.msg import Bool, UInt64, String
 from ros2_px4_interfaces.msg import UnitVector, UwbSensor, VelocityVector
 from ros2_px4_interfaces.srv import DroneCustomCommand
 from ros2_px4_functions import swarming_functions
-
-
-UWB_ON = True
 
 
 class Drone(Node):
@@ -35,7 +32,10 @@ class Drone(Node):
                 ('TARGET_ID', None),                    # ID of the target UWB sensor
                 ('MAX_SWARMING_SPEED', None),           # horizontal swarming saturation speed
                 ('TIMEOUT', None),                      # timeout for lost drone
-                ('ID', None)                            # drone ID
+                ('UWB_ON', None),                       # if the UWB sensor is on or off on the drone
+                ('SINGLE_DRONE_FOR_TEST', None),        # to fly a single drone with this code
+                ('ID', None),                           # drone ID
+                ('NOT_FLYING_FOR_TEST', None)           # if the drone is thought to just send data without being armed
             ]
         )
 
@@ -52,7 +52,10 @@ class Drone(Node):
         self.TARGET_ID = self.get_parameter('TARGET_ID').value
         self.MAX_SWARMING_SPEED = self.get_parameter('MAX_SWARMING_SPEED').value
         self.TIMEOUT = self.get_parameter('TIMEOUT').value
+        self.UWB_ON = self.get_parameter('UWB_ON').value
+        self.SINGLE_DRONE_FOR_TEST = self.get_parameter('SINGLE_DRONE_FOR_TEST').value
         self.ID = self.get_parameter('ID').value
+        self.NOT_FLYING_FOR_TEST = self.get_parameter('NOT_FLYING_FOR_TEST').value
         # endregion
 
         # Drone operations: methods to exploit specific drone's functionalities
@@ -96,7 +99,7 @@ class Drone(Node):
         self.droneMode = None                           # str                               current drone mode
         self.droneModeOld = None                        # str                               previous drone mode
         self.nodeDestroyed = None                       # bool                              has the node been destroyed?
-        if UWB_ON:
+        if self.UWB_ON:
             self.uwbDistancesReceived = None            # bool                              has the drone received UWB data from every swarm member?
             self.lastUWBDataReceivedTimer = None        # dict(int: int)                    time from the last received UWB data from every swarm member
             self.uwbDistances = None                    # dict(int: float)                  inter-drones distances from UWB sensor
@@ -112,7 +115,7 @@ class Drone(Node):
         self.readyForSwarmingSubs = None                # subscriptions to get which member of the swarm is ready for swarming
         self.anchorsPositionSubs = None                 # subscriptions to swarm members' GPS position
         self.trackingVelocitySub = None                 # subscription to tracking velocity centralized controller
-        if UWB_ON:
+        if self.UWB_ON:
             self.uwbSensorSub = None                    # subscription to UWB sensor's data
 
         # Publishers
@@ -121,6 +124,7 @@ class Drone(Node):
         self.readyForTakeoffPub = None                  # publisher to communicate when the current drone is ready for takeoff
         self.readyForSwarmingPub = None                 # publisher to communicate when the current drone is ready for swarming
         self.trajectorySetpointPub = None               # publisher to send trajectory setpoint
+        self.vehiclesInfoPub = None                     # publisher to send information about the vehicles of the swarm
 
         # Services
         self.droneCommandSrv = None                     # service to receive external commands
@@ -165,7 +169,7 @@ class Drone(Node):
         self.droneMode = "disarmed"
         self.droneModeOld = "disarmed"
         self.nodeDestroyed = False
-        if UWB_ON:
+        if self.UWB_ON:
             self.uwbDistancesReceived = False
             self.lastUWBDataReceivedTimer = {}
             self.uwbDistances = {}
@@ -179,7 +183,7 @@ class Drone(Node):
         self.readyForSwarmingSubs = {}
         self.anchorsPositionSubs = {}
         self.trackingVelocitySub = self.create_subscription(VelocityVector, "trackingVelocityCalculator/trackingVelocity", self.trackingVelocityCallback, self.QUEUE_SIZE)
-        if UWB_ON:
+        if self.UWB_ON:
             self.uwbSensorSub = self.create_subscription(UwbSensor, "uwb_sensor_" + str(self.ID), self.uwbSensorCallback, self.QUEUE_SIZE)
 
         # Publishers initialization
@@ -188,6 +192,7 @@ class Drone(Node):
         self.readyForTakeoffPub = self.create_publisher(Bool, "readyForTakeoff", self.QUEUE_SIZE)
         self.readyForSwarmingPub = self.create_publisher(Bool, "readyForSwarming", self.QUEUE_SIZE)
         self.trajectorySetpointPub = self.create_publisher(TrajectorySetpoint, "TrajectorySetpoint_PubSubTopic", self.QUEUE_SIZE)
+        self.vehiclesInfoPub = self.create_publisher(String, "vehiclesInfo", self.QUEUE_SIZE)
 
         # Services initialization
         self.droneCommandSrv = self.create_service(DroneCustomCommand, "DroneCustomCommand", self.droneCommandCallback)
@@ -253,7 +258,13 @@ class Drone(Node):
             self.armCounter += 1
         else:
             self.get_logger().warn("Vehicle not authorized for offboard")
+            self.publishDroneInfo("Vehicle not authorized for offboard")
             self.droneMode = "idle"
+
+    def publishDroneInfo(self, message):
+        msg = String()
+        msg.data = "Drone " + str(self.ID) + ": " + message
+        self.vehiclesInfoPub.publish(msg)
     # endregion
 
     # region Services' handling methods
@@ -269,16 +280,16 @@ class Drone(Node):
             msg.data = True
             self.readyForTakeoffPub.publish(msg)
 
-        if len(self.anchorsReadyForTakeoff) < self.N:
+        if not self.SINGLE_DRONE_FOR_TEST and len(self.anchorsReadyForTakeoff) < self.N:
             # The other anchors are not ready to takeoff yet
             msg = Bool()
             msg.data = True
             self.readyForTakeoffPub.publish(msg)
             return
 
-        # # Check if the commanded altitude is high enough
-        # if self.lastGoalPositionReceived.z > -3.0:
-        #     self.lastGoalPositionReceived.z = -3.0
+        # Check if the commanded altitude is high enough
+        if self.lastGoalPositionReceived.z > -self.H_DES:
+            self.lastGoalPositionReceived.z = -self.H_DES
 
         # Arm the drone (if necessary)
         if self.vehicleStatus.arming_state != VehicleStatus.ARMING_STATE_ARMED or self.armCounter < 2:
@@ -307,9 +318,10 @@ class Drone(Node):
         self.setTrajectorySetpoint(vx=self.lastGoalVelocityReceived.linear.x, vy=self.lastGoalVelocityReceived.linear.y)
 
     def swarming(self):
-        if (UWB_ON and (not self.anchorsPositionReceived or not self.uwbDistancesReceived)) or (not UWB_ON and not self.anchorsPositionReceived):
+        if (self.UWB_ON and (not self.anchorsPositionReceived or not self.uwbDistancesReceived)) or (not self.UWB_ON and not self.anchorsPositionReceived) or self.SINGLE_DRONE_FOR_TEST:
             # Complete info from the other anchors has not arrived yet
-            self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
+            # self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
+            self.returnHome()
             return
         elif not self.readyForSwarming:
             # Communicate to the other anchors that I am ready to start swarming
@@ -319,12 +331,13 @@ class Drone(Node):
             msg.data = True
             self.readyForSwarmingPub.publish(msg)
 
-        if len(self.anchorsReadyForSwarming) < self.N:
+        if not self.SINGLE_DRONE_FOR_TEST and len(self.anchorsReadyForSwarming) < self.N:
             # The other anchors are not ready to swarm yet
             msg = Bool()
             msg.data = True
             self.readyForSwarmingPub.publish(msg)
-            self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
+            # self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
+            self.returnHome()
             return
 
         # Check if all of the drones are still active
@@ -333,7 +346,7 @@ class Drone(Node):
             if self.lastPositionReceivedTimer[key] >= self.TIMEOUT * self.RATE:
                 self.N -= 1
                 keysToDelete.append(key)
-                if UWB_ON:
+                if self.UWB_ON:
                     for dataStructure in [self.anchorsReadyForTakeoff, self.anchorsReadyForSwarming, self.anchorsPosition, self.unitVectors, self.uwbDistances]:
                         assert type(dataStructure) is dict, self.get_logger().error("Something wrong with the data structures")
                         if key in dataStructure.keys():
@@ -353,18 +366,19 @@ class Drone(Node):
                 self.activeDrones.pop(key)
             if key in self.lastPositionReceivedTimer.keys():
                 self.lastPositionReceivedTimer.pop(key)
-            if UWB_ON:
+            if self.UWB_ON:
                 if key in self.lastUWBDataReceivedTimer.keys():
                     self.lastUWBDataReceivedTimer.pop(key)
 
         if self.ID not in self.anchorsPosition.keys():
             self.get_logger().info("Drone %d is no longer part of the swarm" % self.ID)
+            self.publishDroneInfo("No longer part of the swarm")
             self.nodeDestroyed = True
             self.destroy_node()
             return
 
         # Compute the distances between the drones from their GPS positions
-        if not UWB_ON and self.anchorsPositionReceived:
+        if not self.UWB_ON and self.anchorsPositionReceived:
             self.computeInterDronesDistances()
 
         # Compute the unit vectors for the swarming algorithm
@@ -375,7 +389,7 @@ class Drone(Node):
         velEast = 0.0
         velNorth = 0.0
         # Swarming velocity
-        if UWB_ON:
+        if self.UWB_ON:
             for key in self.uwbDistances.keys():
                 if key != self.TARGET_ID:
                     componentEast = self.uwbDistances[key] * self.unitVectors[key].east * (self.A - self.B * math.exp(-self.uwbDistances[key]**2 / self.C))
@@ -440,17 +454,19 @@ class Drone(Node):
         if self.timestamp == 0:
             if self.loggerCounter % self.RATE == 0:
                 self.get_logger().warn("Not synced")
+                self.publishDroneInfo("Not synced")
             return
 
         # If the number of drones in the swarm is not known yet
         if self.N is None:
             if self.loggerCounter % self.RATE == 0:
                 self.get_logger().warn("Number of anchors unknown")
+                self.publishDroneInfo("Number of anchors unknown")
             return
 
         for key in self.lastPositionReceivedTimer.keys():
             self.lastPositionReceivedTimer[key] += 1
-        if UWB_ON:
+        if self.UWB_ON:
             for key in self.lastUWBDataReceivedTimer.keys():
                 self.lastUWBDataReceivedTimer[key] += 1
 
@@ -459,10 +475,45 @@ class Drone(Node):
             self.droneMode = "idle"
             self.readyForIdle = False
 
-        self.droneOperations.get(self.droneMode, self.idle)()
+        if self.NOT_FLYING_FOR_TEST:
+            if not self.readyForTakeoff:
+                # Communicate to the other anchors that I am ready to takeoff
+                self.readyForTakeoff = True
+                self.anchorsReadyForTakeoff[self.ID] = True
+                msg = Bool()
+                msg.data = True
+                self.readyForTakeoffPub.publish(msg)
+
+            if len(self.anchorsReadyForTakeoff) < self.N:
+                # The other anchors are not ready to takeoff yet
+                msg = Bool()
+                msg.data = True
+                self.readyForTakeoffPub.publish(msg)
+                return
+
+            if not self.readyForSwarming:
+                # Communicate to the other anchors that I am ready to start swarming
+                self.readyForSwarming = True
+                self.anchorsReadyForSwarming[self.ID] = True
+                msg = Bool()
+                msg.data = True
+                self.readyForSwarmingPub.publish(msg)
+
+            if len(self.anchorsReadyForSwarming) < self.N:
+                # The other anchors are not ready to swarm yet
+                msg = Bool()
+                msg.data = True
+                self.readyForSwarmingPub.publish(msg)
+                self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
+                return
+
+            self.idle()
+        else:
+            self.droneOperations.get(self.droneMode, self.idle)()
 
         if self.droneMode != self.droneModeOld:
             self.get_logger().info("Setting %s mode" % self.droneMode)
+            self.publishDroneInfo("Setting " + self.droneMode + " mode")
 
         self.droneModeOld = self.droneMode
 
@@ -496,8 +547,8 @@ class Drone(Node):
 
         if self.authorizedForOffboard and self.vehicleStatus.arming_state == VehicleStatus.ARMING_STATE_ARMED and \
                 self.vehicleStatus.nav_state != VehicleStatus.NAVIGATION_STATE_OFFBOARD and previousNavState == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-            # (self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_STICK or
-            #  self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_SWITCH):
+        # if self.authorizedForOffboard and (self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_STICK or \
+        #                                    self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_SWITCH):
             self.authorizedForOffboard = False
             self.droneMode = "idle"
 
@@ -542,12 +593,13 @@ class Drone(Node):
             self.lastGoalVelocityReceived.angular.z = request.wz
         else:
             self.get_logger().warn("Invalid command")
+            self.publishDroneInfo("Invalid command")
             self.droneMode = "hover"
             response.result = "failure"
 
             self.lastGoalPositionReceived.x = 0.0
             self.lastGoalPositionReceived.y = 0.0
-            self.lastGoalPositionReceived.z = -3.0
+            self.lastGoalPositionReceived.z = -self.H_DES
             self.lastGoalVelocityReceived.linear.x = 0.0
             self.lastGoalVelocityReceived.linear.y = 0.0
             self.lastGoalVelocityReceived.linear.z = 0.0
