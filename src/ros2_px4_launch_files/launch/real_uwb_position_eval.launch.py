@@ -7,7 +7,7 @@ def generate_launch_description():
             package='ros2_px4_estimation',
             executable='uwb_driver',
             parameters=[
-                {'topic_name': '/uwb_sensor_0'}
+                {'topic_name': '/uwb_sensor/Iris'}
             ]
         ),
         Node(

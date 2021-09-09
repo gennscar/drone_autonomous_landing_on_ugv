@@ -134,8 +134,8 @@ class MovingTagAnalyzer():
         return self.leica_time, self.leica_range - interp_range
 
 
-ROS2BAG_FILE = 'rosbags/MovingTag0/MovingTag0_0.db3'
-LEICA_FILE = 'rosbags/MovingTag0/MovingTag0.csv'
+ROS2BAG_FILE = 'rosbags/FixedTag0/FixedTag0_0.db3'
+LEICA_FILE = 'rosbags/FixedTag0/FixedTag0_0.db3.csv'
 LEICA_Z_OFFSET = 0.06  # mm under the UWB sensor
 
 ANCHOR_POSITION = np.array([

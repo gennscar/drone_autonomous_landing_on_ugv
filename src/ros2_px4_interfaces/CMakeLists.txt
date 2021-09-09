@@ -30,6 +30,7 @@ set(msg_files
   "msg/UwbSensor.msg"
   "msg/Yaw.msg"
   "msg/VelocityVector.msg"
+  "msg/Uwb.msg"
 )
 
 set(srv_files

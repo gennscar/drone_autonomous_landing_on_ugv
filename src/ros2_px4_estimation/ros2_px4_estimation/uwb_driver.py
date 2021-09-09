@@ -30,7 +30,7 @@ class UwbDevice(Node):
         self.uwb_serial()
 
         # Getting anchor info from file
-        fp = open('json/anchors.json', 'r')
+        fp = open('json/anchors_covivio.json', 'r')
         self.anchors = json.load(fp)
         fp.close()
 
