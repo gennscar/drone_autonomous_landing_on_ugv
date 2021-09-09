@@ -29,7 +29,9 @@ setup(
             'unitVectorsCalculator = ros2_px4_swarming.unitVectorsCalculator:main',
             'trackingVelocityCalculator = ros2_px4_swarming.trackingVelocityCalculator:main',
             'performanceAnalyzer = ros2_px4_swarming.performanceAnalyzer:main',
-            'numAnchorsNode = ros2_px4_swarming.numAnchorsNode:main'
+            'numAnchorsNode = ros2_px4_swarming.numAnchorsNode:main',
+            'GPSSimulator = ros2_px4_swarming.GPSSimulator:main',
+            'printInformationNode = ros2_px4_swarming.printInformationNode:main'
         ],
     },
 )

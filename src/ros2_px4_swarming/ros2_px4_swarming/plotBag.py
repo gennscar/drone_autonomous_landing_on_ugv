@@ -101,6 +101,23 @@ class BagFileParser:
 
         plt.savefig(self.folderName + "InterAnchorsDistances.png")
 
+    def plotTargetAnchorsDistances(self):
+        targetAnchorsDistances = self.getMessages("/performanceAnalyzer/targetAnchorsDistances")
+        plt.figure()
+        legend = list()
+
+        for couple in range(len(targetAnchorsDistances[0][1].data)):
+            plt.plot(list((targetAnchorsDistances[i][0] - targetAnchorsDistances[0][0]) * 1e-9 for i in range(len(targetAnchorsDistances))),
+                     list(targetAnchorsDistances[i][1].data[couple].distance for i in range(len(targetAnchorsDistances))))
+            legend.append("$Drone_" + str(targetAnchorsDistances[0][1].data[couple].destination_drone_id) + "$")
+
+        plt.grid()
+        plt.xlabel("$Time \ [s]$")
+        plt.legend(legend)
+        plt.title("Drone-target distances [m]", size="xx-large", weight="bold")
+
+        plt.savefig(self.folderName + "TargetAnchorsDistances.png")
+
     def plotTargetUwbDistances(self):
         targetUwbDistances = self.getMessages("/uwb_sensor_200")
         dronesTargetUwbDistances = {}
@@ -156,6 +173,31 @@ class BagFileParser:
         plt.title("Vehicles' trajectory", size="xx-large", weight="bold")
 
         plt.savefig(self.folderName + "Trajectories.png")
+
+    def plot2DTrajectories(self):
+        targetTrajectory = self.getMessages("/targetRover/GroundTruth/odom")
+        centerTrajectory = self.getMessages("/performanceAnalyzer/swarmCenter")
+
+        plt.figure()
+        legend = list()
+
+        if targetTrajectory:
+            plt.plot(list(targetTrajectory[i][1].pose.pose.position.x for i in range(len(targetTrajectory))),
+                     list(targetTrajectory[i][1].pose.pose.position.y for i in range(len(targetTrajectory))),
+                     "--r")
+            legend.append("$Target$")
+        if targetTrajectory:
+            plt.plot(list(centerTrajectory[i][1].pose.pose.position.x for i in range(len(centerTrajectory))),
+                     list(centerTrajectory[i][1].pose.pose.position.y for i in range(len(centerTrajectory))))
+            legend.append("Center")
+
+        plt.grid()
+        plt.xlabel("$x \ [m]$")
+        plt.ylabel("$y \ [m]$")
+        plt.legend(legend)
+        plt.title("2D trajectories", size="xx-large", weight="bold")
+
+        plt.savefig(self.folderName + "Trajectories2D.png")
 
     def plotAltitudes(self):
         dronesAltitude = list()
@@ -378,8 +420,10 @@ if __name__ == "__main__":
 
     parser.plotTrackingError()
     parser.plotInterAnchorsDistances()
+    parser.plotTargetAnchorsDistances()
     parser.plotTargetUwbDistances()
     parser.plotTrajectories()
+    parser.plot2DTrajectories()
     parser.plotAltitudes()
     parser.plotTrackingVelocity()
     parser.plotVelocities()

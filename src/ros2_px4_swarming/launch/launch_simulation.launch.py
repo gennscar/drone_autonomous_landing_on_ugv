@@ -5,7 +5,7 @@ from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 from ament_index_python.packages import get_package_share_directory, get_package_prefix
 
-RECORD_ON = True
+RECORD_ON = False
 
 
 def generate_launch_description():
@@ -149,30 +149,6 @@ def generate_launch_description():
         )
         ld.add_action(trackingVelocityCalculator)
 
-        # Launch performanceAnalyzer
-        performanceAnalyzer = Node(
-            package='ros2_px4_swarming',
-            namespace='performanceAnalyzer',
-            executable='performanceAnalyzer',
-            name='performanceAnalyzer',
-            parameters=[
-                params,
-                {'N': numDrones},
-                {'NUM_TARGET': numTarget}
-            ],
-            remappings=[
-                ('/performanceAnalyzer/uwb_sensor_200', '/uwb_sensor_200'),
-                ('/performanceAnalyzer/targetRover/GroundTruth/odom', '/targetRover/GroundTruth/odom'),
-                ('/performanceAnalyzer/X500_0/GroundTruth/odom', '/X500_0/GroundTruth/odom'),
-                ('/performanceAnalyzer/X500_1/GroundTruth/odom', '/X500_1/GroundTruth/odom'),
-                ('/performanceAnalyzer/X500_2/GroundTruth/odom', '/X500_2/GroundTruth/odom'),
-                ('/performanceAnalyzer/X500_3/GroundTruth/odom', '/X500_3/GroundTruth/odom'),
-                ('/performanceAnalyzer/X500_4/GroundTruth/odom', '/X500_4/GroundTruth/odom'),
-                ('/performanceAnalyzer/X500_5/GroundTruth/odom', '/X500_5/GroundTruth/odom')
-            ]
-        )
-        ld.add_action(performanceAnalyzer)
-
         # # Launch rqt_plot
         # cmdVector = ['ros2', 'run', 'rqt_plot', 'rqt_plot']
         # # cmdVector.append('/performanceAnalyzer/trackingError/distance')
@@ -194,5 +170,35 @@ def generate_launch_description():
                 output='screen'
             )
             ld.add_action(ros2Record)
+
+    # Launch performanceAnalyzer
+    performanceAnalyzer = Node(
+        package='ros2_px4_swarming',
+        namespace='performanceAnalyzer',
+        executable='performanceAnalyzer',
+        name='performanceAnalyzer',
+        parameters=[
+            params,
+            {'N': numDrones},
+            {'NUM_TARGET': numTarget}
+        ],
+        remappings=[
+            ('/performanceAnalyzer/uwb_sensor_200', '/uwb_sensor_200'),
+            ('/performanceAnalyzer/targetRover/GroundTruth/odom', '/targetRover/GroundTruth/odom'),
+            ('/performanceAnalyzer/X500_0/GroundTruth/odom', '/X500_0/GroundTruth/odom'),
+            ('/performanceAnalyzer/X500_1/GroundTruth/odom', '/X500_1/GroundTruth/odom'),
+            ('/performanceAnalyzer/X500_2/GroundTruth/odom', '/X500_2/GroundTruth/odom'),
+            ('/performanceAnalyzer/X500_3/GroundTruth/odom', '/X500_3/GroundTruth/odom'),
+            ('/performanceAnalyzer/X500_4/GroundTruth/odom', '/X500_4/GroundTruth/odom'),
+            ('/performanceAnalyzer/X500_5/GroundTruth/odom', '/X500_5/GroundTruth/odom'),
+            ('/performanceAnalyzer/X500_0/VehicleLocalPosition_PubSubTopic', '/X500_0/VehicleLocalPosition_PubSubTopic'),
+            ('/performanceAnalyzer/X500_1/VehicleLocalPosition_PubSubTopic', '/X500_1/VehicleLocalPosition_PubSubTopic'),
+            ('/performanceAnalyzer/X500_2/VehicleLocalPosition_PubSubTopic', '/X500_2/VehicleLocalPosition_PubSubTopic'),
+            ('/performanceAnalyzer/X500_3/VehicleLocalPosition_PubSubTopic', '/X500_3/VehicleLocalPosition_PubSubTopic'),
+            ('/performanceAnalyzer/X500_4/VehicleLocalPosition_PubSubTopic', '/X500_4/VehicleLocalPosition_PubSubTopic'),
+            ('/performanceAnalyzer/X500_5/VehicleLocalPosition_PubSubTopic', '/X500_5/VehicleLocalPosition_PubSubTopic')
+        ]
+    )
+    ld.add_action(performanceAnalyzer)
 
     return ld

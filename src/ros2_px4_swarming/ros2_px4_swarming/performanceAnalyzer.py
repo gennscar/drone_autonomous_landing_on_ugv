@@ -33,6 +33,8 @@ class PerformanceAnalyzer(Node):
         self.NUM_TARGET = self.get_parameter('NUM_TARGET').value
 
         # Useful variables
+        self.anchorsPositionGroundTruth = {}
+        self.anchorsPositionGroundTruthSubs = list()
         self.anchorsPosition = {}
         self.anchorsPositionSubs = list()
         self.targetPosition = None
@@ -40,7 +42,8 @@ class PerformanceAnalyzer(Node):
 
         # Subscribers initialization
         for i in range(self.N):
-            self.anchorsPositionSubs.append(self.create_subscription(Odometry, "X500_" + str(i) + "/GroundTruth/odom", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
+            self.anchorsPositionGroundTruthSubs.append(self.create_subscription(Odometry, "X500_" + str(i) + "/GroundTruth/odom", partial(self.anchorsPositionGroundTruthCallback, droneId=i), self.QUEUE_SIZE))
+            self.anchorsPositionSubs.append(self.create_subscription(Odometry, "X500_" + str(i) + "/VehicleLocalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
         if self.NUM_TARGET == 1:
             self.targetPositionSub = self.create_subscription(Odometry, "targetRover/GroundTruth/odom", self.targetPositionCallback, self.QUEUE_SIZE)
             self.targetUwbSensorSub = self.create_subscription(UwbSensor, "uwb_sensor_" + str(self.TARGET_ID), self.targetUwbSensorCallback, self.QUEUE_SIZE)
@@ -49,6 +52,7 @@ class PerformanceAnalyzer(Node):
         if self.NUM_TARGET == 1:
             self.trackingErrorPub = self.create_publisher(DistanceStamped, "trackingError", self.QUEUE_SIZE)
         self.interAnchorsDistancesPub = self.create_publisher(DistanceStampedArray, "interAnchorsDistances", self.QUEUE_SIZE)
+        self.targetAnchorsDistancesPub = self.create_publisher(DistanceStampedArray, "targetAnchorsDistances", self.QUEUE_SIZE)
         self.synchronizationErrorUwbPub = self.create_publisher(Float64, "synchronizationErrorUwb", self.QUEUE_SIZE)
         self.swarmCenterPub = self.create_publisher(Odometry, "swarmCenter", self.QUEUE_SIZE)
 
@@ -91,6 +95,22 @@ class PerformanceAnalyzer(Node):
         result.data = interAnchorsDistances
         return result
 
+    def computeTargetAnchorsDistances(self):
+        targetAnchorsDistances = list()
+        result = DistanceStampedArray()
+        msg = DistanceStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        for i in range(self.N):
+            msg.destination_drone_id = i
+            msg.start_drone_id = 200
+            try:
+                msg.distance = math.sqrt((self.anchorsPosition[i].pose.pose.position.x - self.targetPosition.pose.pose.position.x)**2 + (self.anchorsPosition[i].pose.pose.position.y - self.targetPosition.pose.pose.position.y)**2 + (self.anchorsPosition[i].pose.pose.position.z - self.targetPosition.pose.pose.position.z)**2)
+            except:
+                msg.distance = 0.0
+            targetAnchorsDistances.append(copy.deepcopy(msg))
+        result.data = targetAnchorsDistances
+        return result
+
     def computeSynchronizationErrorUwb(self):
         msg = Float64()
         syncErr = 0.0
@@ -106,6 +126,7 @@ class PerformanceAnalyzer(Node):
     def timerCallback(self):
         if len(self.anchorsPosition) == self.N:
             self.interAnchorsDistancesPub.publish(self.computeInterAnchorsDistances())
+            self.targetAnchorsDistancesPub.publish(self.computeTargetAnchorsDistances())
             swarmCenter = self.computeSwarmCenter()
             msg = Odometry()
             msg.pose.pose.position.x = swarmCenter[0]
@@ -118,8 +139,13 @@ class PerformanceAnalyzer(Node):
         if len(self.targetUwbDistances) == self.N:
             self.synchronizationErrorUwbPub.publish(self.computeSynchronizationErrorUwb())
 
+    def anchorsPositionGroundTruthCallback(self, msg, droneId):
+        self.anchorsPositionGroundTruth[droneId] = msg
+
     def anchorsPositionCallback(self, msg, droneId):
         self.anchorsPosition[droneId] = msg
+        if droneId == 0:
+            self.get_logger().info("%f" % msg.z)
 
     def targetPositionCallback(self, msg):
         self.targetPosition = msg
