@@ -10,10 +10,14 @@ class GPSSimulator(Node):
 
         # Parameters declaration
         self.queue_size_ = self.declare_parameter('queue_size', 10)
+        self.vehicle_namespace_ = self.declare_parameter(
+            "vehicle_namespace", '')
 
         # Parameters initialization
         self.queue_size_ = self.get_parameter(
             'queue_size').get_parameter_value().integer_value
+        self.vehicle_namespace_ = self.get_parameter(
+            "vehicle_namespace").get_parameter_value().string_value
 
         # Variables declaration
         self.timestamp = 0
@@ -24,7 +28,7 @@ class GPSSimulator(Node):
 
         # Publishers initialization
         self.visualOdometryPub = self.create_publisher(
-            VehicleVisualOdometry, "VehicleVisualOdometry_PubSubTopic", self.queue_size_)
+            VehicleVisualOdometry, self.vehicle_namespace_ + "VehicleVisualOdometry_PubSubTopic", self.queue_size_)
 
         # Timer initialization
         self.timer = self.create_timer(0.1, self.timerCallback)
