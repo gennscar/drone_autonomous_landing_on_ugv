@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'ros2_px4_control'
+package_name = 'ros2_px4_testing'
 
 setup(
     name=package_name,
@@ -21,12 +21,12 @@ setup(
         'cosimocon@gmail.com'
         'gennscar97@gmail.com'
     ],
-    description='This package contains nodes to control the drone interfacing with PX4',
+    description='This package contains accessory nodes to test the drone',
     license='GNU GPLv3',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "drone_controller = ros2_px4_control.drone_controller:main",
+            "GPS_simulator = ros2_px4_control.GPS_simulator:main"
         ],
     },
 )
