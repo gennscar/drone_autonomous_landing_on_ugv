@@ -1,7 +1,0 @@
-string operation 'hover'
-
-float64 lat 0
-float64 lon 0
-
----
-string result

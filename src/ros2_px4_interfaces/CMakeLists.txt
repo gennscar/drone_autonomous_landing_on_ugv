@@ -15,31 +15,23 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
+# Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
+# Adding messages
 set(msg_files
-  "msg/DistanceStamped.msg"
-  "msg/DistanceStampedArray.msg"
-  "msg/Error.msg"
-  "msg/UnitVector.msg"
-  "msg/UnitVectorArray.msg"
   "msg/UwbSensor.msg"
-  "msg/Yaw.msg"
-  "msg/VelocityVector.msg"
-  "msg/Uwb.msg"
 )
 
+# Adding services
 set(srv_files
   "srv/ControlMode.srv"
-  "srv/TargetCustomCommand.srv"
-  "srv/DroneCustomCommand.srv"
-  "srv/SwarmCommand.srv"
 )
 
+# Building everything
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${srv_files}
@@ -47,5 +39,4 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 
 ament_export_dependencies(rosidl_default_runtime)
-
 ament_package()

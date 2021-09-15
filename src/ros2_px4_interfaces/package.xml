@@ -3,9 +3,10 @@
 <package format="3">
   <name>ros2_px4_interfaces</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="gennscar97@gmail.com">gennscar</maintainer>
-  <license>TODO: License declaration</license>
+  <description>This package contains all interfaces required from the other packages of this repo</description>
+  <maintainer email="cosimocon@gmail.com">Cosimo Conte</maintainer>
+  <maintainer email="gennscar97@gmail.com">Gennaro Scarati</maintainer>
+  <license>GNU GPLv3</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
