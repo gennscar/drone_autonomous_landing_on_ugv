@@ -9,7 +9,7 @@ class GPSSimulator(Node):
         super().__init__("GPS_simulator")
 
         # Parameters declaration
-        self.declare_parameters('queue_size', 10)
+        self.queue_size_ = self.declare_parameter('queue_size', 10)
 
         # Parameters initialization
         self.queue_size_ = self.get_parameter(
@@ -77,10 +77,9 @@ class GPSSimulator(Node):
         self.visualOdometryPub.publish(msg)
 
 
-def main():
-    rclpy.init(args=None)
+def main(args=None):
+    rclpy.init(args=args)
     node = GPSSimulator()
-
     rclpy.spin(node)
     rclpy.shutdown()
 

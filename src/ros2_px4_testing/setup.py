@@ -26,7 +26,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "GPS_simulator = ros2_px4_control.GPS_simulator:main"
+            "GPS_simulator = ros2_px4_testing.GPS_simulator:main"
         ],
     },
 )
