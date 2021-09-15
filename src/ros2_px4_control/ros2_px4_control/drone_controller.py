@@ -52,7 +52,7 @@ class DroneController(Node):
         }
 
         # Control state
-        self.control_mode_old_ = "idle"
+        self.control_mode_old_ = "none"
         self.sent_offboard_ = 0
         self.local_position_ = [NULL]*3
         self.setpoint_ = [NULL]*3
@@ -167,9 +167,9 @@ class DroneController(Node):
         # Check if the control mode is valid
         if request.control_mode in self.CONTROLLERS.keys():
             self.control_mode_ = request.control_mode
-            response.success = "Changing control mode into " + self.control_mode_
+            response.message = "Changing control mode into " + self.control_mode_
         else:
-            response.success = "Control mode " + request.control_mode + " does not exists"
+            response.message = "Control mode " + request.control_mode + " does not exists"
             self.get_logger().warn(
                 """Control mode {request.control_mode} does not exists"""
             )
@@ -249,7 +249,7 @@ class DroneController(Node):
 
         if self.setpoint_[2] == NULL or self.setpoint_[2] < MIN_HEIGHT or self.setpoint_[2] > MAX_HEIGHT:
             self.get_logger().warn(f"""
-                                   Setting standard height, instead of {self.setpoint_[2]}. Check bounds.
+                                   Setting standard height of {STD_HEIGHT}, instead of {self.setpoint_[2]}. Check bounds.
                                    """)
             self.setpoint_[2] = STD_HEIGHT
 
