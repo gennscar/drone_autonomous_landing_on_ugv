@@ -2,17 +2,36 @@ import numpy as np
 import scipy.linalg
 from scipy.interpolate import interp1d
 
-def PID(kp, ki, kd, e, e_old, int_e, u_max, u_min, int_max, dt):
+class PID_controller:
+    def __init__(self, kp_, ki_, kd_, u_max_, u_min_, int_max_, dt_):
 
-    int_e = int_e + e*dt
-    e_dot = (e - e_old)/dt
-    e_old = e
-    uk = - np.multiply(kp, e) - np.multiply(ki, int_e) - np.multiply(kd, e_dot)
+        self.kp_ = kp_
+        self.ki_ = ki_
+        self.kd_ = kd_
+        self.u_max_ = u_max_
+        self.u_min_ = u_min_
+        self.int_max_ = int_max_
+        self.dt_ = dt_
 
-    uk = np.clip(uk, u_min, u_max)
-    int_e = np.clip(int_e, - int_max, int_max)
+        self.e_old_ = []
+        self.e_int_ = 0.0
 
-    return uk, int_e, e_dot, e_old
+    def PID(self, e_):
+
+        if self.e_old_!=[]:
+            self.e_dot_ = (e_ - self.e_old_)/self.dt_
+        else:
+            self.e_dot_ = np.zeros(len(e_))
+
+        self.e_int_ = self.e_int_ + e_
+        self.e_int_ = np.clip(self.e_int_, - self.int_max_, self.int_max_)
+
+        self.e_old_ = e_
+        uk_ = np.multiply(self.kp_, e_) + np.multiply(self.ki_, self.e_int_) + np.multiply(self.kd_, self.e_dot_)
+
+        uk_ = np.clip(uk_, self.u_min_, self.u_max_)
+
+        return uk_, self.e_dot_, self.e_int_
 
 
 def DLQR_optimizer(A, B, Q, R):
