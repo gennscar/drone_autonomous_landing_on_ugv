@@ -4,7 +4,6 @@ import rclpy
 from rclpy.node import Node
 import ros2_px4_functions
 import numpy as np
-
 from px4_msgs.msg import OffboardControlMode
 from px4_msgs.msg import TrajectorySetpoint
 from px4_msgs.msg import Timesync
@@ -34,6 +33,7 @@ LAND_HOVERING_HEIGHT = 1.5
 FOLLOW_HOVERING_HEIGHT = 5.0
 
 dt = 0.1
+
 
 
 class DroneController(Node):
@@ -68,7 +68,6 @@ class DroneController(Node):
         self.vehicle_number = self.declare_parameter("vehicle_number", 2)
         self.uwb_estimator = self.declare_parameter("uwb_estimator", "/LS_uwb_estimator")
 
-
         # Retrieve parameter values
         self.control_mode = self.get_parameter(
             "control_mode").get_parameter_value().integer_value
@@ -97,7 +96,6 @@ class DroneController(Node):
         self.target_uwb_position_subscriber = self.create_subscription(
             PoseWithCovarianceStamped, self.uwb_estimator + "/estimated_pos", self.callback_target_uwb_position, 3)
 
-
         # Services
         self.control_mode_service = self.create_service(
             ControlMode, "control_mode", self.callback_control_mode)
@@ -105,8 +103,37 @@ class DroneController(Node):
         # Control loop timer
         self.timer = self.create_timer(dt, self.timer_callback)
 
+
+
+    def publish_vehicle_command(self, command, param1, param2):
+        msg = VehicleCommand()
+        msg.timestamp = self.timestamp
+        msg.param1 = param1
+        msg.param2 = param2
+        msg.command = command
+        msg.target_system = self.vehicle_number
+        msg.source_system = 1
+        msg.source_component = 1
+        msg.from_external = True
+
+        self.vehicle_command_publisher_.publish(msg)
+
+    def publish_offboard_control_mode(self):
+        msg = OffboardControlMode()
+        msg.timestamp = self.timestamp
+        msg.position = True
+        msg.velocity = True
+        msg.acceleration = False
+        msg.attitude = False
+        msg.body_rate = False
+
+        self.offboard_control_mode_publisher_.publish(msg)
+
     def callback_timesync(self, msg):
         self.timestamp = msg.timestamp
+
+    def callback_drone_status(self, msg):
+        self.ARMING_STATE = msg.arming_state
 
     def callback_local_position(self, msg):
         self.x = msg.x
@@ -116,28 +143,17 @@ class DroneController(Node):
         self.vy = msg.vy
         self.vz = msg.vz
 
-    def timer_callback(self):
-        if (self.offboard_setpoint_counter_ >= 10):
-            self.publish_vehicle_command(176, 1.0, 6.0)
+    def arm(self):
+        self.publish_vehicle_command(400, 1.0, 0.0)
 
-            self.get_logger().info("arming..")
-            self.arm()
-
-        self.publish_offboard_control_mode()
-        self.publish_trajectory_setpoint()
-
-        if (self.offboard_setpoint_counter_ < 30):
-            self.offboard_setpoint_counter_ += 1
-
-    def callback_drone_status(self, msg):
-        self.ARMING_STATE = msg.arming_state
+    def disarm(self):
+        self.publish_vehicle_command(400, 0.0, 1.0)
 
     def callback_target_uwb_position(self, msg):
         # From rover ENU frame to drone NED frame
         self.target_uwb_local_relative_pos = [
             - msg.pose.pose.position.y, - msg.pose.pose.position.x]
         self.e = np.array(self.target_uwb_local_relative_pos)
-
 
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
@@ -154,35 +170,20 @@ class DroneController(Node):
             self.control_mode = 5
         return response
 
-    def publish_vehicle_command(self, command, param1, param2):
-        msg = VehicleCommand()
-        msg.timestamp = self.timestamp
-        msg.param1 = param1
-        msg.param2 = param2
-        msg.command = command
-        msg.target_system = self.vehicle_number
-        msg.source_system = 1
-        msg.source_component = 1
-        msg.from_external = True
 
-        self.vehicle_command_publisher_.publish(msg)
 
-    def arm(self):
-        self.publish_vehicle_command(400, 1.0, 0.0)
+    def timer_callback(self):
+        if (self.offboard_setpoint_counter_ >= 10):
+            self.publish_vehicle_command(176, 1.0, 6.0)
 
-    def disarm(self):
-        self.publish_vehicle_command(400, 0.0, 1.0)
+            self.get_logger().info("arming..")
+            self.arm()
 
-    def publish_offboard_control_mode(self):
-        msg = OffboardControlMode()
-        msg.timestamp = self.timestamp
-        msg.position = True
-        msg.velocity = True
-        msg.acceleration = False
-        msg.attitude = False
-        msg.body_rate = False
+        self.publish_offboard_control_mode()
+        self.publish_trajectory_setpoint()
 
-        self.offboard_control_mode_publisher_.publish(msg)
+        if (self.offboard_setpoint_counter_ < 30):
+            self.offboard_setpoint_counter_ += 1
 
     def publish_trajectory_setpoint(self):
         msg = TrajectorySetpoint()
@@ -208,6 +209,8 @@ class DroneController(Node):
             msg = self.takeoff_mode(msg)
 
         self.trajectory_setpoint_publisher_.publish(msg)
+
+
 
     def land_on_target_mode(self, msg):
         msg.x = float("NaN")
