@@ -4,7 +4,7 @@ from scipy.interpolate import interp1d
 
 def PID(kp, ki, kd, e, e_old, int_e, u_max, u_min, int_max, dt):
 
-    int_e = int_e + e
+    int_e = int_e + e*dt
     e_dot = (e - e_old)/dt
     e_old = e
     uk = - np.multiply(kp, e) - np.multiply(ki, int_e) - np.multiply(kd, e_dot)
