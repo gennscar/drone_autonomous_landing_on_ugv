@@ -1,8 +1,12 @@
-# Control mode service to request functionalities from DroneController
+# Control mode service to request functionalities from DroneController, all values are in ENU frame.
 
 string control_mode   # Requested control mode
 float64 x             # Requested x position
 float64 y             # Requested y position
 float64 z             # Requested z position
+float64 vx            # Requested x velocity
+float64 vy            # Requested y velocity
+float64 vz            # Requested z velocity
+float64 yaw           # Requested yaw wtr of something
 ---
 string message        # Return message

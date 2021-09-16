@@ -3,12 +3,7 @@
 import rclpy
 from rclpy.node import Node
 
-from px4_msgs.msg import OffboardControlMode
-from px4_msgs.msg import TrajectorySetpoint
-from px4_msgs.msg import Timesync
-from px4_msgs.msg import VehicleCommand
-from px4_msgs.msg import VehicleLocalPosition
-from px4_msgs.msg import VehicleStatus
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, VehicleCommand, VehicleLocalPosition, VehicleStatus
 from ros2_px4_interfaces.srv import ControlMode
 
 # Parameters
@@ -19,15 +14,7 @@ STD_HEIGHT = 3.0    # Standard height used if out of bound
 
 
 # NULL definition and check function
-
 NULL = float("NaN")
-
-
-def check_null(list):
-    ret = []
-    for x in list:
-        ret.append(x == NULL)
-    return ret
 
 
 class DroneController(Node):
@@ -176,7 +163,15 @@ class DroneController(Node):
 
         # Try to retrieve the setpoint from the request
         try:
-            self.setpoint_ = [request.x, request.y, request.z]
+            self.setpoint_ = [
+                request.x,
+                request.y,
+                request.z,
+                request.vx,
+                request.vy,
+                request.vz,
+                request.yaw
+            ]
         except:
             pass
 
@@ -227,20 +222,22 @@ class DroneController(Node):
         """Controller for setpoint mode: send the request setpoint
         """
 
-        # Sanitizing setpoint input
-        if any(check_null(self.setpoint_)):
-            self.get_logger().warn(f"""Setpoint not valid: {self.setpoint_}""")
-            self.control_mode_ = "land"
-            return
-
         self.check_height()
 
         self.arm()
-        self.offboard([
-            self.start_local_position_[0] + self.setpoint_[0],
-            self.start_local_position_[1] + self.setpoint_[1],
-            self.start_local_position_[2] + self.setpoint_[2]
-        ])
+        self.offboard(
+            position=[
+                self.start_local_position_[0] + self.setpoint_[0],
+                self.start_local_position_[1] + self.setpoint_[1],
+                self.start_local_position_[2] + self.setpoint_[2]
+            ],
+            velocity=[
+                self.setpoint_[3],
+                self.setpoint_[4],
+                self.setpoint_[5]
+            ],
+            yaw=self.setpoint_[6]
+        )
 
     def check_height(self):
         """Check if the requested height is in the boundaries or set the
@@ -300,7 +297,7 @@ class DroneController(Node):
             self.get_logger().info("Disarming")
             self.publish_vehicle_command(400, 0.0, 1.0)
 
-    def offboard(self, position=[NULL]*3, velocity=[NULL]*3):
+    def offboard(self, position=[NULL]*3, velocity=[NULL]*3, yaw=NULL):
         """This function send the requested offboard command
 
         Args:
@@ -308,6 +305,8 @@ class DroneController(Node):
             Defaults to [NULL]*3.
             velocity (list of 3 float, optional): The requested velocity.
             Defaults to [NULL]*3.
+            yaw (float, optional): The requested yaw.
+            Defaults to NULL.
         """
 
         # Counting offboard command to initiate offboard control
@@ -316,10 +315,10 @@ class DroneController(Node):
         # Setting up offboard control mode
         msg = OffboardControlMode()
         msg.timestamp = self.timestamp_
-        msg.position = not all(check_null(position))
-        msg.velocity = not all(check_null(velocity))
+        msg.position = True
+        msg.velocity = True
         msg.acceleration = False
-        msg.attitude = False
+        msg.attitude = True
         msg.body_rate = False
 
         self.offboard_control_mode_publisher_.publish(msg)
@@ -335,6 +334,7 @@ class DroneController(Node):
         msg.vx = velocity[1]
         msg.vy = velocity[0]
         msg.vz = -velocity[2]
+        msg.yaw = yaw
 
         self.trajectory_setpoint_publisher_.publish(msg)
 
