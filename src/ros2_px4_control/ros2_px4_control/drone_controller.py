@@ -328,7 +328,7 @@ class DroneController(Node):
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp_
 
-        # Conversion from NED to ENU
+        # Conversion from ENU to NED
         msg.x = position[1]
         msg.y = position[0]
         msg.z = -position[2]
