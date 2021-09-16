@@ -76,7 +76,7 @@ class PositioningError(Node):
         
         # Rover ENU frame
         self.estimated_position = [msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z]
-        self.true_position = np.subtract(self.rover_true_position, self.drone_true_position)
+        self.true_position = np.subtract(self.drone_true_position, self.rover_true_position)
         self.positioning_error_vector = np.subtract(self.estimated_position, self.true_position)
         self.positioning_error_xy = np.array([self.positioning_error_vector[0], self.positioning_error_vector[1]])
         self.norm_xy_positioning_error = np.linalg.norm(self.positioning_error_xy, ord=2)

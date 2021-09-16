@@ -23,7 +23,7 @@ class PID_controller:
         else:
             self.e_dot_ = np.zeros(len(e_))
 
-        self.e_int_ = self.e_int_ + e_
+        self.e_int_ = self.e_int_ + e_*self.dt_
         self.e_int_ = np.clip(self.e_int_, - self.int_max_, self.int_max_)
 
         self.e_old_ = e_

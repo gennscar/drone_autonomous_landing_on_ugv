@@ -41,25 +41,23 @@ class DroneController(Node):
         super().__init__("offboard_control")
 
         # Initialization to 0 of all parameters
-        self.int_e = np.array([0, 0])
-        self.e_dot = np.array([0, 0])
-        self.e_old = np.array([0, 0])
+        self.e_dot = []
         self.e = []
 
         self.ARMING_STATE = 0
         self.LANDING_STATE = 0
         self.DESCENDING_STATE = 0
         self.TAKEOFF_STATE = 0
-        self.x = 0.0
-        self.y = 0.0
+
         self.z = 0.0
-        self.vx = 0.0
-        self.vy = 0.0
-        self.vz = 0.0
         self.target_local_pos = []
         self.target_uwb_local_relative_pos = []
+
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
+
+        self.PID_1 = ros2_px4_functions.PID_controller(
+            KP, KI, KD, VMAX, VMIN, INT_MAX, dt)
 
         # Parameters declaration
         self.control_mode = self.declare_parameter("control_mode", 1)
@@ -136,12 +134,7 @@ class DroneController(Node):
         self.ARMING_STATE = msg.arming_state
 
     def callback_local_position(self, msg):
-        self.x = msg.x
-        self.y = msg.y
         self.z = msg.z
-        self.vx = msg.vx
-        self.vy = msg.vy
-        self.vz = msg.vz
 
     def arm(self):
         self.publish_vehicle_command(400, 1.0, 0.0)
@@ -165,9 +158,6 @@ class DroneController(Node):
         elif request.control_mode == "land_on_target_mode":
             self.reset_counters()
             self.control_mode = 3
-        elif request.control_mode == "landing_mode":
-            self.reset_counters()
-            self.control_mode = 5
         return response
 
 
@@ -203,8 +193,6 @@ class DroneController(Node):
                 msg = self.takeoff_mode(msg)
             else:
                 msg = self.land_on_target_mode(msg)
-        elif self.control_mode == 5:
-            self.landing_mode()
         else:
             msg = self.takeoff_mode(msg)
 
@@ -223,8 +211,8 @@ class DroneController(Node):
             else:
                 self.TAKEOFF_STATE = 1
 
-        [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = ros2_px4_functions.PID(
-            KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
+        [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e)
+
         self.norm_e = np.linalg.norm(self.e, ord=2)
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
@@ -265,8 +253,8 @@ class DroneController(Node):
             else:
                 self.TAKEOFF_STATE = 1
 
-        [msg.vx, msg.vy], self.int_e, self.e_dot, self.e_old = ros2_px4_functions.PID(
-            KP, KI, KD, self.e, self.e_old, self.int_e, VMAX, VMIN, INT_MAX, dt)
+        [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e)
+        
         self.norm_e = np.linalg.norm(self.e, ord=2)
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
         self.get_logger().info("Following target..")
@@ -279,10 +267,6 @@ class DroneController(Node):
         msg.y = float("NaN")
         msg.z = -2.5
         return msg
-
-    def landing_mode(self):
-        self.get_logger().info("Landing..")
-        self.publish_vehicle_command(21, 0.0, 0.0)
 
     def reset_counters(self):
         self.LANDING_STATE = 0

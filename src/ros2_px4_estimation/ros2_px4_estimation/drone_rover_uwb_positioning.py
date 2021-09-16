@@ -135,7 +135,7 @@ class UwbPositioning(Node):
             msg.header.stamp = self.get_clock().now().to_msg()
 
             # Rotating the vector into the ENU rover frame
-            self.rotated_sensor_est_pos_ = - self.rover_rotation.apply(self.sensor_est_pos_)
+            self.rotated_sensor_est_pos_ = self.rover_rotation.apply(self.sensor_est_pos_)
 
             msg.pose.pose.position.x = self.rotated_sensor_est_pos_[0]
             msg.pose.pose.position.y = self.rotated_sensor_est_pos_[1]
