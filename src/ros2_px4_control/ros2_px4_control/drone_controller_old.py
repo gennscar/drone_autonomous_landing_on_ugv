@@ -17,7 +17,7 @@ KP = 1.3 # 1.3
 KI = 0.1 # 0.2
 KD = 0.05 # 0.05
 POS_GAIN_SWITCH = 5.0
-V_MAX = 1.0
+V_MAX = 1.3
 
 LAND_ERR_TOLL = 0.3   # Maximum XY position error allowed to perform landing
 LAND_VEL_TOLL = 0.3   # Maximum XY velocity error allowed to perform landing
@@ -250,10 +250,16 @@ class DroneController(Node):
         msg.y = float("NaN")
         msg.z = - FOLLOW_HOVERING_HEIGHT
 
-        [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, [self.vx, self.vy])
-        
         self.norm_e = np.linalg.norm(self.e, ord=2)
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
+
+        if (self.norm_e) < POS_GAIN_SWITCH:
+            [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e,[self.vx, self.vy], self.RESET_INT)
+            self.RESET_INT = False
+        else:
+            [msg.vx, msg.vy], self.e_dot, _ = self.PID_2.PID(self.e,[self.vx, self.vy], self.RESET_INT)
+            self.RESET_INT = True
+
         self.get_logger().info("Following target..")
 
         return msg
