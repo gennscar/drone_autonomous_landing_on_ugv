@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>ros2_px4_launch_files</name>
+  <version>0.0.0</version>
+  <description>This package contains all the launch files to perform automatic action with multiple nodes</description>
+  <maintainer email="cosimocon@gmail.com">Cosimo Conte</maintainer>
+  <maintainer email="gennscar97@gmail.com">Gennaro Scarati</maintainer>
+  <license>GNU GPLv3</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <exec_depend>ros2_px4_control</exec_depend>
+  <exec_depend>ros2_px4_estimation</exec_depend>
+  <exec_depend>ros2_px4_testing</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

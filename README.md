@@ -16,4 +16,5 @@ This is a set of ROS2 packages that work with PX4 Drone Autopilot
 1. [ros2_px4_control](src/ros2_px4_control) This package contains nodes to control the drone interfacing with PX4
 2. [ros2_px4_interfaces](src/ros2_px4_interfaces) This package contains all interfaces required from the other packages
 of this repo
-3. [ros2_px4_testing](src/ros2_px4_testing) This package contains accessory nodes to test the drone
+3. [ros2_px4_launch_files](src/ros2_px4_launch_files) This package contains all the launch files to perform automatic action with multiple nodes
+4. [ros2_px4_testing](src/ros2_px4_testing) This package contains accessory nodes to test the drone
