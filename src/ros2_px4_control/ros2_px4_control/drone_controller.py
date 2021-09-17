@@ -3,7 +3,8 @@
 import rclpy
 from rclpy.node import Node
 
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, VehicleCommand, VehicleLocalPosition, VehicleStatus
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, \
+    VehicleCommand, VehicleLocalPosition, VehicleStatus
 from ros2_px4_interfaces.srv import ControlMode
 
 # Parameters
@@ -22,7 +23,6 @@ class DroneController(Node):
 
     Args:
         control_mode (string): starting control mode.
-        vehicle_namespace (string): namespace of the vehicle to control.
         vehicle_number (string): number of the vehicle to control (only needed
         on simulation).
     """
@@ -52,40 +52,36 @@ class DroneController(Node):
 
         # Parameters declaration
         self.control_mode_ = self.declare_parameter("control_mode", "idle")
-        self.vehicle_namespace_ = self.declare_parameter(
-            "vehicle_namespace", '')
         self.vehicle_number_ = self.declare_parameter("vehicle_number", 1)
 
         # Retrieve parameter values
         self.control_mode_ = self.get_parameter(
             "control_mode").get_parameter_value().string_value
-        self.vehicle_namespace_ = self.get_parameter(
-            "vehicle_namespace").get_parameter_value().string_value
         self.vehicle_number_ = self.get_parameter(
             "vehicle_number").get_parameter_value().integer_value
 
         # Publishers
         self.offboard_control_mode_publisher_ = self.create_publisher(
-            OffboardControlMode, self.vehicle_namespace_ + "/OffboardControlMode_PubSubTopic", 1)
+            OffboardControlMode, "OffboardControlMode_PubSubTopic", 1)
         self.trajectory_setpoint_publisher_ = self.create_publisher(
-            TrajectorySetpoint, self.vehicle_namespace_ + "/TrajectorySetpoint_PubSubTopic", 1)
+            TrajectorySetpoint, "TrajectorySetpoint_PubSubTopic", 1)
         self.vehicle_command_publisher_ = self.create_publisher(
-            VehicleCommand, self.vehicle_namespace_ + "/VehicleCommand_PubSubTopic", 1)
+            VehicleCommand, "VehicleCommand_PubSubTopic", 1)
 
         # Subscribers
         self.drone_status_subscriber = self.create_subscription(
-            VehicleStatus, self.vehicle_namespace_ + "/VehicleStatus_PubSubTopic", self.callback_drone_status, 1)
+            VehicleStatus, "VehicleStatus_PubSubTopic", self.callback_drone_status, 1)
         self.timesync_sub_ = self.create_subscription(
-            Timesync, self.vehicle_namespace_ + "/Timesync_PubSubTopic", self.callback_timesync, 1)
+            Timesync, "Timesync_PubSubTopic", self.callback_timesync, 1)
         self.drone_position_subscriber = self.create_subscription(
-            VehicleLocalPosition, self.vehicle_namespace_ + "/VehicleLocalPosition_PubSubTopic", self.callback_local_position, 1)
+            VehicleLocalPosition, "VehicleLocalPosition_PubSubTopic", self.callback_local_position, 1)
 
         # Services
         self.control_mode_service = self.create_service(
-            ControlMode, self.vehicle_namespace_ + "/control_mode", self.callback_control_mode)
+            ControlMode, "ControlMode_Service", self.callback_control_mode)
 
         # Control loop timer
-        self.timer = self.create_timer(OFFBOARD_DT, self.timer_callback)
+        self.timer = self.create_timer(OFFBOARD_DT, self.callback_timer)
 
     def callback_timesync(self, msg):
         """This callback retrieve the timesync value from PX4.
@@ -115,7 +111,7 @@ class DroneController(Node):
         """
         self.local_position_ = [msg.y, msg.x, -msg.z]
 
-    def timer_callback(self):
+    def callback_timer(self):
         """This callback send the required messages to enact the offboard
         control.
         """
