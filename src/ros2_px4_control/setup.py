@@ -27,6 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             "drone_controller = ros2_px4_control.drone_controller:main",
+            "odometry_sender = ros2_px4_control.odometry_sender:main"
         ],
     },
 )

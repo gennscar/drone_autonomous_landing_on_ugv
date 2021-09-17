@@ -3,40 +3,44 @@ import rclpy
 from rclpy.node import Node
 from px4_msgs.msg import Timesync, VehicleVisualOdometry
 
+SENDER_DT = 0.1
+QUEUE_SIZE = 10
 
-class GPSSimulator(Node):
+
+class OdometrySender(Node):
+    """This node send the odometry information from another topic to PX4 visual
+    odometry topic. It can be used to enhance the state estimation of the drone.
+    """
+
     def __init__(self):
-        super().__init__("GPS_simulator")
-
-        # Parameters declaration
-        self.queue_size_ = self.declare_parameter('queue_size', 10)
-        self.vehicle_namespace_ = self.declare_parameter(
-            "vehicle_namespace", '')
-
-        # Parameters initialization
-        self.queue_size_ = self.get_parameter(
-            'queue_size').get_parameter_value().integer_value
-        self.vehicle_namespace_ = self.get_parameter(
-            "vehicle_namespace").get_parameter_value().string_value
+        super().__init__("odometry_sender")
 
         # Variables declaration
         self.timestamp = 0
 
         # Subscribers initialization
         self.timesyncSub = self.create_subscription(
-            Timesync, "Timesync_PubSubTopic", self.timesyncCallback, self.queue_size_)
+            Timesync, "Timesync_PubSubTopic", self.callback_timesync, QUEUE_SIZE)
 
         # Publishers initialization
         self.visualOdometryPub = self.create_publisher(
-            VehicleVisualOdometry, self.vehicle_namespace_ + "VehicleVisualOdometry_PubSubTopic", self.queue_size_)
+            VehicleVisualOdometry, "VehicleVisualOdometry_PubSubTopic", QUEUE_SIZE)
 
         # Timer initialization
-        self.timer = self.create_timer(0.1, self.timerCallback)
+        self.timer = self.create_timer(SENDER_DT, self.callback_timer)
 
-    def timesyncCallback(self, msg):
+    def callback_timesync(self, msg):
+        """This callback retrieve the timesync value from PX4.
+
+        Args:
+            msg (px4_msgs.msg.Timesync): Tymesync message.
+        """
         self.timestamp = msg.timestamp
 
-    def timerCallback(self):
+    def callback_timer(self):
+        """This callback send the odometry to PX4
+        """
+
         msg = VehicleVisualOdometry()
         msg.timestamp = self.timestamp
         msg.timestamp_sample = self.timestamp
@@ -83,7 +87,7 @@ class GPSSimulator(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = GPSSimulator()
+    node = OdometrySender()
     rclpy.spin(node)
     rclpy.shutdown()
 
