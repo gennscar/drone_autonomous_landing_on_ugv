@@ -27,6 +27,6 @@ def generate_launch_description():
     )
 
     ld.add_action(drone_controller_node)
-    #ld.add_action(rover_controller_node)
+    ld.add_action(rover_controller_node)
     
     return ld

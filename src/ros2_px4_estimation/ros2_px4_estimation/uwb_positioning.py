@@ -102,7 +102,7 @@ class UwbPositioning(Node):
         ranges = ranges[0:N]
 
         # Only if trilateration is possible
-        if N > 3:
+        if N > 2:
             # Perform Least-Square
             if(self.method_ == "LS"):
                 self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(

@@ -3,35 +3,43 @@ import scipy.linalg
 from scipy.interpolate import interp1d
 
 class PID_controller:
-    def __init__(self, kp_, ki_, kd_, u_max_, u_min_, int_max_, dt_):
+    def __init__(self, kp_, ki_, kd_, u_max_, dim_, dt_):
 
         self.kp_ = kp_
         self.ki_ = ki_
         self.kd_ = kd_
         self.u_max_ = u_max_
-        self.u_min_ = u_min_
-        self.int_max_ = int_max_
         self.dt_ = dt_
+        self.dim_ = dim_
 
-        self.e_old_ = []
-        self.e_int_ = 0.0
+        self.e_old_ = []        
+        self.e_int_ = np.zeros(self.dim_)
 
-    def PID(self, e_):
+    def PID(self, e_, u_fb_):
 
+        e_ = np.array(e_)
+        u_fb_ = np.array(u_fb_)
+        
         if self.e_old_!=[]:
             self.e_dot_ = (e_ - self.e_old_)/self.dt_
         else:
             self.e_dot_ = np.zeros(len(e_))
+                
+        for i in range(len(u_fb_)):
+            u_max_i = (u_fb_[i]/np.linalg.norm(u_fb_, ord=2)) * self.u_max_
 
-        self.e_int_ = self.e_int_ + e_*self.dt_
-        self.e_int_ = np.clip(self.e_int_, - self.int_max_, self.int_max_)
-
+            if abs(u_fb_[i]) >= abs(u_max_i) :
+                self.e_int_[i] = self.e_int_[i]
+            else:
+                self.e_int_[i] = self.e_int_[i] + e_[i]*self.dt_
+        
         self.e_old_ = e_
+
         uk_ = np.multiply(self.kp_, e_) + np.multiply(self.ki_, self.e_int_) + np.multiply(self.kd_, self.e_dot_)
-
-        uk_ = np.clip(uk_, self.u_min_, self.u_max_)
-
+        
         return uk_, self.e_dot_, self.e_int_
+
+
 
 
 def DLQR_optimizer(A, B, Q, R):

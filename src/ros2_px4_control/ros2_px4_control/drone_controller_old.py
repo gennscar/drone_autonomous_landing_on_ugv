@@ -4,13 +4,8 @@ import rclpy
 from rclpy.node import Node
 import ros2_px4_functions
 import numpy as np
-from px4_msgs.msg import OffboardControlMode
-from px4_msgs.msg import TrajectorySetpoint
-from px4_msgs.msg import Timesync
-from px4_msgs.msg import VehicleCommand
-from px4_msgs.msg import VehicleLocalPosition
-from px4_msgs.msg import VehicleStatus
-from geometry_msgs.msg import PoseWithCovarianceStamped, Point
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, VehicleCommand, VehicleLocalPosition, VehicleStatus
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from ros2_px4_interfaces.srv import ControlMode
 
 # TO ADD: stop following if no uwb info arrive -> go in take off mode
@@ -18,21 +13,23 @@ from ros2_px4_interfaces.srv import ControlMode
 # TO CHECK: what happens if one anchors or more miss
 
 # Control parameters
-KP = 1.1  # 1.15
-KI = 0.1  # 0.03
-KD = 0.01  # 0.008
-INT_MAX = float("inf") #250/(KI*100)
-VMAX = 5.0
-VMIN = - VMAX
-LAND_ERR_TOLL = 0.3  # 0.2 Maximum position error allowed to perform landing
-LAND_VEL_TOLL = 0.8  # 0.2 # Maximum velocity error allowed to perform landing
-LAND_DESC_VEL = 0.5  # 0.2
-LAND_H_TOLL = 0.9  # 0.85 # Turn off motors at this height
-LAND_HOVERING_HEIGHT_SWITCH = 10.0
-LAND_HOVERING_HEIGHT = 1.5
-FOLLOW_HOVERING_HEIGHT = 5.0
+KP = 1.3  # 1.15
+KI = 0.1 # 0.03
+KD = 0.1 #0.3  # 0.008
+V_MAX = 1.0
 
-dt = 0.1
+LAND_ERR_TOLL = 0.3   # Maximum XY position error allowed to perform landing
+LAND_VEL_TOLL = 0.3   # Maximum XY velocity error allowed to perform landing
+LAND_DESC_VEL = 0.5   # Z velocity when descending on target
+
+TURN_OFF_MOT_HEIGHT = 0.9  # Turn off motors at this height @ref to altimeter
+LAND_HOVERING_HEIGHT_XY_THRESH = 10.0
+LAND_HOVERING_HEIGHT = 2.0
+FOLLOW_HOVERING_HEIGHT = 2.0
+TAKEOFF_HOVERING_HEIGHT = 2.0
+CLIMB_VEL_FAIL_LAND = 0.2
+
+dT_ = 0.1
 
 
 
@@ -49,15 +46,16 @@ class DroneController(Node):
         self.DESCENDING_STATE = 0
         self.TAKEOFF_STATE = 0
 
+        self.vx = 0.0
+        self.vy = 0.0
         self.z = 0.0
-        self.target_local_pos = []
-        self.target_uwb_local_relative_pos = []
+        self.estimated_rel_target_pos = []
 
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
 
         self.PID_1 = ros2_px4_functions.PID_controller(
-            KP, KI, KD, VMAX, VMIN, INT_MAX, dt)
+            KP, KI, KD, V_MAX, 2, dT_)
 
         # Parameters declaration
         self.control_mode = self.declare_parameter("control_mode", 1)
@@ -99,7 +97,7 @@ class DroneController(Node):
             ControlMode, "control_mode", self.callback_control_mode)
 
         # Control loop timer
-        self.timer = self.create_timer(dt, self.timer_callback)
+        self.timer = self.create_timer(dT_, self.timer_callback)
 
 
 
@@ -135,6 +133,8 @@ class DroneController(Node):
 
     def callback_local_position(self, msg):
         self.z = msg.z
+        self.vx = msg.vx
+        self.vy = msg.vy
 
     def arm(self):
         self.publish_vehicle_command(400, 1.0, 0.0)
@@ -144,9 +144,9 @@ class DroneController(Node):
 
     def callback_target_uwb_position(self, msg):
         # From rover ENU frame to drone NED frame
-        self.target_uwb_local_relative_pos = [
+        self.estimated_rel_target_pos = [
             - msg.pose.pose.position.y, - msg.pose.pose.position.x]
-        self.e = np.array(self.target_uwb_local_relative_pos)
+        self.e = np.array(self.estimated_rel_target_pos)
 
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
@@ -165,8 +165,6 @@ class DroneController(Node):
     def timer_callback(self):
         if (self.offboard_setpoint_counter_ >= 10):
             self.publish_vehicle_command(176, 1.0, 6.0)
-
-            self.get_logger().info("arming..")
             self.arm()
 
         self.publish_offboard_control_mode()
@@ -204,41 +202,37 @@ class DroneController(Node):
         msg.x = float("NaN")
         msg.y = float("NaN")
 
-        if self.TAKEOFF_STATE == 0:
-            if -self.z <= LAND_HOVERING_HEIGHT:
-                msg.z = - LAND_HOVERING_HEIGHT - 0.5
-                return msg
-            else:
-                self.TAKEOFF_STATE = 1
-
-        [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e)
+        [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e,[self.vx, self.vy])
 
         self.norm_e = np.linalg.norm(self.e, ord=2)
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
-        if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (-self.z < LAND_H_TOLL):
+        """
+        if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (-self.z < TURN_OFF_MOT_HEIGHT):
             self.LANDING_STATE = 1
             self.get_logger().info("Landing..")
-            self.publish_vehicle_command(185, 1.0, 0.0)
+            self.publish_vehicle_command(185, 1.0, 0.0)"""
+
         if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and self.LANDING_STATE == 0:
             self.DESCENDING_STATE = 1
             self.get_logger().info("Descending on target..")
             msg.z = float("NaN")
             msg.vz = LAND_DESC_VEL
-        elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0 and self.norm_e < LAND_HOVERING_HEIGHT_SWITCH:
+
+        elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0 and self.norm_e < LAND_HOVERING_HEIGHT_XY_THRESH:
             self.get_logger().info("Following target..")
             msg.z = - LAND_HOVERING_HEIGHT
             msg.vz = float("NaN")
+
         elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0:
             self.get_logger().info("Following target..")
             msg.z = - FOLLOW_HOVERING_HEIGHT
             msg.vz = float("NaN")
+
         elif self.LANDING_STATE == 0:
             self.get_logger().info("Stopped descending..")
             msg.z = - LAND_HOVERING_HEIGHT
-            msg.vz = - 0.05
-        if self.ARMING_STATE == 1:
-            rclpy.shutdown()
+            msg.vz = - CLIMB_VEL_FAIL_LAND
 
         return msg
 
@@ -246,14 +240,8 @@ class DroneController(Node):
         msg.x = float("NaN")
         msg.y = float("NaN")
         msg.z = - FOLLOW_HOVERING_HEIGHT
-        if self.TAKEOFF_STATE == 0:
-            if -self.z <= LAND_HOVERING_HEIGHT:
-                msg.z = - LAND_HOVERING_HEIGHT - 0.5
-                return msg
-            else:
-                self.TAKEOFF_STATE = 1
 
-        [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e)
+        [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, [self.vx, self.vy])
         
         self.norm_e = np.linalg.norm(self.e, ord=2)
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
@@ -265,7 +253,7 @@ class DroneController(Node):
         self.get_logger().info("Takeoff..")
         msg.x = float("NaN")
         msg.y = float("NaN")
-        msg.z = -2.5
+        msg.z = - TAKEOFF_HOVERING_HEIGHT
         return msg
 
     def reset_counters(self):
