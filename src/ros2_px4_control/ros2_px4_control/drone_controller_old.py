@@ -13,15 +13,15 @@ from ros2_px4_interfaces.srv import ControlMode
 # TO CHECK: what happens if one anchors or more miss
 
 # Control parameters
-KP = 1.3  # 1.15
-KI = 0.1 # 0.03
-KD = 0.1 #0.3  # 0.008
+KP = 1.3 # 1.3
+KI = 0.1 # 0.2
+KD = 0.05 # 0.05
+POS_GAIN_SWITCH = 5.0
 V_MAX = 1.0
 
 LAND_ERR_TOLL = 0.3   # Maximum XY position error allowed to perform landing
 LAND_VEL_TOLL = 0.3   # Maximum XY velocity error allowed to perform landing
 LAND_DESC_VEL = 0.5   # Z velocity when descending on target
-
 TURN_OFF_MOT_HEIGHT = 0.9  # Turn off motors at this height @ref to altimeter
 LAND_HOVERING_HEIGHT_XY_THRESH = 10.0
 LAND_HOVERING_HEIGHT = 2.0
@@ -40,7 +40,8 @@ class DroneController(Node):
         # Initialization to 0 of all parameters
         self.e_dot = []
         self.e = []
-
+        self.RESET_INT = False
+        
         self.ARMING_STATE = 0
         self.LANDING_STATE = 0
         self.DESCENDING_STATE = 0
@@ -56,6 +57,8 @@ class DroneController(Node):
 
         self.PID_1 = ros2_px4_functions.PID_controller(
             KP, KI, KD, V_MAX, 2, dT_)
+        self.PID_2 = ros2_px4_functions.PID_controller(
+            KP, 0.0, 0.0, V_MAX, 2, dT_)
 
         # Parameters declaration
         self.control_mode = self.declare_parameter("control_mode", 1)
@@ -202,10 +205,16 @@ class DroneController(Node):
         msg.x = float("NaN")
         msg.y = float("NaN")
 
-        [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e,[self.vx, self.vy])
 
         self.norm_e = np.linalg.norm(self.e, ord=2)
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
+
+        if (self.norm_e) < POS_GAIN_SWITCH:
+            [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e,[self.vx, self.vy], self.RESET_INT)
+            self.RESET_INT = False
+        else:
+            [msg.vx, msg.vy], self.e_dot, _ = self.PID_2.PID(self.e,[self.vx, self.vy], self.RESET_INT)
+            self.RESET_INT = True
 
         """
         if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (-self.z < TURN_OFF_MOT_HEIGHT):

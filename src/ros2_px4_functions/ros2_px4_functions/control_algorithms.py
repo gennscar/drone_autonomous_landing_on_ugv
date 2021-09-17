@@ -15,11 +15,14 @@ class PID_controller:
         self.e_old_ = []        
         self.e_int_ = np.zeros(self.dim_)
 
-    def PID(self, e_, u_fb_):
+    def PID(self, e_, u_fb_, reset_int_):
 
         e_ = np.array(e_)
         u_fb_ = np.array(u_fb_)
-        
+
+        if reset_int_:
+            self.e_int_ = np.zeros(self.dim_)
+            
         if self.e_old_!=[]:
             self.e_dot_ = (e_ - self.e_old_)/self.dt_
         else:
@@ -28,7 +31,7 @@ class PID_controller:
         for i in range(len(u_fb_)):
             u_max_i = (u_fb_[i]/np.linalg.norm(u_fb_, ord=2)) * self.u_max_
 
-            if abs(u_fb_[i]) >= abs(u_max_i) :
+            if abs(u_fb_[i]) >= abs(u_max_i) and np.sign(self.e_int_[i]) == np.sign(e_[i]):
                 self.e_int_[i] = self.e_int_[i]
             else:
                 self.e_int_[i] = self.e_int_[i] + e_[i]*self.dt_
