@@ -21,6 +21,11 @@ class PX4YawNode(Node):
         self.rot_NED_2_ENU = R.from_matrix(
             [[0, 1, 0], [1, 0, 0], [0, 0, -1]])
 
+        self.old_rover_yaw = 0.0
+        self.old_rover_yaw_raw = 0.0
+        self.rover_yaw = 0.0
+        self.n_turns_ = 0.0
+
         self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/rover')
 
         self.vehicle_namespace = self.get_parameter(
@@ -35,18 +40,26 @@ class PX4YawNode(Node):
 
         self.rover_quaternion = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
         self.rover_rotation = self.rot_NED_2_ENU* R.from_quat(self.rover_quaternion)
-        
+
         # Yaw in ENU frame 
-        
-        self.rover_yaw = - (self.rover_rotation.as_euler(
+        self.rover_yaw_raw = - (self.rover_rotation.as_euler(
                 'xyz', degrees=True))[2]
 
-        msg = Yaw()
-        msg.yaw = self.rover_yaw 
-        msg.header.frame_id = self.estimator_topic_name_
-        msg.header.stamp = self.get_clock().now().to_msg()
+        if self.rover_yaw_raw >= -180.0 and self.rover_yaw_raw <= 180.0:
+            if self.rover_yaw_raw - self.old_rover_yaw_raw > 300.0:
+                self.n_turns_ -= 1
+            elif self.rover_yaw_raw - self.old_rover_yaw_raw < - 300.0:
+                self.n_turns_ += 1
+            self.old_rover_yaw_raw = self.rover_yaw_raw
 
-        self.rover_px4_yaw_publisher.publish(msg)
+            self.rover_yaw = self.rover_yaw_raw + self.n_turns_*360.0
+
+            msg = Yaw()
+            msg.yaw = self.rover_yaw 
+            msg.header.frame_id = self.estimator_topic_name_
+            msg.header.stamp = self.get_clock().now().to_msg()
+
+            self.rover_px4_yaw_publisher.publish(msg)
 
 def main(args=None):
   

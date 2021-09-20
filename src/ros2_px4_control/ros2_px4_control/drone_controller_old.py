@@ -8,6 +8,8 @@ from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, Vehi
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from ros2_px4_interfaces.srv import ControlMode
 
+from sensor_msgs.msg import Range
+
 # TO ADD: stop following if no uwb info arrive -> go in take off mode
 # TO MODIFY: remove get logger spamming
 # TO CHECK: what happens if one anchors or more miss
@@ -22,7 +24,7 @@ V_MAX = 1.3
 LAND_ERR_TOLL = 0.3   # Maximum XY position error allowed to perform landing
 LAND_VEL_TOLL = 0.3   # Maximum XY velocity error allowed to perform landing
 LAND_DESC_VEL = 0.5   # Z velocity when descending on target
-TURN_OFF_MOT_HEIGHT = 0.9  # Turn off motors at this height @ref to altimeter
+TURN_OFF_MOT_HEIGHT = 0.25  # Turn off motors at this height (wrt platform)
 LAND_HOVERING_HEIGHT_XY_THRESH = 10.0
 LAND_HOVERING_HEIGHT = 2.0
 FOLLOW_HOVERING_HEIGHT = 2.0
@@ -45,11 +47,11 @@ class DroneController(Node):
         self.ARMING_STATE = 0
         self.LANDING_STATE = 0
         self.DESCENDING_STATE = 0
-        self.TAKEOFF_STATE = 0
 
-        self.vx = 0.0
-        self.vy = 0.0
-        self.z = 0.0
+        self.vx = []
+        self.vy = []
+        self.z = []
+        self.z_dist_sensor = []
         self.estimated_rel_target_pos = []
 
         self.timestamp = 0
@@ -94,6 +96,10 @@ class DroneController(Node):
             Timesync, self.vehicle_namespace + "/Timesync_PubSubTopic", self.callback_timesync, 3)
         self.target_uwb_position_subscriber = self.create_subscription(
             PoseWithCovarianceStamped, self.uwb_estimator + "/estimated_pos", self.callback_target_uwb_position, 3)
+        
+        self.drone_position_subscriber = self.create_subscription(
+            Range, self.vehicle_namespace + "/DistanceSensor_PubSubTopic", self.callback_distance_sensor, 3)
+
 
         # Services
         self.control_mode_service = self.create_service(
@@ -138,6 +144,9 @@ class DroneController(Node):
         self.z = msg.z
         self.vx = msg.vx
         self.vy = msg.vy
+
+    def callback_distance_sensor(self,msg):
+        self.z_dist_sensor = msg.range
 
     def arm(self):
         self.publish_vehicle_command(400, 1.0, 0.0)
@@ -216,12 +225,14 @@ class DroneController(Node):
             [msg.vx, msg.vy], self.e_dot, _ = self.PID_2.PID(self.e,[self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = True
 
+        # This can be commented out to avoid motor turn off. 
         """
-        if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (-self.z < TURN_OFF_MOT_HEIGHT):
+        if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (self.z_dist_sensor <= TURN_OFF_MOT_HEIGHT):
             self.LANDING_STATE = 1
             self.get_logger().info("Landing..")
-            self.publish_vehicle_command(185, 1.0, 0.0)"""
-
+            self.publish_vehicle_command(185, 1.0, 0.0)
+        """
+        
         if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and self.LANDING_STATE == 0:
             self.DESCENDING_STATE = 1
             self.get_logger().info("Descending on target..")
@@ -243,6 +254,10 @@ class DroneController(Node):
             msg.z = - LAND_HOVERING_HEIGHT
             msg.vz = - CLIMB_VEL_FAIL_LAND
 
+        elif self.LANDING_STATE == 1:
+            self.destroy_node()
+            rclpy.shutdown()
+            
         return msg
 
     def target_follower_mode(self, msg):
@@ -273,7 +288,6 @@ class DroneController(Node):
 
     def reset_counters(self):
         self.LANDING_STATE = 0
-        self.TAKEOFF_STATE = 0
         self.DESCENDING_STATE = 0
 
 

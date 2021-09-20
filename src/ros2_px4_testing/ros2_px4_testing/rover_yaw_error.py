@@ -15,7 +15,10 @@ class YawError(Node):
         super().__init__("yaw_error")
 
         self.estimator_topics_ = {}
-        self.true_yaw = []
+        self.true_yaw = 0.0
+        self.true_yaw_raw = 0.0
+        self.old_true_yaw_raw = 0.0
+        self.n_turns_ = 0.0
 
         self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/rover')
 
@@ -61,17 +64,26 @@ class YawError(Node):
 
         self.true_quaternion = np.array([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
         self.true_rotation = R.from_quat(self.true_quaternion)
-
+        
         # Yaw in ENU frame
-        self.true_yaw = (self.true_rotation.as_euler(
-                'xyz', degrees=True))[2]
-                
-        msg = Yaw()
-        msg.yaw = self.true_yaw 
-        msg.header.frame_id = self.vehicle_namespace + "/true_yaw"
-        msg.header.stamp = self.get_clock().now().to_msg()
+        self.true_yaw_raw = (self.true_rotation.as_euler(
+                'xyz', degrees=True))[2] 
 
-        self.true_yaw_publisher.publish(msg)
+        if self.true_yaw_raw >= -180.0 and self.true_yaw_raw <= 180.0:
+            if self.true_yaw_raw - self.old_true_yaw_raw > 300.0:
+                self.n_turns_ -= 1
+            elif self.true_yaw_raw - self.old_true_yaw_raw < - 300.0:
+                self.n_turns_ += 1
+            self.old_true_yaw_raw = self.true_yaw_raw
+
+            self.true_yaw = self.true_yaw_raw + self.n_turns_*360.0
+
+            msg = Yaw()
+            msg.yaw = self.true_yaw 
+            msg.header.frame_id = self.vehicle_namespace + "/true_yaw"
+            msg.header.stamp = self.get_clock().now().to_msg()
+
+            self.true_yaw_publisher.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)

@@ -6,13 +6,12 @@ import numpy as np
 
 from geometry_msgs.msg import Point, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float64
 
 class PositioningError(Node):
     """Node to estimate the position norm_xy_positioning_erroror of estimators"""
 
     def __init__(self):
-        super().__init__("positioning_norm_xy_positioning_erroror")
+        super().__init__("drone_rover_positioning_error")
 
         self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
         self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/rover')
@@ -52,7 +51,7 @@ class PositioningError(Node):
                 self.create_subscription(
                     PoseWithCovarianceStamped, topic_name, self.callback_position_estimator, 10)
                 self.estimator_topics_[topic_name] = self.create_publisher(
-                    Float64, topic_name.replace("estimated_pos", "") + "error", 10)
+                    Point, topic_name.replace("estimated_pos", "") + "error", 10)
 
                 self.get_logger().info(f"""
                                        Connected to: {topic_name}
@@ -61,7 +60,7 @@ class PositioningError(Node):
     def callback_rover_true_pose(self, msg):
         self.rover_true_position = [msg.pose.pose.position.x,
                             msg.pose.pose.position.y,
-                            msg.pose.pose.position.z]
+                            msg.pose.pose.position.z + 0.456]
         self.rover_true_orientation = [msg.pose.pose.orientation.x,
                                      msg.pose.pose.orientation.y,
                                      msg.pose.pose.orientation.z,
@@ -81,14 +80,16 @@ class PositioningError(Node):
         self.positioning_error_xy = np.array([self.positioning_error_vector[0], self.positioning_error_vector[1]])
         self.norm_xy_positioning_error = np.linalg.norm(self.positioning_error_xy, ord=2)
 
-        norm_xy_positioning_error_ = Float64()
-        norm_xy_positioning_error_.data = self.norm_xy_positioning_error
+        norm_positioning_error_vector_ = Point()
+        norm_positioning_error_vector_.x = self.positioning_error_vector[0]**2
+        norm_positioning_error_vector_.y = self.positioning_error_vector[1]**2
+        norm_positioning_error_vector_.z = self.positioning_error_vector[2]**2
         
         self.publish_true_position()
 
         # Sending norm_xy_positioning_erroror message only if the estimator is valid
         if(msg.header.frame_id in self.estimator_topics_.keys()):
-            self.estimator_topics_[msg.header.frame_id].publish(norm_xy_positioning_error_)
+            self.estimator_topics_[msg.header.frame_id].publish(norm_positioning_error_vector_)
 
     def publish_true_position(self):
         

@@ -3,17 +3,11 @@
 import rclpy
 from rclpy.node import Node
 import numpy as np
-import scipy 
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
-from px4_msgs.msg import VehicleOdometry
 from ros2_px4_interfaces.msg import Yaw
-from scipy.spatial.transform import Rotation as R
 
 class KFYawEstimator(Node):
-    """
-    EKF
-    """
 
     def __init__(self):
         super().__init__("kf_drone_rover")
@@ -34,20 +28,19 @@ class KFYawEstimator(Node):
         self.namespace_rover = self.get_parameter('namespace_rover').get_parameter_value().string_value
 
         # Kalman Filter
-        self.kalman_filter_ = KalmanFilter(dim_x=3, dim_z=3)
+        self.kalman_filter_ = KalmanFilter(dim_x=2, dim_z=2)
 
         # State transition matrix
         f = np.array([
-            [1., self.deltaT_, 0.5*self.deltaT_**2.],
-            [0., 1.,         self.deltaT_],
-            [0., 0.,         1.]
+            [1., self.deltaT_],
+            [0., 1.]
         ])
         self.kalman_filter_.F = f
         # Observation matrix
-        self.kalman_filter_.H = np.eye(3)
+        self.kalman_filter_.H = np.eye(2)
 
         # Process noise
-        Q1 = Q_discrete_white_noise(dim=3, dt=self.deltaT_, var=self.Q_, block_size=1)
+        Q1 = Q_discrete_white_noise(dim=2, dt=self.deltaT_, var=self.Q_, block_size=1)
         self.kalman_filter_.Q = Q1
         # Covariance matrix
         self.kalman_filter_.P *= 1.
@@ -70,12 +63,11 @@ class KFYawEstimator(Node):
     def callback_apriltag_subscriber(self, msg):
         # Storing current estimate in a np.array
         z = np.array([
-            msg.yaw,  0., 0.
+            msg.yaw,  0.
         ])
 
-        H = np.array([[1., 0., 0.],
-                     [0., 0., 0.],
-                     [0., 0., 0.]])
+        H = np.array([[1., 0.],
+                     [0., 0.]])
 
         # Filter update
         self.kalman_filter_.update(z, self.R_apriltag_, H)
@@ -85,12 +77,11 @@ class KFYawEstimator(Node):
 
         # Storing current estimate in a np.array
         z = np.array([
-            msg.yaw,  0., 0.
+            msg.yaw,  0.
         ])
 
-        H = np.array([[1., 0., 0.],
-                     [0., 0., 0.],
-                     [0., 0., 0.]])
+        H = np.array([[1., 0.],
+                     [0., 0.]])
 
         R_px4_yaw = self.R_px4_yaw_
         # Filter update

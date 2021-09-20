@@ -3,7 +3,6 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-import numpy as np
 
 # seed the pseudorandom number generator
 from random import seed
