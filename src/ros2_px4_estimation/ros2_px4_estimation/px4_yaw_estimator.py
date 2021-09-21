@@ -39,7 +39,7 @@ class PX4YawNode(Node):
     def callback_rover_px4_yaw(self, msg):
 
         self.rover_quaternion = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
-        self.rover_rotation = self.rot_NED_2_ENU* R.from_quat(self.rover_quaternion)
+        self.rover_rotation = self.rot_NED_2_ENU*R.from_quat(self.rover_quaternion)
 
         # Yaw in ENU frame 
         self.rover_yaw_raw = - (self.rover_rotation.as_euler(

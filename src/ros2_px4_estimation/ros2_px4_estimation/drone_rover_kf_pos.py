@@ -6,10 +6,8 @@ import numpy as np
 import scipy
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
 from px4_msgs.msg import VehicleLocalPosition
-
-from sensor_msgs.msg import Range
 
 
 class KfConstHeight(Node):
@@ -24,8 +22,6 @@ class KfConstHeight(Node):
         self.declare_parameter("R_range_sensor", 1e-2)
         self.declare_parameter("rng_sensor_fuse_radius", 0.4)
         self.declare_parameter("rng_sensor_out_radius", 2.0)
-        self.declare_parameter("rng_sensor_max_height", 20.0)
-        self.declare_parameter("rng_sensor_min_height", 0.2)
         self.declare_parameter('Q_drone', 1e-3)
         self.declare_parameter('Q_drone_z', 1e-3)
         self.declare_parameter('Q_rover', 1e-3)
@@ -37,8 +33,6 @@ class KfConstHeight(Node):
         self.R_uwb_ = self.get_parameter('R_uwb').get_parameter_value().double_value
         self.R_px4_ = self.get_parameter('R_px4').get_parameter_value().double_value
         self.R_range_sensor = self.get_parameter('R_range_sensor').get_parameter_value().double_value
-        self.rng_sensor_max_height_ = self.get_parameter('rng_sensor_max_height').get_parameter_value().double_value
-        self.rng_sensor_min_height_ = self.get_parameter('rng_sensor_min_height').get_parameter_value().double_value
         self.rng_sensor_fuse_radius_ = self.get_parameter('rng_sensor_fuse_radius').get_parameter_value().double_value
         self.rng_sensor_out_radius_ = self.get_parameter('rng_sensor_out_radius').get_parameter_value().double_value
         self.Q_drone = self.get_parameter('Q_drone').get_parameter_value().double_value
@@ -86,12 +80,14 @@ class KfConstHeight(Node):
             VehicleLocalPosition, self.namespace_drone + "/VehicleLocalPosition_PubSubTopic", self.callback_px4_drone_subscriber, 10)
 
         self.range_sensor_subscriber = self.create_subscription(
-            Range, self.namespace_drone + "/DistanceSensor_PubSubTopic", self.callback_range_sensor_subscriber, 10)
+            PoseWithCovarianceStamped, "/range_sensor_positioning/estimated_pos", self.callback_range_sensor_subscriber, 10)
 
             
-        # Setting up position publisher
+        # Setting up position and velocity publisher
         self.est_pos_publisher_ = self.create_publisher(
             PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
+        self.est_vel_publisher_ = self.create_publisher(
+            TwistWithCovarianceStamped, self.get_namespace() + "/estimated_vel", 10)
 
         # Prediction timer
         self.timer = self.create_timer(self.deltaT_, self.predict_callback)
@@ -163,12 +159,10 @@ class KfConstHeight(Node):
     def callback_range_sensor_subscriber(self, msg):
 
         if self.norm_rel_xy_pos != -1.0 and \
-           self.norm_rel_xy_pos <= self.rng_sensor_fuse_radius_ and \
-           msg.range <= self.rng_sensor_max_height_             and \
-           msg.range >= self.rng_sensor_min_height_:
+           self.norm_rel_xy_pos <= self.rng_sensor_fuse_radius_:
             
             z = np.array([
-                msg.range,
+                msg.pose.pose.position.z,
                 0.,
                 0.,
                 0.,
@@ -191,12 +185,10 @@ class KfConstHeight(Node):
             self.kalman_filter_.update(z, self.R_range_sensor, H)
 
         elif self.norm_rel_xy_pos != -1.0 and \
-             self.norm_rel_xy_pos >= self.rng_sensor_out_radius_ and \
-             msg.range <= self.rng_sensor_max_height_            and \
-             msg.range >= self.rng_sensor_min_height_:
+             self.norm_rel_xy_pos >= self.rng_sensor_out_radius_:
 
             z = np.array([
-                msg.range,
+                msg.pose.pose.position.z,
                 0.,
                 0.,
                 0.,
@@ -236,6 +228,19 @@ class KfConstHeight(Node):
         msg.pose.pose.position.y = self.rel_pos_y_
         msg.pose.pose.position.z = self.rel_pos_z_
         self.est_pos_publisher_.publish(msg)
+
+        self.rel_vel_x_ = float(- self.kalman_filter_.x[9][0] + self.kalman_filter_.x[1][0])
+        self.rel_vel_y_ = float(- self.kalman_filter_.x[11][0] + self.kalman_filter_.x[4][0])
+        self.rel_vel_z_ = float(+ self.kalman_filter_.x[7][0])
+
+        # Sending the estimated velocity
+        msg = TwistWithCovarianceStamped()
+        msg.header.frame_id = self.get_namespace() + "/estimated_vel"
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.twist.twist.linear.x = self.rel_vel_x_
+        msg.twist.twist.linear.y = self.rel_vel_y_
+        msg.twist.twist.linear.z = self.rel_vel_z_
+        self.est_vel_publisher_.publish(msg)
 
         # Predict
         self.kalman_filter_.predict()

@@ -5,10 +5,8 @@ from rclpy.node import Node
 import ros2_px4_functions
 import numpy as np
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, VehicleCommand, VehicleLocalPosition, VehicleStatus
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
 from ros2_px4_interfaces.srv import ControlMode
-
-from sensor_msgs.msg import Range
 
 # TO ADD: stop following if no uwb info arrive -> go in take off mode
 # TO MODIFY: remove get logger spamming
@@ -16,7 +14,7 @@ from sensor_msgs.msg import Range
 
 # Control parameters
 KP = 1.3 # 1.3
-KI = 0.1 # 0.2
+KI = 0.1 # 0.1
 KD = 0.05 # 0.05
 POS_GAIN_SWITCH = 5.0
 V_MAX = 1.3
@@ -58,16 +56,17 @@ class DroneController(Node):
         self.offboard_setpoint_counter_ = 0
 
         self.PID_1 = ros2_px4_functions.PID_controller(
-            KP, KI, KD, V_MAX, 2, dT_)
+            KP, KI, KD, V_MAX, 2, True, dT_)
         self.PID_2 = ros2_px4_functions.PID_controller(
-            KP, 0.0, 0.0, V_MAX, 2, dT_)
+            KP, 0.0, 0.0, V_MAX, 2, True, dT_)
 
         # Parameters declaration
         self.control_mode = self.declare_parameter("control_mode", 1)
         self.vehicle_namespace = self.declare_parameter(
             "vehicle_namespace", "/drone")
         self.vehicle_number = self.declare_parameter("vehicle_number", 2)
-        self.uwb_estimator = self.declare_parameter("uwb_estimator", "/LS_uwb_estimator")
+        self.uwb_estimator = self.declare_parameter("uwb_estimator", "/KF_pos_estimator_pos_0")
+        self.rng_sensor_topic = self.declare_parameter("rng_sensor_topic", "/range_sensor_positioning/estimated_pos")
 
         # Retrieve parameter values
         self.control_mode = self.get_parameter(
@@ -78,6 +77,8 @@ class DroneController(Node):
             "vehicle_number").get_parameter_value().integer_value
         self.uwb_estimator = self.get_parameter(
             "uwb_estimator").get_parameter_value().string_value
+        self.rng_sensor_topic = self.get_parameter(
+            "rng_sensor_topic").get_parameter_value().string_value
 
         # Publishers
         self.offboard_control_mode_publisher_ = self.create_publisher(
@@ -96,9 +97,11 @@ class DroneController(Node):
             Timesync, self.vehicle_namespace + "/Timesync_PubSubTopic", self.callback_timesync, 3)
         self.target_uwb_position_subscriber = self.create_subscription(
             PoseWithCovarianceStamped, self.uwb_estimator + "/estimated_pos", self.callback_target_uwb_position, 3)
-        
+        self.target_uwb_position_subscriber = self.create_subscription(
+            TwistWithCovarianceStamped, self.uwb_estimator + "/estimated_vel", self.callback_target_uwb_velocity, 3)
+
         self.drone_position_subscriber = self.create_subscription(
-            Range, self.vehicle_namespace + "/DistanceSensor_PubSubTopic", self.callback_distance_sensor, 3)
+            PoseWithCovarianceStamped, self.rng_sensor_topic, self.callback_distance_sensor, 3)
 
 
         # Services
@@ -146,7 +149,7 @@ class DroneController(Node):
         self.vy = msg.vy
 
     def callback_distance_sensor(self,msg):
-        self.z_dist_sensor = msg.range
+        self.z_dist_sensor = msg.pose.pose.position.z
 
     def arm(self):
         self.publish_vehicle_command(400, 1.0, 0.0)
@@ -159,6 +162,12 @@ class DroneController(Node):
         self.estimated_rel_target_pos = [
             - msg.pose.pose.position.y, - msg.pose.pose.position.x]
         self.e = np.array(self.estimated_rel_target_pos)
+
+    def callback_target_uwb_velocity(self, msg):
+        # From rover ENU frame to drone NED frame
+        self.estimated_rel_target_vel = [
+            - msg.twist.twist.linear.y, - msg.twist.twist.linear.x]
+        self.e_dot = np.array(self.estimated_rel_target_vel)
 
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
@@ -211,6 +220,7 @@ class DroneController(Node):
 
 
     def land_on_target_mode(self, msg):
+        
         msg.x = float("NaN")
         msg.y = float("NaN")
 
@@ -219,19 +229,19 @@ class DroneController(Node):
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
         if (self.norm_e) < POS_GAIN_SWITCH:
-            [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e,[self.vx, self.vy], self.RESET_INT)
+            [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = False
         else:
-            [msg.vx, msg.vy], self.e_dot, _ = self.PID_2.PID(self.e,[self.vx, self.vy], self.RESET_INT)
+            [msg.vx, msg.vy], _, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = True
 
         # This can be commented out to avoid motor turn off. 
-        """
+    
         if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (self.z_dist_sensor <= TURN_OFF_MOT_HEIGHT):
             self.LANDING_STATE = 1
             self.get_logger().info("Landing..")
             self.publish_vehicle_command(185, 1.0, 0.0)
-        """
+        
         
         if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and self.LANDING_STATE == 0:
             self.DESCENDING_STATE = 1
@@ -269,10 +279,10 @@ class DroneController(Node):
         self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
         if (self.norm_e) < POS_GAIN_SWITCH:
-            [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e,[self.vx, self.vy], self.RESET_INT)
+            [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = False
         else:
-            [msg.vx, msg.vy], self.e_dot, _ = self.PID_2.PID(self.e,[self.vx, self.vy], self.RESET_INT)
+            [msg.vx, msg.vy], _, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = True
 
         self.get_logger().info("Following target..")

@@ -13,7 +13,8 @@ def generate_launch_description():
         {"control_mode": 1},
         {"vehicle_namespace": "/drone"},
         {"vehicle_number": 2},
-        {"uwb_estimator": "/LS_uwb_estimator"}
+        {"uwb_estimator": "/KF_pos_estimator_pos_0"},
+        {"rng_sensor_topic": "/range_sensor_positioning/estimated_pos"}
         ]
     )
     

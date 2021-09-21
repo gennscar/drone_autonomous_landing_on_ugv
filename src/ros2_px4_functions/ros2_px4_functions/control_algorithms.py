@@ -3,7 +3,7 @@ import scipy.linalg
 from scipy.interpolate import interp1d
 
 class PID_controller:
-    def __init__(self, kp_, ki_, kd_, u_max_, dim_, dt_):
+    def __init__(self, kp_, ki_, kd_, u_max_, dim_, e_dot_given_, dt_):
 
         self.kp_ = kp_
         self.ki_ = ki_
@@ -14,19 +14,23 @@ class PID_controller:
 
         self.e_old_ = []        
         self.e_int_ = np.zeros(self.dim_)
+        self.e_dot_given_ = e_dot_given_
 
-    def PID(self, e_, u_fb_, reset_int_):
+    def PID(self, e_, e_dot_in_, u_fb_, reset_int_):
 
         e_ = np.array(e_)
         u_fb_ = np.array(u_fb_)
 
         if reset_int_:
             self.e_int_ = np.zeros(self.dim_)
-            
-        if self.e_old_!=[]:
-            self.e_dot_ = (e_ - self.e_old_)/self.dt_
+        
+        if self.e_dot_given_:
+            e_dot_ = np.array(e_dot_in_)
         else:
-            self.e_dot_ = np.zeros(len(e_))
+            if self.e_old_!=[]:
+                e_dot_ = (e_ - self.e_old_)/self.dt_
+            else:
+                e_dot_ = np.zeros(len(e_))
                 
         for i in range(len(u_fb_)):
             u_max_i = (u_fb_[i]/np.linalg.norm(u_fb_, ord=2)) * self.u_max_
@@ -38,9 +42,9 @@ class PID_controller:
         
         self.e_old_ = e_
 
-        uk_ = np.multiply(self.kp_, e_) + np.multiply(self.ki_, self.e_int_) + np.multiply(self.kd_, self.e_dot_)
+        uk_ = np.multiply(self.kp_, e_) + np.multiply(self.ki_, self.e_int_) + np.multiply(self.kd_, e_dot_)
         
-        return uk_, self.e_dot_, self.e_int_
+        return uk_, e_dot_, self.e_int_
 
 
 

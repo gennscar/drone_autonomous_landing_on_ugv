@@ -5,8 +5,8 @@ kf_params_pos = [
 
     [{'deltaT': 1e-1}, {'R_uwb': 1e-3}, {'R_px4': 1e-1}, {'R_range_sensor': 6.25e-4}, 
     {'rng_sensor_fuse_radius': 0.30}, {'Q_drone': 1e-4}, {'Q_rover': 1e-2}, 
-    {'Q_rover_z': 1e-6}, {'Q_drone_z': 1e-4}, {'include_drone': 1}, 
-    {'namespace_drone': "/drone"}, {'uwb_estimator': "/LS_uwb_estimator"}]
+    {'Q_rover_z': 1e-8}, {'Q_drone_z': 1e-3}, {'include_drone': 1}, 
+    {'namespace_drone': "/drone"}, {'uwb_estimator': "/LS_uwb_estimator"}],
 
 ]
 
@@ -36,7 +36,11 @@ def generate_launch_description():
     ld.add_entity(Node(
         package='ros2_px4_estimation',
         executable='range_sensor_positioning',
-        namespace='range_sensor_positioning'
+        namespace='range_sensor_positioning',
+        parameters = [
+            {"rng_sensor_min_height": 0.2},
+            {"rng_sensor_max_height": 10.0}
+        ]
         ))
 
     for i, param in enumerate(kf_params_pos):
