@@ -10,23 +10,22 @@ from ros2_px4_interfaces.srv import ControlMode
 
 # TO ADD: stop following if no uwb info arrive -> go in take off mode
 # TO MODIFY: remove get logger spamming
-# TO CHECK: what happens if one anchors or more miss
 
 # Control parameters
-KP = 1.3 # 1.3
-KI = 0.1 # 0.1
-KD = 0.05 # 0.05
-POS_GAIN_SWITCH = 5.0
+KP = 0.8 # 1.3
+KI = 0.05 # 0.1
+KD = 0.2 # 0.05
+POS_GAIN_SWITCH = 3.0
 V_MAX = 1.3
 
-LAND_ERR_TOLL = 0.3   # Maximum XY position error allowed to perform landing
-LAND_VEL_TOLL = 0.3   # Maximum XY velocity error allowed to perform landing
-LAND_DESC_VEL = 0.5   # Z velocity when descending on target
+LAND_ERR_TOLL = 0.4 #0.3   # Maximum XY position error allowed to perform landing
+LAND_VEL_TOLL = 0.4 #0.3   # Maximum XY velocity error allowed to perform landing
+LAND_DESC_VEL = 0.7 #0.5   # Z velocity when descending on target
 TURN_OFF_MOT_HEIGHT = 0.25  # Turn off motors at this height (wrt platform)
 LAND_HOVERING_HEIGHT_XY_THRESH = 10.0
-LAND_HOVERING_HEIGHT = 2.0
-FOLLOW_HOVERING_HEIGHT = 2.0
-TAKEOFF_HOVERING_HEIGHT = 2.0
+LAND_HOVERING_HEIGHT = 1.5 #2.0
+FOLLOW_HOVERING_HEIGHT = 1.5 #2.0
+TAKEOFF_HOVERING_HEIGHT = 1.5 #2.0
 CLIMB_VEL_FAIL_LAND = 0.2
 
 dT_ = 0.1
@@ -236,18 +235,19 @@ class DroneController(Node):
             self.RESET_INT = True
 
         # This can be commented out to avoid motor turn off. 
-    
+        """
         if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (self.z_dist_sensor <= TURN_OFF_MOT_HEIGHT):
             self.LANDING_STATE = 1
             self.get_logger().info("Landing..")
             self.publish_vehicle_command(185, 1.0, 0.0)
-        
+        """
         
         if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and self.LANDING_STATE == 0:
             self.DESCENDING_STATE = 1
             self.get_logger().info("Descending on target..")
             msg.z = float("NaN")
             msg.vz = LAND_DESC_VEL
+            self.disarm()
 
         elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0 and self.norm_e < LAND_HOVERING_HEIGHT_XY_THRESH:
             self.get_logger().info("Following target..")

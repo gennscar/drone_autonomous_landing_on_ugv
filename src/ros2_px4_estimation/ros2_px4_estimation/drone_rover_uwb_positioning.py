@@ -12,19 +12,6 @@ import ros2_px4_functions
 
 
 class UwbPositioning(Node):
-    """
-    Node to estimate the position using only the UWB
-
-    Params:
-      sensor_id (str): The anchor ID of the UWB sensor that need to be tracked
-        is the <anchor_id> param provided @ the UWB gazebo plugin
-
-      method (str): Can be "LS" or "GN":
-        "LS" is the Least-Square method
-        "GN" is for the Gauss-Newton method
-
-      iterations (int): Numbers of iterations, valid only with the GN method
-    """
 
     def __init__(self):
         super().__init__("uwb_positioning")
@@ -37,22 +24,22 @@ class UwbPositioning(Node):
         
         # Parameters declaration
         self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
-        self.method_ = self.declare_parameter("method", "LS")
-        self.iterations_ = self.declare_parameter("iterations", 1)
         self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/rover')
         self.yaw_estimator = self.declare_parameter("yaw_estimator", '/px4_estimator')
+        self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e8)
+        self.max_range = self.declare_parameter("max_range", 30.0)
 
         # Retrieve parameter values
         self.sensor_id_ = self.get_parameter(
             "sensor_id").get_parameter_value().string_value
-        self.method_ = self.get_parameter(
-            "method").get_parameter_value().string_value
-        self.iterations_ = self.get_parameter(
-            "iterations").get_parameter_value().integer_value
         self.vehicle_namespace = self.get_parameter(
             "vehicle_namespace").get_parameter_value().string_value
         self.yaw_estimator = self.get_parameter(
             "yaw_estimator").get_parameter_value().string_value
+        self.allowed_delay_ns = self.get_parameter(
+            "allowed_delay_ns").get_parameter_value().double_value
+        self.max_range = self.get_parameter(
+            "max_range").get_parameter_value().double_value
 
         # Namespace check
         if(self.get_namespace() == '/'):
@@ -76,8 +63,6 @@ class UwbPositioning(Node):
 
         self.get_logger().info(f"""Node has started:
                                Sensor ID:  {self.sensor_id_}
-                               Method:     {self.method_}
-                               Iterations  {self.iterations_}
                               """)
 
     def callback_rover_attitude(self, msg):
@@ -105,7 +90,7 @@ class UwbPositioning(Node):
             delta = Time.from_msg(msg.anchor_pose.header.stamp) - \
                 Time.from_msg(data.anchor_pose.header.stamp)
 
-            if delta < Duration(nanoseconds=1e2):
+            if delta < Duration(nanoseconds=self.allowed_delay_ns) and data.range > 0.0 and data.range <= self.max_range:
                 anchor_pos[i, :] = np.array(
                     [data.anchor_pose.pose.position.x, data.anchor_pose.pose.position.y, data.anchor_pose.pose.position.z])
                 ranges[i] = data.range
@@ -118,16 +103,9 @@ class UwbPositioning(Node):
         # Only if trilateration is possible
         if N > 2:
             # Perform Least-Square
-            if(self.method_ == "LS"):
-                self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
-                    anchor_pos, ranges, N)
-
-            # Perform Gauss-Newton
-            if(self.method_ == "GN"):
-                # Perform N iterations of GN
-                for _ in range(self.iterations_):
-                    self.sensor_est_pos_ = ros2_px4_functions.gauss_newton_trilateration(
-                        self.sensor_est_pos_, anchor_pos, ranges)
+            
+            self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
+                anchor_pos, ranges, N)
 
             # Sending the estimated position and the name of the node that generated it
             msg = PoseWithCovarianceStamped()

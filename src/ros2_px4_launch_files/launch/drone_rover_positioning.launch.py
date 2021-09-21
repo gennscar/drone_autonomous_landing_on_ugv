@@ -10,16 +10,18 @@ kf_params_pos = [
 
 ]
 
-kf_params_yaw= [
-
-    [{'deltaT': 1e-1}, {'R_px4_yaw': 1e-5}, {'Q': 1e-1}]
-
-]
 
 def generate_launch_description():
     ld = LaunchDescription()
 
-
+    """ld.add_entity(Node(
+        package='ros2_px4_estimation',
+        executable='uwb_driver',
+        namespace='uwb_driver',
+        parameters=[
+        {'topic_name': '/uwb_sensor_Iris'}
+        ]
+    ))"""
 
     ld.add_entity(Node(
         package='ros2_px4_estimation',
@@ -27,7 +29,8 @@ def generate_launch_description():
         namespace='LS_uwb_estimator',
         parameters=[
             {"sensor_id": "Iris"},
-            {"method": "LS"},
+            {"allowed_delay_ns": 1e8},
+            {"max_range": 30.0},
             {"vehicle_namespace": "/rover"},
             {"yaw_estimator": "/px4_estimator"}
         ]
@@ -56,7 +59,8 @@ def generate_launch_description():
         executable = "px4_yaw_estimator",
         name = "px4_yaw_estimator",
         parameters = [
-            {"vehicle_namespace": "/rover"}
+            {"vehicle_namespace": "/rover"},
+            {"yaw_offset": 0.0}
         ]
     ))
 
@@ -68,14 +72,6 @@ def generate_launch_description():
             {"vehicle_namespace": "/rover"},
             {"sensor_id": "Iris"}
         ]
-        ))
-
-    for i, param in enumerate(kf_params_yaw):
-        ld.add_entity(Node(
-            package='ros2_px4_estimation',
-            executable='drone_rover_kf_yaw',
-            namespace='KF_yaw_estimator_' + str(i),
-            parameters=param
         ))
 
 
