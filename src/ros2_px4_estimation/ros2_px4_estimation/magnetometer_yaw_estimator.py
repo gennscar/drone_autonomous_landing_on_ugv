@@ -23,7 +23,7 @@ class MagnetometerNode(Node):
         self.declare_parameter('timerPeriod', 0.1)
 
         # Topic name where to send magnetometer data
-        self.declare_parameter('topic_name', '/magnetometer_yaw')
+        self.declare_parameter('yaw_publisher_topic', "/yaw_estimator/estimated_yaw")
 
         # Getting serial connection
         self.magnetometer_serial()
@@ -31,8 +31,8 @@ class MagnetometerNode(Node):
 
         # magnetometer messages publisher
 
-        self.topic_name = self.get_parameter('topic_name').get_parameter_value().string_value
-        self.publisher_ = self.create_publisher(Yaw, self.topic_name, 10)
+        self.yaw_publisher_topic = self.get_parameter('yaw_publisher_topic').get_parameter_value().string_value
+        self.publisher_ = self.create_publisher(Yaw, self.yaw_publisher_topic, 10)
         self.timer = self.create_timer(self.get_parameter(
             'timerPeriod').get_parameter_value().double_value, self.timer_callback)
         self.i = 0
@@ -83,7 +83,7 @@ class MagnetometerNode(Node):
 
                 msg = Yaw()
                 msg.yaw = angle_deg_
-                msg.header.frame_id = self.topic_name
+                msg.header.frame_id = self.yaw_publisher_topic
                 msg.header.stamp = self.get_clock().now().to_msg()
 
                 self.publisher_.publish(msg)

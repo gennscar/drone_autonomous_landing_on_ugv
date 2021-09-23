@@ -28,18 +28,15 @@ class UwbPositioning(Node):
 
         # Parameters declaration
         self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
-        self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/rover')
-        self.yaw_estimator = self.declare_parameter("yaw_estimator", '/px4_estimator')
+        self.yaw_subscriber_topic = self.declare_parameter("yaw_subscriber_topic", '/px4_estimator/estimated_yaw')
         self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e2)
         self.max_range = self.declare_parameter("max_range", 30.0)
 
         # Retrieve parameter values
         self.sensor_id_ = self.get_parameter(
             "sensor_id").get_parameter_value().string_value
-        self.vehicle_namespace = self.get_parameter(
-            "vehicle_namespace").get_parameter_value().string_value
-        self.yaw_estimator = self.get_parameter(
-            "yaw_estimator").get_parameter_value().string_value
+        self.yaw_subscriber_topic = self.get_parameter(
+            "yaw_subscriber_topic").get_parameter_value().string_value
         self.allowed_delay_ns = self.get_parameter(
             "allowed_delay_ns").get_parameter_value().double_value
         self.max_range = self.get_parameter(
@@ -53,9 +50,8 @@ class UwbPositioning(Node):
         # Setting up sensors subscriber for the UWB plugin
         self.sensor_subscriber_ = self.create_subscription(
             UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
-
         # Setting up sensor subscriber for vehicle yaw
-        self.rover_attitude_subscriber = self.create_subscription(Yaw, self.yaw_estimator + "/estimated_yaw", self.callback_rover_attitude, 10)
+        self.rover_attitude_subscriber = self.create_subscription(Yaw, self.yaw_subscriber_topic, self.callback_rover_attitude, 10)
         
         # Setting up a publishers to send the estimated position in the NED frame
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"

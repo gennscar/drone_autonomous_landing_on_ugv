@@ -36,8 +36,12 @@ class kf_xyz_estimator(Node):
         self.declare_parameter('Q_rover', 1e-3)
         self.declare_parameter('Q_rover_z', 1e-3)
         self.declare_parameter('Q_compass', 1e-3)
+
+        self.declare_parameter('rng_sensor_topic', "/range_sensor_positioning/estimated_pos")
         self.declare_parameter('namespace_drone','/drone')
         self.declare_parameter("uwb_estimator", "/LS_uwb_estimator")
+        self.declare_parameter("yaw_subscriber_topic", "/px4_estimator/estimated_yaw")
+
         self.deltaT_ = self.get_parameter('deltaT').get_parameter_value().double_value
         self.R_uwb_ = self.get_parameter('R_uwb').get_parameter_value().double_value
         self.R_px4_ = self.get_parameter('R_px4').get_parameter_value().double_value
@@ -50,8 +54,11 @@ class kf_xyz_estimator(Node):
         self.Q_rover = self.get_parameter('Q_rover').get_parameter_value().double_value
         self.Q_rover_z= self.get_parameter('Q_rover_z').get_parameter_value().double_value
         self.Q_compass= self.get_parameter('Q_compass').get_parameter_value().double_value
+
         self.namespace_drone = self.get_parameter('namespace_drone').get_parameter_value().string_value
         self.uwb_estimator = self.get_parameter("uwb_estimator").get_parameter_value().string_value
+        self.rng_sensor_topic = self.get_parameter("rng_sensor_topic").get_parameter_value().string_value
+        self.yaw_subscriber_topic = self.get_parameter("yaw_subscriber_topic").get_parameter_value().string_value
 
         # Kalman Filter
         self.kalman_filter_ = KalmanFilter(dim_x=14, dim_z=14)
@@ -91,16 +98,17 @@ class kf_xyz_estimator(Node):
         self.px4_drone_subscriber = self.create_subscription(
             VehicleLocalPosition, self.namespace_drone + "/VehicleLocalPosition_PubSubTopic", self.callback_px4_drone_subscriber, 10)
         self.range_sensor_subscriber = self.create_subscription(
-            PoseWithCovarianceStamped, "/range_sensor_positioning/estimated_pos", self.callback_range_sensor_subscriber, 10)
+            PoseWithCovarianceStamped, self.rng_sensor_topic, self.callback_range_sensor_subscriber, 10)
         self.compass_subscriber = self.create_subscription(
-            Yaw, "/px4_estimator/estimated_yaw", self.callback_compass_subscriber, 10)
+            Yaw, self.yaw_subscriber_topic, self.callback_compass_subscriber, 10)
             
         # Setting up position and velocity publisher
         self.est_pos_publisher_ = self.create_publisher(
             PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
         self.est_vel_publisher_ = self.create_publisher(
             TwistWithCovarianceStamped, self.get_namespace() + "/estimated_vel", 10)
-        self.est_yaw_publisher_ = self.create_publisher(Yaw, self.get_namespace() + "/estimated_yaw", 10)
+        self.est_yaw_publisher_ = self.create_publisher(
+            Yaw, self.get_namespace() + "/estimated_yaw", 10)
 
         # Prediction timer
         self.timer = self.create_timer(self.deltaT_, self.predict_callback)

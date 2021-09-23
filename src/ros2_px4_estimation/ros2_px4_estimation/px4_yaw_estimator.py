@@ -33,23 +33,24 @@ class PX4YawNode(Node):
         self.rover_yaw = 0.0
         self.n_turns_ = 0.0
 
-        self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/X500_2')
         self.yaw_offset = self.declare_parameter("yaw_offset", 0.0)
         self.yaw_std_dev = self.declare_parameter("yaw_std_dev", 0.0)
+        self.yaw_publisher_topic = self.declare_parameter("yaw_publisher_topic", "/px4_estimator/estimated_yaw")
+        self.yaw_subscriber_topic = self.declare_parameter("yaw_subscriber_topic", "/rover/VehicleAttitude_PubSubTopic")
 
-        self.vehicle_namespace = self.get_parameter(
-            "vehicle_namespace").get_parameter_value().string_value
         self.yaw_offset = self.get_parameter(
             "yaw_offset").get_parameter_value().double_value
         self.yaw_std_dev = self.get_parameter(
             "yaw_std_dev").get_parameter_value().double_value
+        self.yaw_publisher_topic = self.get_parameter(
+            "yaw_publisher_topic").get_parameter_value().string_value
+        self.yaw_subscriber_topic = self.get_parameter(
+            "yaw_subscriber_topic").get_parameter_value().string_value
 
-        self.rover_px4_yaw_subscriber = self.create_subscription(VehicleAttitude, self.vehicle_namespace + "/VehicleAttitude_PubSubTopic", self.callback_rover_px4_yaw, 1) 
+        self.rover_yaw_subscriber = self.create_subscription(VehicleAttitude, self.yaw_subscriber_topic, self.callback_rover_yaw, 1) 
+        self.rover_px4_yaw_publisher = self.create_publisher(Yaw, self.yaw_publisher_topic, 10)
 
-        self.estimator_topic_name_ = "/px4_estimator/estimated_yaw"
-        self.rover_px4_yaw_publisher = self.create_publisher(Yaw, self.estimator_topic_name_, 10)
-
-    def callback_rover_px4_yaw(self, msg):
+    def callback_rover_yaw(self, msg):
 
         self.rover_quaternion = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
         self.rover_rotation = self.rot_NED_2_ENU*R.from_quat(self.rover_quaternion)
@@ -72,7 +73,7 @@ class PX4YawNode(Node):
 
             msg = Yaw()
             msg.yaw = self.rover_yaw 
-            msg.header.frame_id = self.estimator_topic_name_
+            msg.header.frame_id = self.yaw_publisher_topic
             msg.header.stamp = self.get_clock().now().to_msg()
 
             self.rover_px4_yaw_publisher.publish(msg)
