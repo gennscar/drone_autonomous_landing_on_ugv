@@ -17,17 +17,7 @@ def generate_launch_description():
         {"rng_sensor_topic": "/range_sensor_positioning/estimated_pos"}
         ]
     )
-    
-    rover_controller_node = Node(
-        package = "ros2_px4_control",
-        executable = "rover_controller",
-        name = "rover_controller",
-        parameters = [
-        {"vehicle_namespace": "/rover"}
-        ]
-    )
 
     ld.add_action(drone_controller_node)
-    #ld.add_action(rover_controller_node)
     
     return ld

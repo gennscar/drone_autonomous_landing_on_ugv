@@ -7,6 +7,13 @@ from px4_msgs.msg import VehicleAttitude
 from ros2_px4_interfaces.msg import Yaw
 from scipy.spatial.transform import Rotation as R
 
+
+from random import gauss
+from random import seed
+# seed random number generator
+seed(1)
+
+
 class PX4YawNode(Node):
     """
     Create an ImagePublisher class, which is a subclass of the Node class.
@@ -28,12 +35,14 @@ class PX4YawNode(Node):
 
         self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/X500_2')
         self.yaw_offset = self.declare_parameter("yaw_offset", 0.0)
+        self.yaw_std_dev = self.declare_parameter("yaw_std_dev", 0.0)
 
         self.vehicle_namespace = self.get_parameter(
             "vehicle_namespace").get_parameter_value().string_value
         self.yaw_offset = self.get_parameter(
             "yaw_offset").get_parameter_value().double_value
-
+        self.yaw_std_dev = self.get_parameter(
+            "yaw_std_dev").get_parameter_value().double_value
 
         self.rover_px4_yaw_subscriber = self.create_subscription(VehicleAttitude, self.vehicle_namespace + "/VehicleAttitude_PubSubTopic", self.callback_rover_px4_yaw, 1) 
 
@@ -56,7 +65,10 @@ class PX4YawNode(Node):
                 self.n_turns_ += 1
             self.old_rover_yaw_raw = self.rover_yaw_raw
 
-            self.rover_yaw = self.rover_yaw_raw + self.n_turns_*360.0 - self.yaw_offset
+            if self.yaw_std_dev != 0.0:
+                self.rover_yaw = self.rover_yaw_raw + self.n_turns_*360.0 + gauss(- self.yaw_offset, self.yaw_std_dev)
+            else:
+                self.rover_yaw = self.rover_yaw_raw + self.n_turns_*360.0 - self.yaw_offset
 
             msg = Yaw()
             msg.yaw = self.rover_yaw 

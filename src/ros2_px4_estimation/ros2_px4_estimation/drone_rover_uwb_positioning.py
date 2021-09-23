@@ -5,7 +5,7 @@ import numpy as np
 from rclpy.node import Node
 from rclpy.time import Time, Duration
 from ros2_px4_interfaces.msg import UwbSensor
-from geometry_msgs.msg import PoseWithCovarianceStamped, Point
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from scipy.spatial.transform import Rotation as R
 from ros2_px4_interfaces.msg import Yaw
 import ros2_px4_functions
@@ -21,12 +21,16 @@ class UwbPositioning(Node):
 
         self.rover_rotation = R.from_matrix(
             [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-        
+
+        self.watchdog_counter = 0
+        self.watchdog_dT_ = 1.0
+        self.run_publisher = True
+
         # Parameters declaration
         self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
         self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/rover')
         self.yaw_estimator = self.declare_parameter("yaw_estimator", '/px4_estimator')
-        self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e8)
+        self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e2)
         self.max_range = self.declare_parameter("max_range", 30.0)
 
         # Retrieve parameter values
@@ -59,7 +63,7 @@ class UwbPositioning(Node):
             PoseWithCovarianceStamped, self.estimator_topic_name_, 10)
         self.norot_estimator_topic_name_ = self.get_namespace() + "/norot_pos"
         self.norot_position_publisher = self.create_publisher(
-            Point, self.norot_estimator_topic_name_, 10)
+            PoseWithCovarianceStamped, self.norot_estimator_topic_name_, 10)
 
         self.get_logger().info(f"""Node has started:
                                Sensor ID:  {self.sensor_id_}
@@ -69,6 +73,7 @@ class UwbPositioning(Node):
 
         self.rover_rotation = (R.from_euler(
             'z', msg.yaw, degrees=True))
+        self.watchdog_counter += 1
 
     def callback_sensor_subscriber(self, msg):
         """
@@ -107,26 +112,37 @@ class UwbPositioning(Node):
             self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
                 anchor_pos, ranges, N)
 
-            # Sending the estimated position and the name of the node that generated it
             msg = PoseWithCovarianceStamped()
-            msg.header.frame_id = self.estimator_topic_name_
+            msg.header.frame_id = self.norot_estimator_topic_name_
             msg.header.stamp = self.get_clock().now().to_msg()
-
-            # Rotating the vector into the ENU rover frame
-            self.rotated_sensor_est_pos_ = self.rover_rotation.apply(self.sensor_est_pos_)
-
-            msg.pose.pose.position.x = self.rotated_sensor_est_pos_[0]
-            msg.pose.pose.position.y = self.rotated_sensor_est_pos_[1]
-            msg.pose.pose.position.z = self.rotated_sensor_est_pos_[2]
-
-            self.rotated_position_publisher.publish(msg)
-
-            msg = Point()
-            msg.x = self.sensor_est_pos_[0]
-            msg.y = self.sensor_est_pos_[1]
-            msg.z = self.sensor_est_pos_[2]
+            msg.pose.pose.position.x = self.sensor_est_pos_[0]
+            msg.pose.pose.position.y = self.sensor_est_pos_[1]
+            msg.pose.pose.position.z = self.sensor_est_pos_[2]
             self.norot_position_publisher.publish(msg)
 
+            if self.run_publisher:
+                
+                # Rotating the vector into the ENU rover frame
+                self.rotated_sensor_est_pos_ = self.rover_rotation.apply(self.sensor_est_pos_)
+
+                # Sending the estimated position and the name of the node that generated it
+                msg = PoseWithCovarianceStamped()
+                msg.header.frame_id = self.estimator_topic_name_
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.pose.pose.position.x = self.rotated_sensor_est_pos_[0]
+                msg.pose.pose.position.y = self.rotated_sensor_est_pos_[1]
+                msg.pose.pose.position.z = self.rotated_sensor_est_pos_[2]
+
+                self.rotated_position_publisher.publish(msg)
+
+
+    def watchdog_callback(self):
+        if self.watchdog_counter == 0:
+            self.run_publisher = False
+            self.get_logger().warn("No orientation data available, not publishing")
+        else:
+            self.run_publisher = True
+        self.watchdog_counter = 0
 
 def main(args=None):
     rclpy.init(args=args)

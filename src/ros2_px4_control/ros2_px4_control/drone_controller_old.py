@@ -20,13 +20,12 @@ V_MAX = 1.3
 
 LAND_ERR_TOLL = 0.4 #0.3   # Maximum XY position error allowed to perform landing
 LAND_VEL_TOLL = 0.4 #0.3   # Maximum XY velocity error allowed to perform landing
-LAND_DESC_VEL = 0.7 #0.5   # Z velocity when descending on target
+LAND_DESC_VEL = 0.5 #0.5   # Z velocity when descending on target
 TURN_OFF_MOT_HEIGHT = 0.25  # Turn off motors at this height (wrt platform)
 LAND_HOVERING_HEIGHT_XY_THRESH = 10.0
 LAND_HOVERING_HEIGHT = 1.5 #2.0
 FOLLOW_HOVERING_HEIGHT = 1.5 #2.0
 TAKEOFF_HOVERING_HEIGHT = 1.5 #2.0
-CLIMB_VEL_FAIL_LAND = 0.2
 
 dT_ = 0.1
 
@@ -42,17 +41,19 @@ class DroneController(Node):
         self.RESET_INT = False
         
         self.ARMING_STATE = 0
-        self.LANDING_STATE = 0
-        self.DESCENDING_STATE = 0
-
+        
         self.vx = []
         self.vy = []
+        self.vz = []
         self.z = []
         self.z_dist_sensor = []
         self.estimated_rel_target_pos = []
 
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
+
+        self.watchdog_counter = np.zeros((3,1))
+        self.watchdog_dT_ = 1.0
 
         self.PID_1 = ros2_px4_functions.PID_controller(
             KP, KI, KD, V_MAX, 2, True, dT_)
@@ -110,6 +111,172 @@ class DroneController(Node):
         # Control loop timer
         self.timer = self.create_timer(dT_, self.timer_callback)
 
+        # Watchdog timer
+        self.watchdog_timer = self.create_timer(self.watchdog_dT_, self.watchdog_callback)
+
+
+    def callback_timesync(self, msg):
+        self.timestamp = msg.timestamp
+
+    def callback_drone_status(self, msg):
+        self.ARMING_STATE = msg.arming_state
+
+    def callback_local_position(self, msg):
+        self.z = msg.z
+        self.vx = msg.vx
+        self.vy = msg.vy
+        self.vz = msg.vz
+        
+        self.watchdog_counter[0][0] += 1
+
+    def callback_distance_sensor(self,msg):
+        self.z_dist_sensor = msg.pose.pose.position.z
+
+    def callback_target_uwb_position(self, msg):
+        # From rover ENU frame to drone NED frame
+        self.estimated_rel_target_pos = [
+            - msg.pose.pose.position.y, - msg.pose.pose.position.x]
+        self.e = np.array(self.estimated_rel_target_pos)
+
+        self.watchdog_counter[1][0] += 1
+
+    def callback_target_uwb_velocity(self, msg):
+        # From rover ENU frame to drone NED frame
+        self.estimated_rel_target_vel = [
+            - msg.twist.twist.linear.y, - msg.twist.twist.linear.x]
+        self.e_dot = np.array(self.estimated_rel_target_vel)
+        
+        self.watchdog_counter[2][0] += 1
+
+    def callback_control_mode(self, request, response):
+        if request.control_mode == "takeoff_mode":
+            self.control_mode = 1
+        elif request.control_mode == "target_follower_mode":
+            if self.e == []:
+                self.get_logger().warn("No positioning data available, switching to takeoff")
+            else:
+                self.control_mode = 2
+        elif request.control_mode == "land_on_target_mode":
+            if self.e == []:
+                self.get_logger().warn("No positioning data available, switching to takeoff")
+            else:
+                self.control_mode = 3
+        return response
+
+    def timer_callback(self):
+        if (self.offboard_setpoint_counter_ >= 10):
+            self.publish_vehicle_command(176, 1.0, 6.0)
+            self.arm()
+
+        self.publish_offboard_control_mode()
+        self.publish_trajectory_setpoint()
+
+        if (self.offboard_setpoint_counter_ < 30):
+            self.offboard_setpoint_counter_ += 1
+
+    def watchdog_callback(self):
+
+        if (self.control_mode == 2 or self.control_mode == 3) and any(self.watchdog_counter == 0):
+            self.control_mode = 1
+            self.get_logger().warn("No positioning data available, switching to takeoff")
+        
+        self.watchdog_counter = np.zeros((3,1))
+
+
+
+    def publish_trajectory_setpoint(self):
+        msg = TrajectorySetpoint()
+        msg.timestamp = self.timestamp
+
+        if self.control_mode == 1:
+            msg = self.takeoff_mode(msg)
+        elif self.control_mode == 2:
+            if self.e == []:
+                msg = self.takeoff_mode(msg)
+            else:
+                msg = self.target_follower_mode(msg)
+        elif self.control_mode == 3:
+            if self.e == []:
+                msg = self.takeoff_mode(msg)
+            else:
+                msg = self.land_on_target_mode(msg)
+        else:
+            msg = self.takeoff_mode(msg)
+
+        self.trajectory_setpoint_publisher_.publish(msg)
+
+    def land_on_target_mode(self, msg):
+        
+        msg.x = float("NaN")
+        msg.y = float("NaN")
+
+
+        self.norm_e = np.linalg.norm(self.e, ord=2)
+        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
+
+        if (self.norm_e) < POS_GAIN_SWITCH:
+            [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
+            self.RESET_INT = False
+        else:
+            [msg.vx, msg.vy], _, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
+            self.RESET_INT = True
+
+
+        #if self.ARMING_STATE == 1:
+        #    self.get_logger().info(f"""
+        #    Landed with:
+        #    error norm: {self.norm_e}, 
+        #    ex: {self.e[0]}, 
+        #    ey: {self.e[1]}.""")
+        #    rclpy.shutdown()
+
+
+        #elif ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (self.z_dist_sensor <= TURN_OFF_MOT_HEIGHT):
+        #     self.publish_vehicle_command(185, 1.0, 0.0)
+        
+        if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL):
+            msg.z = float("NaN")
+            msg.vz = LAND_DESC_VEL
+
+        elif self.norm_e < LAND_HOVERING_HEIGHT_XY_THRESH:
+            msg.z = - LAND_HOVERING_HEIGHT
+            msg.vz = float("NaN")
+
+        else:
+            msg.z = - FOLLOW_HOVERING_HEIGHT
+            msg.vz = float("NaN")
+            
+        return msg
+
+    def target_follower_mode(self, msg):
+        msg.x = float("NaN")
+        msg.y = float("NaN")
+        msg.z = - FOLLOW_HOVERING_HEIGHT
+
+        self.norm_e = np.linalg.norm(self.e, ord=2)
+        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
+
+        if (self.norm_e) < POS_GAIN_SWITCH:
+            [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
+            self.RESET_INT = False
+        else:
+            [msg.vx, msg.vy], _, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
+            self.RESET_INT = True
+
+        return msg
+
+    def takeoff_mode(self, msg):
+        msg.x = float("NaN")
+        msg.y = float("NaN")
+        msg.z = - TAKEOFF_HOVERING_HEIGHT
+        return msg
+
+
+    def arm(self):
+        self.publish_vehicle_command(400, 1.0, 0.0)
+
+    def disarm(self):
+        self.publish_vehicle_command(400, 0.0, 1.0)
 
 
     def publish_vehicle_command(self, command, param1, param2):
@@ -136,169 +303,6 @@ class DroneController(Node):
 
         self.offboard_control_mode_publisher_.publish(msg)
 
-    def callback_timesync(self, msg):
-        self.timestamp = msg.timestamp
-
-    def callback_drone_status(self, msg):
-        self.ARMING_STATE = msg.arming_state
-
-    def callback_local_position(self, msg):
-        self.z = msg.z
-        self.vx = msg.vx
-        self.vy = msg.vy
-
-    def callback_distance_sensor(self,msg):
-        self.z_dist_sensor = msg.pose.pose.position.z
-
-    def arm(self):
-        self.publish_vehicle_command(400, 1.0, 0.0)
-
-    def disarm(self):
-        self.publish_vehicle_command(400, 0.0, 1.0)
-
-    def callback_target_uwb_position(self, msg):
-        # From rover ENU frame to drone NED frame
-        self.estimated_rel_target_pos = [
-            - msg.pose.pose.position.y, - msg.pose.pose.position.x]
-        self.e = np.array(self.estimated_rel_target_pos)
-
-    def callback_target_uwb_velocity(self, msg):
-        # From rover ENU frame to drone NED frame
-        self.estimated_rel_target_vel = [
-            - msg.twist.twist.linear.y, - msg.twist.twist.linear.x]
-        self.e_dot = np.array(self.estimated_rel_target_vel)
-
-    def callback_control_mode(self, request, response):
-        if request.control_mode == "takeoff_mode":
-            self.reset_counters()
-            self.control_mode = 1
-        elif request.control_mode == "target_follower_mode":
-            self.reset_counters()
-            self.control_mode = 2
-        elif request.control_mode == "land_on_target_mode":
-            self.reset_counters()
-            self.control_mode = 3
-        return response
-
-
-
-    def timer_callback(self):
-        if (self.offboard_setpoint_counter_ >= 10):
-            self.publish_vehicle_command(176, 1.0, 6.0)
-            self.arm()
-
-        self.publish_offboard_control_mode()
-        self.publish_trajectory_setpoint()
-
-        if (self.offboard_setpoint_counter_ < 30):
-            self.offboard_setpoint_counter_ += 1
-
-    def publish_trajectory_setpoint(self):
-        msg = TrajectorySetpoint()
-        msg.timestamp = self.timestamp
-
-        if self.control_mode == 1:
-            msg = self.takeoff_mode(msg)
-        elif self.control_mode == 2:
-            if self.e == []:
-                self.get_logger().warn("Waiting for uwb positioning")
-                msg = self.takeoff_mode(msg)
-            else:
-                msg = self.target_follower_mode(msg)
-        elif self.control_mode == 3:
-            if self.e == []:
-                self.get_logger().warn("Waiting for uwb positioning")
-                msg = self.takeoff_mode(msg)
-            else:
-                msg = self.land_on_target_mode(msg)
-        else:
-            msg = self.takeoff_mode(msg)
-
-        self.trajectory_setpoint_publisher_.publish(msg)
-
-
-
-    def land_on_target_mode(self, msg):
-        
-        msg.x = float("NaN")
-        msg.y = float("NaN")
-
-
-        self.norm_e = np.linalg.norm(self.e, ord=2)
-        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-
-        if (self.norm_e) < POS_GAIN_SWITCH:
-            [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
-            self.RESET_INT = False
-        else:
-            [msg.vx, msg.vy], _, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
-            self.RESET_INT = True
-
-        # This can be commented out to avoid motor turn off. 
-        """
-        if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (self.z_dist_sensor <= TURN_OFF_MOT_HEIGHT):
-            self.LANDING_STATE = 1
-            self.get_logger().info("Landing..")
-            self.publish_vehicle_command(185, 1.0, 0.0)
-        """
-        
-        if ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and self.LANDING_STATE == 0:
-            self.DESCENDING_STATE = 1
-            self.get_logger().info("Descending on target..")
-            msg.z = float("NaN")
-            msg.vz = LAND_DESC_VEL
-            self.disarm()
-
-        elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0 and self.norm_e < LAND_HOVERING_HEIGHT_XY_THRESH:
-            self.get_logger().info("Following target..")
-            msg.z = - LAND_HOVERING_HEIGHT
-            msg.vz = float("NaN")
-
-        elif self.LANDING_STATE == 0 and self.DESCENDING_STATE == 0:
-            self.get_logger().info("Following target..")
-            msg.z = - FOLLOW_HOVERING_HEIGHT
-            msg.vz = float("NaN")
-
-        elif self.LANDING_STATE == 0:
-            self.get_logger().info("Stopped descending..")
-            msg.z = - LAND_HOVERING_HEIGHT
-            msg.vz = - CLIMB_VEL_FAIL_LAND
-
-        elif self.LANDING_STATE == 1:
-            self.destroy_node()
-            rclpy.shutdown()
-            
-        return msg
-
-    def target_follower_mode(self, msg):
-        msg.x = float("NaN")
-        msg.y = float("NaN")
-        msg.z = - FOLLOW_HOVERING_HEIGHT
-
-        self.norm_e = np.linalg.norm(self.e, ord=2)
-        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
-
-        if (self.norm_e) < POS_GAIN_SWITCH:
-            [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
-            self.RESET_INT = False
-        else:
-            [msg.vx, msg.vy], _, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
-            self.RESET_INT = True
-
-        self.get_logger().info("Following target..")
-
-        return msg
-
-    def takeoff_mode(self, msg):
-        self.get_logger().info("Takeoff..")
-        msg.x = float("NaN")
-        msg.y = float("NaN")
-        msg.z = - TAKEOFF_HOVERING_HEIGHT
-        return msg
-
-    def reset_counters(self):
-        self.LANDING_STATE = 0
-        self.DESCENDING_STATE = 0
 
 
 def main(args=None):

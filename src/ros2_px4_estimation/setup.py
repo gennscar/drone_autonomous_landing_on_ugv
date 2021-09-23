@@ -30,9 +30,9 @@ setup(
             "drone_rover_uwb_positioning = ros2_px4_estimation.drone_rover_uwb_positioning:main",
             "uwb_driver = ros2_px4_estimation.uwb_driver:main",
             "range_sensor_positioning = ros2_px4_estimation.range_sensor_positioning:main",
-            "drone_rover_kf_yaw = ros2_px4_estimation.drone_rover_kf_yaw:main",
             "drone_rover_kf_pos = ros2_px4_estimation.drone_rover_kf_pos:main",
-            "magnetometer_driver = ros2_px4_estimation.magnetometer_driver:main"
-        ],
+            "magnetometer_driver = ros2_px4_estimation.magnetometer_driver:main",
+            "drone_rover_kf_pos_theta = ros2_px4_estimation.drone_rover_kf_pos_theta:main",
+       ],
     },
 )
