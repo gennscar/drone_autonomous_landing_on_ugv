@@ -65,7 +65,7 @@ class DroneController(Node):
         self.vehicle_namespace = self.declare_parameter(
             "vehicle_namespace", "/drone")
         self.vehicle_number = self.declare_parameter("vehicle_number", 2)
-        self.uwb_estimator = self.declare_parameter("uwb_estimator", "/KF_pos_estimator_pos_0")
+        self.uwb_estimator = self.declare_parameter("uwb_estimator", "/KF_pos_estimator_0")
         self.rng_sensor_topic = self.declare_parameter("rng_sensor_topic", "/range_sensor_positioning/estimated_pos")
 
         # Retrieve parameter values
