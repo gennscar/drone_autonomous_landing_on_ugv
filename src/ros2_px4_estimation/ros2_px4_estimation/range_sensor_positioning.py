@@ -5,7 +5,8 @@ from rclpy.node import Node
 
 from geometry_msgs.msg import PoseWithCovarianceStamped
 
-from sensor_msgs.msg import Range
+from px4_msgs.msg import DistanceSensor
+#from sensor_msgs.msg import Range
 
 class Px4Positioning(Node):
 
@@ -21,9 +22,11 @@ class Px4Positioning(Node):
         self.rng_sensor_max_height_ = self.get_parameter('rng_sensor_max_height').get_parameter_value().double_value
         self.rng_sensor_min_height_ = self.get_parameter('rng_sensor_min_height').get_parameter_value().double_value
 
+        #self.range_sensor_subscriber = self.create_subscription(
+        #    Range, self.vehicle_namespace + "/DistanceSensor_PubSubTopic", self.callback_range_sensor, 10)
         self.range_sensor_subscriber = self.create_subscription(
-            Range, self.vehicle_namespace + "/DistanceSensor_PubSubTopic", self.callback_range_sensor, 10)
-
+            DistanceSensor, self.vehicle_namespace + "/DistanceSensor_PubSubTopic", self.callback_range_sensor, 10)
+        
         # Setting up position publisher
         self.est_pos_publisher_ = self.create_publisher(
             PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
@@ -33,13 +36,15 @@ class Px4Positioning(Node):
     def callback_range_sensor(self, msg):
         # Filling estimated point message
 
-        if  msg.range <= self.rng_sensor_max_height_ and \
-            msg.range >= self.rng_sensor_min_height_:
+        # distance = msg.range
+        distance = msg.current_distance
+        if  distance <= self.rng_sensor_max_height_ and \
+            distance >= self.rng_sensor_min_height_:
             
             est_pos = PoseWithCovarianceStamped()
             est_pos.header.stamp = self.get_clock().now().to_msg()
             est_pos.header.frame_id = self.get_namespace() + "/estimated_pos"
-            est_pos.pose.pose.position.z = msg.range
+            est_pos.pose.pose.position.z = distance
             self.est_pos_publisher_.publish(est_pos)
 
 

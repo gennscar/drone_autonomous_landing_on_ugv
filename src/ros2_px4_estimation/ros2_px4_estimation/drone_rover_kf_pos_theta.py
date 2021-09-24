@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from filterpy import kalman
 import rclpy
 from rclpy.node import Node
 import numpy as np
@@ -41,6 +40,7 @@ class kf_xyz_estimator(Node):
         self.declare_parameter('namespace_drone','/drone')
         self.declare_parameter("uwb_estimator", "/LS_uwb_estimator")
         self.declare_parameter("yaw_subscriber_topic", "/px4_estimator/estimated_yaw")
+        self.declare_parameter("enable_watchdog", True)
 
         self.deltaT_ = self.get_parameter('deltaT').get_parameter_value().double_value
         self.R_uwb_ = self.get_parameter('R_uwb').get_parameter_value().double_value
@@ -59,6 +59,7 @@ class kf_xyz_estimator(Node):
         self.uwb_estimator = self.get_parameter("uwb_estimator").get_parameter_value().string_value
         self.rng_sensor_topic = self.get_parameter("rng_sensor_topic").get_parameter_value().string_value
         self.yaw_subscriber_topic = self.get_parameter("yaw_subscriber_topic").get_parameter_value().string_value
+        self.enable_watchdog = self.get_parameter("enable_watchdog").get_parameter_value().bool_value
 
         # Kalman Filter
         self.kalman_filter_ = KalmanFilter(dim_x=14, dim_z=14)
@@ -114,7 +115,8 @@ class kf_xyz_estimator(Node):
         self.timer = self.create_timer(self.deltaT_, self.predict_callback)
 
         # Watchdog timer
-        self.watchdog_timer = self.create_timer(self.watchdog_dT_, self.watchdog_callback)
+        if self.enable_watchdog:
+            self.watchdog_timer = self.create_timer(self.watchdog_dT_, self.watchdog_callback)
 
         # Printing node started
         self.get_logger().info("Node has started")
