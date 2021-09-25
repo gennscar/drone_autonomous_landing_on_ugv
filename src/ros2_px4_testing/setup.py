@@ -24,7 +24,8 @@ setup(
             "test_camera = ros2_px4_testing.test_camera:main",
             "setpoints_flight = ros2_px4_testing.setpoints_flight:main",
             "drone_rover_positioning_error = ros2_px4_testing.drone_rover_positioning_error:main",
-            "rover_yaw_error = ros2_px4_testing.rover_yaw_error:main"
+            "rover_yaw_error = ros2_px4_testing.rover_yaw_error:main",
+            "drone_rover_topic_recorder = ros2_px4_testing.drone_rover_topic_recorder:main"
         ],
     },
 )

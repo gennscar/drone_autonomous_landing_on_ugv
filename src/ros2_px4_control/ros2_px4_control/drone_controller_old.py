@@ -5,21 +5,22 @@ from rclpy.node import Node
 import ros2_px4_functions
 import numpy as np
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, VehicleCommand, VehicleLocalPosition, VehicleStatus
-from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped
+from nav_msgs.msg import Odometry
 from ros2_px4_interfaces.srv import ControlMode
 
 # TO ADD: stop following if no uwb info arrive -> go in take off mode
 # TO MODIFY: remove get logger spamming
 
 # Control parameters
-KP = 0.8 # 1.3
-KI = 0.05 # 0.1
-KD = 0.2 # 0.05
+KP = 1.0# 1.3
+KI = 0.1 # 0.1
+KD = 0.1 # 0.05
 POS_GAIN_SWITCH = 3.0
 V_MAX = 1.3
 
-LAND_ERR_TOLL = 0.4 #0.3   # Maximum XY position error allowed to perform landing
-LAND_VEL_TOLL = 0.4 #0.3   # Maximum XY velocity error allowed to perform landing
+LAND_ERR_TOLL = 0.3 #0.3   # Maximum XY position error allowed to perform landing
+LAND_VEL_TOLL = 0.5 #0.3   # Maximum XY velocity error allowed to perform landing
 LAND_DESC_VEL = 0.5 #0.5   # Z velocity when descending on target
 TURN_OFF_MOT_HEIGHT = 0.25  # Turn off motors at this height (wrt platform)
 LAND_HOVERING_HEIGHT_XY_THRESH = 10.0
@@ -52,7 +53,7 @@ class DroneController(Node):
         self.timestamp = 0
         self.offboard_setpoint_counter_ = 0
 
-        self.watchdog_counter = np.zeros((3,1))
+        self.watchdog_counter = np.zeros((2,1))
         self.watchdog_dT_ = 1.0
 
         self.PID_1 = ros2_px4_functions.PID_controller(
@@ -66,7 +67,6 @@ class DroneController(Node):
             "vehicle_namespace", "/drone")
         self.vehicle_number = self.declare_parameter("vehicle_number", 2)
         self.uwb_estimator = self.declare_parameter("uwb_estimator", "/KF_pos_estimator_0")
-        self.rng_sensor_topic = self.declare_parameter("rng_sensor_topic", "/range_sensor_positioning/estimated_pos")
 
         # Retrieve parameter values
         self.control_mode = self.get_parameter(
@@ -77,8 +77,6 @@ class DroneController(Node):
             "vehicle_number").get_parameter_value().integer_value
         self.uwb_estimator = self.get_parameter(
             "uwb_estimator").get_parameter_value().string_value
-        self.rng_sensor_topic = self.get_parameter(
-            "rng_sensor_topic").get_parameter_value().string_value
 
         # Publishers
         self.offboard_control_mode_publisher_ = self.create_publisher(
@@ -96,13 +94,7 @@ class DroneController(Node):
         self.timesync_sub_ = self.create_subscription(
             Timesync, self.vehicle_namespace + "/Timesync_PubSubTopic", self.callback_timesync, 3)
         self.target_uwb_position_subscriber = self.create_subscription(
-            PoseWithCovarianceStamped, self.uwb_estimator + "/estimated_pos", self.callback_target_uwb_position, 3)
-        self.target_uwb_position_subscriber = self.create_subscription(
-            TwistWithCovarianceStamped, self.uwb_estimator + "/estimated_vel", self.callback_target_uwb_velocity, 3)
-
-        self.drone_position_subscriber = self.create_subscription(
-            PoseWithCovarianceStamped, self.rng_sensor_topic, self.callback_distance_sensor, 3)
-
+            Odometry, self.uwb_estimator + "/estimated_pos", self.callback_target_uwb_position, 3)
 
         # Services
         self.control_mode_service = self.create_service(
@@ -129,24 +121,20 @@ class DroneController(Node):
         
         self.watchdog_counter[0][0] += 1
 
-    def callback_distance_sensor(self,msg):
-        self.z_dist_sensor = msg.pose.pose.position.z
-
     def callback_target_uwb_position(self, msg):
+
         # From rover ENU frame to drone NED frame
         self.estimated_rel_target_pos = [
             - msg.pose.pose.position.y, - msg.pose.pose.position.x]
         self.e = np.array(self.estimated_rel_target_pos)
 
-        self.watchdog_counter[1][0] += 1
-
-    def callback_target_uwb_velocity(self, msg):
-        # From rover ENU frame to drone NED frame
         self.estimated_rel_target_vel = [
             - msg.twist.twist.linear.y, - msg.twist.twist.linear.x]
         self.e_dot = np.array(self.estimated_rel_target_vel)
-        
-        self.watchdog_counter[2][0] += 1
+
+        self.z_dist_sensor = msg.pose.pose.position.z
+
+        self.watchdog_counter[1][0] += 1
 
     def callback_control_mode(self, request, response):
         if request.control_mode == "takeoff_mode":
@@ -180,7 +168,7 @@ class DroneController(Node):
             self.control_mode = 1
             self.get_logger().warn("No positioning data available, switching to takeoff")
         
-        self.watchdog_counter = np.zeros((3,1))
+        self.watchdog_counter = np.zeros((2,1))
 
 
 

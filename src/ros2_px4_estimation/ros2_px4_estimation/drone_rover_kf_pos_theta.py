@@ -6,12 +6,13 @@ import numpy as np
 import scipy
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
-from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from px4_msgs.msg import VehicleLocalPosition
 from scipy.spatial.transform import Rotation as R
 
 from ros2_px4_interfaces.msg import Yaw
-
+from sensor_msgs.msg import Range
 
 class kf_xyz_estimator(Node):
 
@@ -30,13 +31,14 @@ class kf_xyz_estimator(Node):
         self.declare_parameter("R_compass", 1e-2)
         self.declare_parameter("rng_sensor_fuse_radius", 0.4)
         self.declare_parameter("rng_sensor_out_radius", 2.0)
+        self.declare_parameter("rng_sensor_max_height", 10.0)
+        self.declare_parameter("rng_sensor_min_height", 0.2)
         self.declare_parameter('Q_drone', 1e-3)
         self.declare_parameter('Q_drone_z', 1e-3)
         self.declare_parameter('Q_rover', 1e-3)
         self.declare_parameter('Q_rover_z', 1e-3)
         self.declare_parameter('Q_compass', 1e-3)
 
-        self.declare_parameter('rng_sensor_topic', "/range_sensor_positioning/estimated_pos")
         self.declare_parameter('namespace_drone','/drone')
         self.declare_parameter("uwb_estimator", "/LS_uwb_estimator")
         self.declare_parameter("yaw_subscriber_topic", "/px4_estimator/estimated_yaw")
@@ -49,6 +51,8 @@ class kf_xyz_estimator(Node):
         self.R_compass_ = self.get_parameter('R_compass').get_parameter_value().double_value
         self.rng_sensor_fuse_radius_ = self.get_parameter('rng_sensor_fuse_radius').get_parameter_value().double_value
         self.rng_sensor_out_radius_ = self.get_parameter('rng_sensor_out_radius').get_parameter_value().double_value
+        self.rng_sensor_max_height_ = self.get_parameter('rng_sensor_max_height').get_parameter_value().double_value
+        self.rng_sensor_min_height_ = self.get_parameter('rng_sensor_min_height').get_parameter_value().double_value
         self.Q_drone = self.get_parameter('Q_drone').get_parameter_value().double_value
         self.Q_drone_z = self.get_parameter('Q_drone_z').get_parameter_value().double_value
         self.Q_rover = self.get_parameter('Q_rover').get_parameter_value().double_value
@@ -57,7 +61,6 @@ class kf_xyz_estimator(Node):
 
         self.namespace_drone = self.get_parameter('namespace_drone').get_parameter_value().string_value
         self.uwb_estimator = self.get_parameter("uwb_estimator").get_parameter_value().string_value
-        self.rng_sensor_topic = self.get_parameter("rng_sensor_topic").get_parameter_value().string_value
         self.yaw_subscriber_topic = self.get_parameter("yaw_subscriber_topic").get_parameter_value().string_value
         self.enable_watchdog = self.get_parameter("enable_watchdog").get_parameter_value().bool_value
 
@@ -99,17 +102,13 @@ class kf_xyz_estimator(Node):
         self.px4_drone_subscriber = self.create_subscription(
             VehicleLocalPosition, self.namespace_drone + "/VehicleLocalPosition_PubSubTopic", self.callback_px4_drone_subscriber, 10)
         self.range_sensor_subscriber = self.create_subscription(
-            PoseWithCovarianceStamped, self.rng_sensor_topic, self.callback_range_sensor_subscriber, 10)
+            Range, self.namespace_drone + "DistanceSensor_PubSubTopic", self.callback_range_sensor_subscriber, 10)
         self.compass_subscriber = self.create_subscription(
             Yaw, self.yaw_subscriber_topic, self.callback_compass_subscriber, 10)
             
         # Setting up position and velocity publisher
-        self.est_pos_publisher_ = self.create_publisher(
-            PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
-        self.est_vel_publisher_ = self.create_publisher(
-            TwistWithCovarianceStamped, self.get_namespace() + "/estimated_vel", 10)
-        self.est_yaw_publisher_ = self.create_publisher(
-            Yaw, self.get_namespace() + "/estimated_yaw", 10)
+        self.est_pos_publisher = self.create_publisher(
+            Odometry, self.get_namespace() + "/estimated_pos", 10)
 
         # Prediction timer
         self.timer = self.create_timer(self.deltaT_, self.predict_callback)
@@ -193,10 +192,12 @@ class kf_xyz_estimator(Node):
     def callback_range_sensor_subscriber(self, msg):
 
         if self.norm_rel_xy_pos != -1.0 and \
-           self.norm_rel_xy_pos <= self.rng_sensor_fuse_radius_:
+           self.norm_rel_xy_pos <= self.rng_sensor_fuse_radius_ and \
+           self.range <= self.rng_sensor_max_height_ and \
+           self.range >= self.rng_sensor_min_height_:
             
             z = np.array([
-                msg.pose.pose.position.z,
+                msg.range,
                 0.,
                 0.,
                 0.,
@@ -220,10 +221,12 @@ class kf_xyz_estimator(Node):
             self.kalman_filter_.update(z, self.R_range_sensor_, H)
 
         elif self.norm_rel_xy_pos != -1.0 and \
-             self.norm_rel_xy_pos >= self.rng_sensor_out_radius_:
+             self.norm_rel_xy_pos >= self.rng_sensor_out_radius_ and \
+             self.range <= self.rng_sensor_max_height_ and \
+             self.range >= self.rng_sensor_min_height_:
 
             z = np.array([
-                msg.pose.pose.position.z,
+                msg.range,
                 0.,
                 0.,
                 0.,
@@ -286,35 +289,22 @@ class kf_xyz_estimator(Node):
         self.rel_pos_y_ = float(- self.kalman_filter_.x[10][0] + self.kalman_filter_.x[3][0])
         self.rel_pos_z_ = float(- self.kalman_filter_.x[12][0] + self.kalman_filter_.x[6][0])
         self.norm_rel_xy_pos = np.linalg.norm([self.rel_pos_x_, self.rel_pos_y_], ord=2)
+        self.rel_vel_x_ = float(- self.kalman_filter_.x[9][0] + self.kalman_filter_.x[1][0])
+        self.rel_vel_y_ = float(- self.kalman_filter_.x[11][0] + self.kalman_filter_.x[4][0])
+        self.rel_vel_z_ = float(+ self.kalman_filter_.x[7][0])
 
-        # Sending the estimated position
-        msg = PoseWithCovarianceStamped()
+        # Sending the estimated pose
+        msg = Odometry()
         msg.header.frame_id = self.get_namespace() + "/estimated_pos"
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.pose.pose.position.x = self.rel_pos_x_
         msg.pose.pose.position.y = self.rel_pos_y_
         msg.pose.pose.position.z = self.rel_pos_z_
-        self.est_pos_publisher_.publish(msg)
-
-        self.rel_vel_x_ = float(- self.kalman_filter_.x[9][0] + self.kalman_filter_.x[1][0])
-        self.rel_vel_y_ = float(- self.kalman_filter_.x[11][0] + self.kalman_filter_.x[4][0])
-        self.rel_vel_z_ = float(+ self.kalman_filter_.x[7][0])
-
-        # Sending the estimated velocity
-        msg = TwistWithCovarianceStamped()
-        msg.header.frame_id = self.get_namespace() + "/estimated_vel"
-        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.pose.pose.orientation.w = float(self.kalman_filter_.x[13][0])
         msg.twist.twist.linear.x = self.rel_vel_x_
         msg.twist.twist.linear.y = self.rel_vel_y_
         msg.twist.twist.linear.z = self.rel_vel_z_
-        self.est_vel_publisher_.publish(msg)
-
-        msg = Yaw()
-        msg.yaw = float(self.kalman_filter_.x[13][0])
-        msg.header.frame_id = self.get_namespace() + "/estimated_yaw"
-        msg.header.stamp = self.get_clock().now().to_msg()
-
-        self.est_yaw_publisher_.publish(msg)
+        self.est_pos_publisher.publish(msg)
 
         # Predict
         self.kalman_filter_.predict()
@@ -323,7 +313,7 @@ class kf_xyz_estimator(Node):
 
         if any(self.watchdog_counter == 0):
             self.run_publisher = False
-            self.get_logger().warn("No sensor data available, not publishing")
+            self.get_logger().warn(f"No sensor data available, not publishing {self.watchdog_counter}")
         else:
             self.run_publisher = True
         self.watchdog_counter = np.zeros((3,1))

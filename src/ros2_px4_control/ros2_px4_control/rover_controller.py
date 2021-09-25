@@ -16,7 +16,7 @@ t1 = 200 #100 #200
 t2 = t1 + 30
 
 lin_vel = 1.0
-ang_vel = 0.5
+ang_vel = 0.3
 
 curvature = True
 noise = False

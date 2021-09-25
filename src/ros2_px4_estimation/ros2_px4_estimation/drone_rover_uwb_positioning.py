@@ -30,7 +30,7 @@ class UwbPositioning(Node):
         self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
         self.yaw_subscriber_topic = self.declare_parameter("yaw_subscriber_topic", '/px4_estimator/estimated_yaw')
         self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e2)
-        self.max_range = self.declare_parameter("max_range", 30.0)
+        self.max_range = self.declare_parameter("max_range", 50.0)
 
         # Retrieve parameter values
         self.sensor_id_ = self.get_parameter(
@@ -107,29 +107,31 @@ class UwbPositioning(Node):
             
             self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
                 anchor_pos, ranges, N)
-
-            msg = PoseWithCovarianceStamped()
-            msg.header.frame_id = self.norot_estimator_topic_name_
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.pose.pose.position.x = self.sensor_est_pos_[0]
-            msg.pose.pose.position.y = self.sensor_est_pos_[1]
-            msg.pose.pose.position.z = self.sensor_est_pos_[2]
-            self.norot_position_publisher.publish(msg)
-
-            if self.run_publisher:
                 
-                # Rotating the vector into the ENU rover frame
-                self.rotated_sensor_est_pos_ = self.rover_rotation.apply(self.sensor_est_pos_)
-
-                # Sending the estimated position and the name of the node that generated it
+            if np.linalg.norm(self.sensor_est_pos_[0:2], ord=2) <= self.max_range:
+                
                 msg = PoseWithCovarianceStamped()
-                msg.header.frame_id = self.estimator_topic_name_
+                msg.header.frame_id = self.norot_estimator_topic_name_
                 msg.header.stamp = self.get_clock().now().to_msg()
-                msg.pose.pose.position.x = self.rotated_sensor_est_pos_[0]
-                msg.pose.pose.position.y = self.rotated_sensor_est_pos_[1]
-                msg.pose.pose.position.z = self.rotated_sensor_est_pos_[2]
+                msg.pose.pose.position.x = self.sensor_est_pos_[0]
+                msg.pose.pose.position.y = self.sensor_est_pos_[1]
+                msg.pose.pose.position.z = self.sensor_est_pos_[2]
+                self.norot_position_publisher.publish(msg)
 
-                self.rotated_position_publisher.publish(msg)
+                if self.run_publisher:
+                    
+                    # Rotating the vector into the ENU rover frame
+                    self.rotated_sensor_est_pos_ = self.rover_rotation.apply(self.sensor_est_pos_)
+
+                    # Sending the estimated position and the name of the node that generated it
+                    msg = PoseWithCovarianceStamped()
+                    msg.header.frame_id = self.estimator_topic_name_
+                    msg.header.stamp = self.get_clock().now().to_msg()
+                    msg.pose.pose.position.x = self.rotated_sensor_est_pos_[0]
+                    msg.pose.pose.position.y = self.rotated_sensor_est_pos_[1]
+                    msg.pose.pose.position.z = self.rotated_sensor_est_pos_[2]
+
+                    self.rotated_position_publisher.publish(msg)
 
 
     def watchdog_callback(self):

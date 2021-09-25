@@ -2,15 +2,16 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 
-yaw_topic_name = "/yaw_estimator/estimated_yaw"
+yaw_topic_name = "/yaw_sensor/estimated_yaw"
+drone_name = "/drone"
 
 kf_params_pos = [
-    [{'deltaT': 1e-1}, {'R_uwb': 1e-3}, {'R_px4': 1e-1}, {'R_range_sensor': 6.25e-4},
-    {'R_compass': 0.25}, {'rng_sensor_fuse_radius': 0.30}, {'Q_drone': 1e-4}, 
-    {'Q_rover': 1e-2}, {'Q_compass': 5e2}, {'Q_rover_z': 1e-8}, {'Q_drone_z': 1e-3}, 
-    {'namespace_drone': "/drone"}, {'uwb_estimator': "/LS_uwb_estimator"},
-    {"rng_sensor_topic": "/range_sensor_positioning/estimated_pos"},
-    {"yaw_subscriber_topic": yaw_topic_name}]
+    [{'deltaT': 1e-1}, {'R_uwb': 1e-3}, {'R_px4': 1e-1}, {'R_range_sensor': 5.625e-5},
+    {'R_compass': 5e-1}, {'Q_drone': 1e-4}, {'Q_rover': 1e-2}, {'Q_compass': 5e2},
+    {'Q_rover_z': 1e-8}, {'Q_drone_z': 1e-1}, {'rng_sensor_fuse_radius': 0.40},
+
+    {'namespace_drone': drone_name}, {'uwb_estimator': "/LS_uwb_estimator"},
+    {"yaw_subscriber_topic": yaw_topic_name}, {"enable_watchdog": True}]
 ]
 
 def generate_launch_description():
@@ -19,11 +20,11 @@ def generate_launch_description():
     
     ld.add_entity(Node(
         package = "ros2_px4_estimation",
-        executable = "px4_yaw_estimator",
-        name = "px4_yaw_estimator",
+        executable = "gazebo_yaw_estimator",
+        name = "gazebo_yaw_estimator",
         parameters = [
             {"yaw_publisher_topic": yaw_topic_name},
-            {"yaw_offset": -20.0},
+            {"yaw_offset": 0.0},
             {"yaw_std_dev": 0.75}
         ]
     ))
@@ -35,21 +36,11 @@ def generate_launch_description():
         parameters=[
             {"sensor_id": "Iris"},
             {"allowed_delay_ns": 1e2},
-            {"max_range": 100.0},
+            {"max_range": 50.0},
             {"yaw_subscriber_topic": yaw_topic_name}
         ]
     ))
 
-    ld.add_entity(Node(
-    package='ros2_px4_estimation',
-    executable='range_sensor_positioning',
-    namespace='range_sensor_positioning',
-    parameters = [
-        {"vehicle_namespace": "/drone"},
-        {"rng_sensor_min_height": 0.2},
-        {"rng_sensor_max_height": 10.0}
-    ]
-    ))
 
     for i, param in enumerate(kf_params_pos):
         ld.add_entity(Node(

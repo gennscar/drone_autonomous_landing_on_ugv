@@ -3,9 +3,9 @@ import rclpy # Python Client Library for ROS 2
 from rclpy.node import Node # Handles the creation of nodes
 
 import numpy as np
-from px4_msgs.msg import VehicleAttitude
 from ros2_px4_interfaces.msg import Yaw
 from scipy.spatial.transform import Rotation as R
+from nav_msgs.msg import Odometry
 
 
 from random import gauss
@@ -14,10 +14,8 @@ from random import seed
 seed(1)
 
 
-class PX4YawNode(Node):
-    """
-    Create an ImagePublisher class, which is a subclass of the Node class.
-    """
+class GazeboYawNode(Node):
+
     def __init__(self):
         """
         Class constructor to set up the node
@@ -35,7 +33,7 @@ class PX4YawNode(Node):
 
         self.yaw_offset = self.declare_parameter("yaw_offset", 0.0)
         self.yaw_std_dev = self.declare_parameter("yaw_std_dev", 0.0)
-        self.yaw_publisher_topic = self.declare_parameter("yaw_publisher_topic", "/px4_estimator/estimated_yaw")
+        self.yaw_publisher_topic = self.declare_parameter("yaw_publisher_topic", "/yaw_sensor/estimated_yaw")
 
         self.yaw_offset = self.get_parameter(
             "yaw_offset").get_parameter_value().double_value
@@ -44,16 +42,16 @@ class PX4YawNode(Node):
         self.yaw_publisher_topic = self.get_parameter(
             "yaw_publisher_topic").get_parameter_value().string_value
 
-        self.rover_yaw_subscriber = self.create_subscription(VehicleAttitude, "/rover/VehicleAttitude_PubSubTopic", self.callback_rover_yaw, 1) 
-        self.rover_px4_yaw_publisher = self.create_publisher(Yaw, self.yaw_publisher_topic, 10)
+        self.rover_yaw_subscriber = self.create_subscription(Odometry, "rover/odom", self.callback_rover_yaw, 1) 
+        self.rover_gazebo_yaw_publisher = self.create_publisher(Yaw, self.yaw_publisher_topic, 10)
 
     def callback_rover_yaw(self, msg):
 
-        self.rover_quaternion = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
-        self.rover_rotation = self.rot_NED_2_ENU*R.from_quat(self.rover_quaternion)
+        self.rover_quaternion = np.array([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
+        self.rover_rotation = R.from_quat(self.rover_quaternion)
 
         # Yaw in ENU frame 
-        self.rover_yaw_raw = - (self.rover_rotation.as_euler(
+        self.rover_yaw_raw = (self.rover_rotation.as_euler(
                 'xyz', degrees=True))[2]
 
         if self.rover_yaw_raw >= -180.0 and self.rover_yaw_raw <= 180.0:
@@ -73,7 +71,7 @@ class PX4YawNode(Node):
             msg.header.frame_id = self.yaw_publisher_topic
             msg.header.stamp = self.get_clock().now().to_msg()
 
-            self.rover_px4_yaw_publisher.publish(msg)
+            self.rover_gazebo_yaw_publisher.publish(msg)
 
 def main(args=None):
   
@@ -81,7 +79,7 @@ def main(args=None):
   rclpy.init(args=args)
   
   # Create the node
-  node = PX4YawNode()
+  node = GazeboYawNode()
   
   # Spin the node so the callback function is called.
   rclpy.spin(node)

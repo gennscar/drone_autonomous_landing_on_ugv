@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 
-yaw_topic_name = "/yaw_estimator/estimated_yaw"
+yaw_topic_name = "/yaw_sensor/estimated_yaw"
 drone_name = "/X500_2"
 
 
