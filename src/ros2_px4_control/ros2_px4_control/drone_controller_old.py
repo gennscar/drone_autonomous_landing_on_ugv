@@ -66,7 +66,7 @@ class DroneController(Node):
         self.vehicle_namespace = self.declare_parameter(
             "vehicle_namespace", "/drone")
         self.vehicle_number = self.declare_parameter("vehicle_number", 2)
-        self.uwb_estimator = self.declare_parameter("uwb_estimator", "/KF_pos_estimator_0")
+        self.uwb_estimator = self.declare_parameter("uwb_estimator", "/KF_pos_estimator_0/estimated_pos")
 
         # Retrieve parameter values
         self.control_mode = self.get_parameter(
@@ -94,7 +94,7 @@ class DroneController(Node):
         self.timesync_sub_ = self.create_subscription(
             Timesync, self.vehicle_namespace + "/Timesync_PubSubTopic", self.callback_timesync, 3)
         self.target_uwb_position_subscriber = self.create_subscription(
-            Odometry, self.uwb_estimator + "/estimated_pos", self.callback_target_uwb_position, 3)
+            Odometry, self.uwb_estimator, self.callback_target_uwb_position, 3)
 
         # Services
         self.control_mode_service = self.create_service(
@@ -208,16 +208,6 @@ class DroneController(Node):
         else:
             [msg.vx, msg.vy], _, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = True
-
-
-        #if self.ARMING_STATE == 1:
-        #    self.get_logger().info(f"""
-        #    Landed with:
-        #    error norm: {self.norm_e}, 
-        #    ex: {self.e[0]}, 
-        #    ey: {self.e[1]}.""")
-        #    rclpy.shutdown()
-
 
         #elif ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (self.z_dist_sensor <= TURN_OFF_MOT_HEIGHT):
         #     self.publish_vehicle_command(185, 1.0, 0.0)

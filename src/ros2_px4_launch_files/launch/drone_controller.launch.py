@@ -12,8 +12,8 @@ def generate_launch_description():
         parameters = [
         {"control_mode": 1},
         {"vehicle_namespace": "/drone"},
-        {"vehicle_number": 1}, #2
-        {"uwb_estimator": "/KF_pos_estimator_0"}
+        {"vehicle_number": 1},
+        {"uwb_estimator": "/KF_pos_estimator_0/estimated_pos"}
         ]
     )
 

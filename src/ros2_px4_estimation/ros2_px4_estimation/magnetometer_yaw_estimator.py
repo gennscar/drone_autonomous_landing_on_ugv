@@ -23,14 +23,13 @@ class MagnetometerNode(Node):
         self.declare_parameter('timerPeriod', 0.1)
 
         # Topic name where to send magnetometer data
-        self.declare_parameter('yaw_publisher_topic', "/yaw_estimator/estimated_yaw")
+        self.declare_parameter('yaw_publisher_topic', "/yaw_sensor/estimated_yaw")
 
         # Getting serial connection
         self.magnetometer_serial()
 
 
         # magnetometer messages publisher
-
         self.yaw_publisher_topic = self.get_parameter('yaw_publisher_topic').get_parameter_value().string_value
         self.publisher_ = self.create_publisher(Yaw, self.yaw_publisher_topic, 10)
         self.timer = self.create_timer(self.get_parameter(

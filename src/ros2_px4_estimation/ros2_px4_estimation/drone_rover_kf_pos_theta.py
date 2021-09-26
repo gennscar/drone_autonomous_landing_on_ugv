@@ -39,9 +39,9 @@ class kf_xyz_estimator(Node):
         self.declare_parameter('Q_rover_z', 1e-3)
         self.declare_parameter('Q_compass', 1e-3)
 
-        self.declare_parameter('namespace_drone','/drone')
-        self.declare_parameter("uwb_estimator", "/LS_uwb_estimator")
-        self.declare_parameter("yaw_subscriber_topic", "/px4_estimator/estimated_yaw")
+        self.declare_parameter('vehicle_namespace','/drone')
+        self.declare_parameter("uwb_estimator", "/LS_drone_rover_uwb_estimator/norot_pos")
+        self.declare_parameter("yaw_subscriber_topic", "/yaw_sensor/estimated_yaw")
         self.declare_parameter("enable_watchdog", True)
 
         self.deltaT_ = self.get_parameter('deltaT').get_parameter_value().double_value
@@ -59,7 +59,7 @@ class kf_xyz_estimator(Node):
         self.Q_rover_z= self.get_parameter('Q_rover_z').get_parameter_value().double_value
         self.Q_compass= self.get_parameter('Q_compass').get_parameter_value().double_value
 
-        self.namespace_drone = self.get_parameter('namespace_drone').get_parameter_value().string_value
+        self.vehicle_namespace = self.get_parameter('vehicle_namespace').get_parameter_value().string_value
         self.uwb_estimator = self.get_parameter("uwb_estimator").get_parameter_value().string_value
         self.yaw_subscriber_topic = self.get_parameter("yaw_subscriber_topic").get_parameter_value().string_value
         self.enable_watchdog = self.get_parameter("enable_watchdog").get_parameter_value().bool_value
@@ -98,11 +98,11 @@ class kf_xyz_estimator(Node):
 
         # Setting up sensors subscribers
         self.target_uwb_position_subscriber = self.create_subscription(
-            PoseWithCovarianceStamped, self.uwb_estimator + "/norot_pos", self.callback_uwb_subscriber, 3)
+            PoseWithCovarianceStamped, self.uwb_estimator, self.callback_uwb_subscriber, 3)
         self.px4_drone_subscriber = self.create_subscription(
-            VehicleLocalPosition, self.namespace_drone + "/VehicleLocalPosition_PubSubTopic", self.callback_px4_drone_subscriber, 10)
+            VehicleLocalPosition, self.vehicle_namespace + "/VehicleLocalPosition_PubSubTopic", self.callback_px4_drone_subscriber, 10)
         self.range_sensor_subscriber = self.create_subscription(
-            Range, self.namespace_drone + "DistanceSensor_PubSubTopic", self.callback_range_sensor_subscriber, 10)
+            Range, self.vehicle_namespace + "/DistanceSensor_PubSubTopic", self.callback_range_sensor_subscriber, 10)
         self.compass_subscriber = self.create_subscription(
             Yaw, self.yaw_subscriber_topic, self.callback_compass_subscriber, 10)
             
@@ -193,8 +193,8 @@ class kf_xyz_estimator(Node):
 
         if self.norm_rel_xy_pos != -1.0 and \
            self.norm_rel_xy_pos <= self.rng_sensor_fuse_radius_ and \
-           self.range <= self.rng_sensor_max_height_ and \
-           self.range >= self.rng_sensor_min_height_:
+           msg.range <= self.rng_sensor_max_height_ and \
+           msg.range >= self.rng_sensor_min_height_:
             
             z = np.array([
                 msg.range,
@@ -222,8 +222,8 @@ class kf_xyz_estimator(Node):
 
         elif self.norm_rel_xy_pos != -1.0 and \
              self.norm_rel_xy_pos >= self.rng_sensor_out_radius_ and \
-             self.range <= self.rng_sensor_max_height_ and \
-             self.range >= self.rng_sensor_min_height_:
+             msg.range <= self.rng_sensor_max_height_ and \
+             msg.range >= self.rng_sensor_min_height_:
 
             z = np.array([
                 msg.range,

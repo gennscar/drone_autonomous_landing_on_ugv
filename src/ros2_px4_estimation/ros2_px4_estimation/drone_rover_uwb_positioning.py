@@ -28,7 +28,7 @@ class UwbPositioning(Node):
 
         # Parameters declaration
         self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
-        self.yaw_subscriber_topic = self.declare_parameter("yaw_subscriber_topic", '/px4_estimator/estimated_yaw')
+        self.yaw_subscriber_topic = self.declare_parameter("yaw_subscriber_topic", '/yaw_sensor/estimated_yaw')
         self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e2)
         self.max_range = self.declare_parameter("max_range", 50.0)
 

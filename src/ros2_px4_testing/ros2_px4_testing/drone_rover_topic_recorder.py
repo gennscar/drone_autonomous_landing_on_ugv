@@ -21,19 +21,35 @@ class TopicRecorder(Node):
     def __init__(self):
         super().__init__("topic_recorder_node")
 
+        self.LS_rot_topic_ = self.declare_parameter("LS_rot_topic", "/LS_drone_rover_uwb_estimator/estimated_pos")
+        self.LS_norot_topic_ = self.declare_parameter("LS_norot_topic", "/LS_drone_rover_uwb_estimator/norot_pos")
+        self.KF_0_topic_ = self.declare_parameter("KF_0_topic", "/KF_pos_estimator_0/estimated_pos")
+        self.range_sensor_topic_ = self.declare_parameter("range_sensor_topic", "/DistanceSensor_PubSubTopic")
+        self.yaw_sensor_topic_ = self.declare_parameter("yaw_sensor_topic", "/yaw_sensor/estimated_yaw")
+        self.vehicle_namespace_ = self.declare_parameter("vehicle_namespace", "/drone")
+
+        # Retrieve parameter values
+        self.LS_rot_topic_ = self.get_parameter("LS_rot_topic").get_parameter_value().string_value
+        self.LS_norot_topic_ = self.get_parameter("LS_norot_topic").get_parameter_value().string_value
+        self.KF_0_topic_ = self.get_parameter("KF_0_topic").get_parameter_value().string_value
+        self.range_sensor_topic_ = self.get_parameter("range_sensor_topic").get_parameter_value().string_value
+        self.yaw_sensor_topic_ = self.get_parameter("yaw_sensor_topic").get_parameter_value().string_value
+        self.vehicle_namespace_ = self.get_parameter("vehicle_namespace").get_parameter_value().string_value
+
+
         self.starting_time_ = self.get_clock().now().to_msg()
 
         # subscribe to the topics
         self.KF_pos_estimator_0_subscriber_ = self.create_subscription(
-            Odometry, "/KF_pos_estimator_0/estimated_pos", self.callback_KF_pos_estimator_0, 3)
+            Odometry, self.KF_0_topic_, self.callback_KF_pos_estimator_0, 3)
         self.LS_pos_estimator_subscriber_ = self.create_subscription(
-            PoseWithCovarianceStamped, "/LS_uwb_estimator/estimated_pos", self.callback_LS_pos_estimator, 3)
+            PoseWithCovarianceStamped, self.LS_rot_topic_, self.callback_LS_pos_estimator, 3)
         self.LS_norot_pos_estimator_subscriber_ = self.create_subscription(
-            PoseWithCovarianceStamped, "/LS_uwb_estimator/norot_pos", self.callback_LS_norot_pos_estimator, 3)
+            PoseWithCovarianceStamped, self.LS_norot_topic_, self.callback_LS_norot_pos_estimator, 3)
         self.range_sensor_subscriber_ = self.create_subscription(
-            Range, "/drone/DistanceSensor_PubSubTopic", self.callback_range_sensor, 3)
+            Range, self.vehicle_namespace_ + self.range_sensor_topic_, self.callback_range_sensor, 3)
         self.yaw_sensor_subscriber_ = self.create_subscription(
-            Yaw, "/yaw_sensor/estimated_yaw", self.callback_yaw_sensor, 3)
+            Yaw, self.yaw_sensor_topic_, self.callback_yaw_sensor, 3)
 
         # create the csv writers
         self.KF_pos_estimator_0_writer_ = csv.writer(KF_pos_estimator_0_)
