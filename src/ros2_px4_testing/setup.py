@@ -22,13 +22,10 @@ setup(
         'console_scripts': [
             "positioning_error = ros2_px4_testing.positioning_error:main",
             "test_camera = ros2_px4_testing.test_camera:main",
-            "uwb_positioning_real = ros2_px4_testing.uwb_positioning_real:main",
             "setpoints_flight = ros2_px4_testing.setpoints_flight:main",
-            "drone_vehicle_positioning_error = ros2_px4_testing.drone_vehicle_positioning_error:main",
-            "test_vehicle_orientation = ros2_px4_testing.test_vehicle_orientation:main",
-            "test_yaw_offset_error = ros2_px4_testing.test_yaw_offset_error:main",
-            "yaw_error = ros2_px4_testing.yaw_error:main"
-
+            "drone_rover_positioning_error = ros2_px4_testing.drone_rover_positioning_error:main",
+            "rover_yaw_error = ros2_px4_testing.rover_yaw_error:main",
+            "drone_rover_topic_recorder = ros2_px4_testing.drone_rover_topic_recorder:main"
         ],
     },
 )

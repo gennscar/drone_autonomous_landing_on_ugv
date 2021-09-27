@@ -39,6 +39,8 @@ class UwbPositioning(Node):
         self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
         self.method_ = self.declare_parameter("method", "LS")
         self.iterations_ = self.declare_parameter("iterations", 1)
+        self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e8)
+        self.max_range = self.declare_parameter("max_range", 30.0)
 
         # Retrieve parameter values
         self.sensor_id_ = self.get_parameter(
@@ -47,6 +49,10 @@ class UwbPositioning(Node):
             "method").get_parameter_value().string_value
         self.iterations_ = self.get_parameter(
             "iterations").get_parameter_value().integer_value
+        self.allowed_delay_ns = self.get_parameter(
+            "allowed_delay_ns").get_parameter_value().double_value
+        self.max_range = self.get_parameter(
+            "max_range").get_parameter_value().double_value
 
         # Namespace check
         if(self.get_namespace() == '/'):
@@ -91,7 +97,7 @@ class UwbPositioning(Node):
             delta = Time.from_msg(msg.anchor_pose.header.stamp) - \
                 Time.from_msg(data.anchor_pose.header.stamp)
 
-            if delta < Duration(nanoseconds=1e8):
+            if delta < Duration(nanoseconds=self.allowed_delay_ns) and data.range > 0.0 and data.range <= self.max_range:
                 anchor_pos[i, :] = np.array(
                     [data.anchor_pose.pose.position.x, data.anchor_pose.pose.position.y, data.anchor_pose.pose.position.z])
                 ranges[i] = data.range
@@ -102,7 +108,7 @@ class UwbPositioning(Node):
         ranges = ranges[0:N]
 
         # Only if trilateration is possible
-        if N > 3:
+        if N > 2:
             # Perform Least-Square
             if(self.method_ == "LS"):
                 self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(

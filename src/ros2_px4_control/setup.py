@@ -23,7 +23,7 @@ setup(
             "hand_of_god_nav = ros2_px4_control.hand_of_god_nav:main",
             "drone_controller = ros2_px4_control.drone_controller:main",
             "drone_controller_old = ros2_px4_control.drone_controller_old:main",
-            "vehicle_controller = ros2_px4_control.vehicle_controller:main",
+            "rover_controller = ros2_px4_control.rover_controller:main",
             "offboard_control = ros2_px4_control.offboard_control:main"
         ],
     },

@@ -1,5 +1,3 @@
-
-  
 # Import the necessary libraries
 import rclpy # Python Client Library for ROS 2
 from rclpy.node import Node # Handles the creation of nodes
@@ -8,11 +6,10 @@ import numpy as np
 from px4_msgs.msg import VehicleAttitude
 from ros2_px4_interfaces.msg import Yaw
 from scipy.spatial.transform import Rotation as R
-from px4_msgs.msg import Timesync
 
-# generate random Gaussian values
-from random import seed
+
 from random import gauss
+from random import seed
 # seed random number generator
 seed(1)
 
@@ -28,47 +25,55 @@ class PX4YawNode(Node):
         # Initiate the Node class's constructor and give it a name
         super().__init__('node')
 
-        self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/rover')
-        self.noise_ = self.declare_parameter("noise", 1)
-        self.timestamp = 0
-
-        self.vehicle_namespace = self.get_parameter(
-            "vehicle_namespace").get_parameter_value().string_value
-        self.noise_ = self.get_parameter(
-            "noise").get_parameter_value().integer_value
-
-        self.noise_mean = []
-        self.noise_std_dev = 5e-2
-        self.noise_mean_freq_ = 5e-8
-        self.rot_global2local = R.from_matrix(
+        self.rot_NED_2_ENU = R.from_matrix(
             [[0, 1, 0], [1, 0, 0], [0, 0, -1]])
 
-        self.timesync_sub_ = self.create_subscription(
-            Timesync, self.vehicle_namespace + "/Timesync_PubSubTopic", self.callback_timesync, 3)
-        self.vehicle_orientation_subscriber = self.create_subscription(VehicleAttitude, self.vehicle_namespace + "/VehicleAttitude_PubSubTopic", self.callback_vehicle_orientation, 1) 
-        self.estimator_topic_name_ = "/px4_estimator/estimated_yaw"
-        self.vehicle_px4_yaw_publisher = self.create_publisher(Yaw, self.estimator_topic_name_, 10)
+        self.old_rover_yaw = 0.0
+        self.old_rover_yaw_raw = 0.0
+        self.rover_yaw = 0.0
+        self.n_turns_ = 0.0
 
-    def callback_vehicle_orientation(self, msg):
-        self.vehicle_orientation = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
-        self.vehicle_rotation = self.rot_global2local* R.from_quat(self.vehicle_orientation)
-        self.vehicle_yaw = - (self.vehicle_rotation.as_euler(
+        self.yaw_offset = self.declare_parameter("yaw_offset", 0.0)
+        self.yaw_std_dev = self.declare_parameter("yaw_std_dev", 0.0)
+        self.yaw_publisher_topic = self.declare_parameter("yaw_publisher_topic", "/px4_estimator/estimated_yaw")
+
+        self.yaw_offset = self.get_parameter(
+            "yaw_offset").get_parameter_value().double_value
+        self.yaw_std_dev = self.get_parameter(
+            "yaw_std_dev").get_parameter_value().double_value
+        self.yaw_publisher_topic = self.get_parameter(
+            "yaw_publisher_topic").get_parameter_value().string_value
+
+        self.rover_yaw_subscriber = self.create_subscription(VehicleAttitude, "/rover/VehicleAttitude_PubSubTopic", self.callback_rover_yaw, 1) 
+        self.rover_px4_yaw_publisher = self.create_publisher(Yaw, self.yaw_publisher_topic, 10)
+
+    def callback_rover_yaw(self, msg):
+
+        self.rover_quaternion = np.array([msg.q[3], msg.q[0], msg.q[1], msg.q[2]])
+        self.rover_rotation = self.rot_NED_2_ENU*R.from_quat(self.rover_quaternion)
+
+        # Yaw in ENU frame 
+        self.rover_yaw_raw = - (self.rover_rotation.as_euler(
                 'xyz', degrees=True))[2]
-        if self.noise_==1:
-          self.noise_mean = 1*np.sin(2*np.pi*self.noise_mean_freq_*self.timestamp) + 2.
 
-          self.noise_value = gauss(self.noise_mean, self.noise_std_dev)
-          self.vehicle_yaw = self.vehicle_yaw + self.noise_value
+        if self.rover_yaw_raw >= -180.0 and self.rover_yaw_raw <= 180.0:
+            if self.rover_yaw_raw - self.old_rover_yaw_raw > 300.0:
+                self.n_turns_ -= 1
+            elif self.rover_yaw_raw - self.old_rover_yaw_raw < - 300.0:
+                self.n_turns_ += 1
+            self.old_rover_yaw_raw = self.rover_yaw_raw
 
-        msg = Yaw()
-        msg.yaw = self.vehicle_yaw 
-        msg.header.frame_id = self.estimator_topic_name_
-        msg.header.stamp = self.get_clock().now().to_msg()
+            if self.yaw_std_dev != 0.0:
+                self.rover_yaw = self.rover_yaw_raw + self.n_turns_*360.0 + gauss(- self.yaw_offset, self.yaw_std_dev)
+            else:
+                self.rover_yaw = self.rover_yaw_raw + self.n_turns_*360.0 - self.yaw_offset
 
-        self.vehicle_px4_yaw_publisher.publish(msg)
+            msg = Yaw()
+            msg.yaw = self.rover_yaw 
+            msg.header.frame_id = self.yaw_publisher_topic
+            msg.header.stamp = self.get_clock().now().to_msg()
 
-    def callback_timesync(self, msg):
-        self.timestamp = msg.timestamp   
+            self.rover_px4_yaw_publisher.publish(msg)
 
 def main(args=None):
   

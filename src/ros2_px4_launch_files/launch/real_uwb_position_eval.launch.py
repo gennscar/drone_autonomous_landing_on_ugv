@@ -15,7 +15,9 @@ def generate_launch_description():
             executable='uwb_positioning',
             namespace='LS_uwb_estimator',
             parameters=[
-                {"method": "LS"}
+                {"method": "LS"},
+                {"allowed_delay_ns": 1e8},
+                {"max_range": 30.0}
             ]
         ),
         Node(
@@ -24,7 +26,9 @@ def generate_launch_description():
             namespace = 'GN_10iter_uwb_estimator',
             parameters=[
                 {"method": "GN"},
-                {"iterations": 10}
+                {"iterations": 10},
+                {"allowed_delay_ns": 1e8},
+                {"max_range": 30.0}
             ]
         ),
         Node(
@@ -33,7 +37,9 @@ def generate_launch_description():
             namespace = 'GN_1iter_uwb_estimator',
             parameters=[
                 {"method": "GN"},
-                {"iterations": 1}
+                {"iterations": 1},
+                {"allowed_delay_ns": 1e8},
+                {"max_range": 30.0}
             ]
         ),
         Node(

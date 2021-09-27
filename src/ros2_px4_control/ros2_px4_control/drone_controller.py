@@ -94,6 +94,7 @@ class DroneController(Node):
         self.takeoff_state_ = msg.takeoff_time > 0
 
     def callback_local_position(self, msg):
+        # From NED to ENU
         self.local_position_ = [msg.y, msg.x, -msg.z]
 
     def timer_callback(self):
@@ -235,7 +236,7 @@ class DroneController(Node):
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp_
 
-        # Conversion from NED to ENU
+        # Conversion from ENU to NED
         msg.x = position[1]
         msg.y = position[0]
         msg.z = -position[2]

@@ -27,12 +27,13 @@ setup(
             "uwb_estimate_2_px4 = ros2_px4_estimation.uwb_estimate_2_px4:main",
             "apriltag_yaw_estimator = ros2_px4_estimation.apriltag_yaw_estimator:main",
             "px4_yaw_estimator = ros2_px4_estimation.px4_yaw_estimator:main",
-            "drone_vehicle_uwb_positioning = ros2_px4_estimation.drone_vehicle_uwb_positioning:main",
-            "drone_vehicle_kf_loose = ros2_px4_estimation.drone_vehicle_kf_loose:main",
-            "drone_vehicle_kf_yaw = ros2_px4_estimation.drone_vehicle_kf_yaw:main",
-            "drone_vehicle_kf_yaw_bias = ros2_px4_estimation.drone_vehicle_kf_yaw:main",
+            "drone_rover_uwb_positioning = ros2_px4_estimation.drone_rover_uwb_positioning:main",
             "uwb_driver = ros2_px4_estimation.uwb_driver:main",
-            "drone_vehicle_px4_positioning = ros2_px4_estimation.drone_vehicle_px4_positioning:main"
-        ],
+            "drone_rover_kf_pos = ros2_px4_estimation.drone_rover_kf_pos:main",
+            "magnetometer_yaw_estimator = ros2_px4_estimation.magnetometer_yaw_estimator:main",
+            "drone_rover_kf_pos_theta = ros2_px4_estimation.drone_rover_kf_pos_theta:main",
+            "gazebo_yaw_estimator = ros2_px4_estimation.gazebo_yaw_estimator:main"
+       
+       ],
     },
 )
