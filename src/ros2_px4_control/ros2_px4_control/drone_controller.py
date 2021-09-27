@@ -2,29 +2,31 @@
 
 import rclpy
 from rclpy.node import Node
-import ros2_px4_functions
-import numpy as np
 
-from px4_msgs.msg import OffboardControlMode
-from px4_msgs.msg import TrajectorySetpoint
-from px4_msgs.msg import Timesync
-from px4_msgs.msg import VehicleCommand
-from px4_msgs.msg import VehicleLocalPosition
-from px4_msgs.msg import VehicleStatus
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, \
+    VehicleCommand, VehicleLocalPosition, VehicleStatus
 from ros2_px4_interfaces.srv import ControlMode
 
-DT = 0.1
+# Parameters
+OFFBOARD_DT = 0.1   # Offboard control period
+MIN_HEIGHT = 1.0    # Minimum height accepted by the ControlMode service
+MAX_HEIGHT = 10.0   # Maximum height accepted by the ControlMode service
+STD_HEIGHT = 3.0    # Standard height used if out of bound
+
+
+# NULL definition and check function
 NULL = float("NaN")
 
 
-def check_null(list):
-    ret = []
-    for x in list:
-        ret.append(x == NULL)
-    return ret
-
-
 class DroneController(Node):
+    """This node is needed to interface with the Offboard Control of PX4.
+
+    Args:
+        control_mode (string): starting control mode.
+        vehicle_number (string): number of the vehicle to control (only needed
+        on simulation).
+    """
+
     def __init__(self):
         super().__init__("drone_controller")
 
@@ -42,7 +44,7 @@ class DroneController(Node):
         self.local_position_ = [NULL]*3
         self.setpoint_ = [NULL]*3
 
-        # Drone states
+        # Drone state
         self.timestamp_ = 0
         self.arming_state_ = False
         self.disarm_reason_ = -1
@@ -50,54 +52,69 @@ class DroneController(Node):
 
         # Parameters declaration
         self.control_mode_ = self.declare_parameter("control_mode", "idle")
-        self.vehicle_namespace_ = self.declare_parameter(
-            "vehicle_namespace", '')
         self.vehicle_number_ = self.declare_parameter("vehicle_number", 1)
 
         # Retrieve parameter values
         self.control_mode_ = self.get_parameter(
             "control_mode").get_parameter_value().string_value
-        self.vehicle_namespace_ = self.get_parameter(
-            "vehicle_namespace").get_parameter_value().string_value
         self.vehicle_number_ = self.get_parameter(
             "vehicle_number").get_parameter_value().integer_value
 
         # Publishers
-        self.offboard_control_mode_publisher_ = self.create_publisher(
-            OffboardControlMode, self.vehicle_namespace_ + "/OffboardControlMode_PubSubTopic", 1)
-        self.trajectory_setpoint_publisher_ = self.create_publisher(
-            TrajectorySetpoint, self.vehicle_namespace_ + "/TrajectorySetpoint_PubSubTopic", 1)
-        self.vehicle_command_publisher_ = self.create_publisher(
-            VehicleCommand, self.vehicle_namespace_ + "/VehicleCommand_PubSubTopic", 1)
+        self.offboard_control_mode_pub_ = self.create_publisher(
+            OffboardControlMode, "OffboardControlMode_PubSubTopic", 1)
+        self.trajectory_setpoint_pub_ = self.create_publisher(
+            TrajectorySetpoint, "TrajectorySetpoint_PubSubTopic", 1)
+        self.vehicle_command_pub_ = self.create_publisher(
+            VehicleCommand, "VehicleCommand_PubSubTopic", 1)
 
         # Subscribers
-        self.drone_status_subscriber = self.create_subscription(
-            VehicleStatus, self.vehicle_namespace_ + "/VehicleStatus_PubSubTopic", self.callback_drone_status, 1)
+        self.drone_status_sub_ = self.create_subscription(
+            VehicleStatus, "VehicleStatus_PubSubTopic", self.callback_drone_status, 1)
         self.timesync_sub_ = self.create_subscription(
-            Timesync, self.vehicle_namespace_ + "/Timesync_PubSubTopic", self.callback_timesync, 1)
-        self.drone_position_subscriber = self.create_subscription(
-            VehicleLocalPosition, self.vehicle_namespace_ + "/VehicleLocalPosition_PubSubTopic", self.callback_local_position, 1)
+            Timesync, "Timesync_PubSubTopic", self.callback_timesync, 1)
+        self.drone_position_sub_ = self.create_subscription(
+            VehicleLocalPosition, "VehicleLocalPosition_PubSubTopic", self.callback_local_position, 1)
 
         # Services
         self.control_mode_service = self.create_service(
-            ControlMode, self.vehicle_namespace_ + "/control_mode", self.callback_control_mode)
+            ControlMode, "ControlMode_Service", self.callback_control_mode)
 
         # Control loop timer
-        self.timer = self.create_timer(DT, self.timer_callback)
+        self.timer = self.create_timer(OFFBOARD_DT, self.callback_timer)
 
     def callback_timesync(self, msg):
+        """This callback retrieve the timesync value from PX4.
+
+        Args:
+            msg (px4_msgs.msg.Timesync): Timesync message.
+        """
         self.timestamp_ = msg.timestamp
 
     def callback_drone_status(self, msg):
+        """This callback retrieve the drone state from PX4.
+
+        Args:
+            msg (px4_msgs.msg.VehicleStatus): VehicleStatus message,
+        """
         self.arming_state_ = msg.arming_state == VehicleStatus.ARMING_STATE_ARMED
         self.disarm_reason_ = msg._latest_disarming_reason
         self.takeoff_state_ = msg.takeoff_time > 0
 
     def callback_local_position(self, msg):
-        # From NED to ENU
+        """This callback retrieve the current local position from PX4 and
+        convert it in ENU frame.
+
+        Args:
+            msg (px4_msgs.msg.VehicleLocalPosition): VehicleLocalPosition
+            message
+        """
         self.local_position_ = [msg.y, msg.x, -msg.z]
 
-    def timer_callback(self):
+    def callback_timer(self):
+        """This callback send the required messages to enact the offboard
+        control.
+        """
         # Check synchronization
         if self.timestamp_ == 0:
             self.get_logger().warn("Not synched")
@@ -117,26 +134,50 @@ class DroneController(Node):
         self.control_mode_old_ = self.control_mode_
 
     def callback_control_mode(self, request, response):
+        """This callback act the control mode requested by the /control_mode
+        service.
+
+        Args:
+          request (dict): structure containing the request received.
+          response (dict): structure containing the response to send.
+        """
+
+        # Idle cannot be manually requested
         if request.control_mode == "idle":
             self.get_logger().warn("""Cannot reach idle manually""")
             request.control_mode = "land"
 
+        # Check if the control mode is valid
         if request.control_mode in self.CONTROLLERS.keys():
             self.control_mode_ = request.control_mode
-            response.success = "Changing control mode into " + self.control_mode_
+            response.message = "Changing control mode into " + self.control_mode_
         else:
-            response.success = "Control mode " + request.control_mode + " does not exists"
+            response.message = "Control mode " + request.control_mode + " does not exists"
             self.get_logger().warn(
-                """Control mode {request.control_mode} does not exists""")
+                """Control mode {request.control_mode} does not exists"""
+            )
 
+        # Try to retrieve the setpoint from the request
         try:
-            self.setpoint_ = [request.x, request.y, request.z]
+            self.setpoint_ = [
+                request.x,
+                request.y,
+                request.z,
+                request.vx,
+                request.vy,
+                request.vz,
+                request.yaw
+            ]
         except:
-            self.setpoint_ = [NULL]*3
+            pass
 
         return response
 
     def idle_controller(self):
+        """Controller for idle mode: it reset the state and memorize the last
+        position as a reference.
+        """
+
         # Resetting everything
         self.disarm_reason_ = -1
         self.sent_offboard_ = 0
@@ -145,12 +186,10 @@ class DroneController(Node):
         self.start_local_position_ = self.local_position_
 
     def takeoff_controller(self):
-        # Setting standard takeoff heigth of 2.5 meters
-        if self.setpoint_[2] == NULL or self.setpoint_[2] < 1.0 or self.setpoint_[2] > 10.0:
-            self.get_logger().warn(f"""Setting standard takeoff heigth of 2.5 meters,
-                                   instead of {self.setpoint_[2]}. Check bounds.
-                                   """)
-            self.setpoint_[2] = 2.5
+        """Controller for takeoff mode: check the height and perform the takeoff
+        """
+
+        self.check_height()
 
         self.arm()
         self.offboard([
@@ -160,6 +199,10 @@ class DroneController(Node):
         ])
 
     def land_controller(self):
+        """Controller for land mode: send the landind message and stop the
+        offboard control
+        """
+
         if not self.arming_state_:
             self.get_logger().info("Drone not armed, switch to idle")
             self.control_mode_ = "idle"
@@ -168,26 +211,50 @@ class DroneController(Node):
         self.offboard()
         self.publish_vehicle_command(21, 0.0, 0.0)
 
-    def setpoint_controller(self):
-        if any(check_null(self.setpoint_)):
-            self.get_logger().warn(f"""Setpoint not valid: {self.setpoint_}""")
-            self.control_mode_ = "idle"
-            return
+        # Switch to idle to interrupt the offboard
+        self.control_mode_ = "idle"
 
-        if self.setpoint_[2] < 1.0 or self.setpoint_[2] > 10.0:
-            self.get_logger().warn(f"""Setting standard heigth of 2.5 meters,
-                                   instead of {self.setpoint_[2]}. Check bounds.
-                                   """)
-            self.setpoint_[2] = 2.5
+    def setpoint_controller(self):
+        """Controller for setpoint mode: send the request setpoint
+        """
+
+        self.check_height()
 
         self.arm()
-        self.offboard([
-            self.start_local_position_[0] + self.setpoint_[0],
-            self.start_local_position_[1] + self.setpoint_[1],
-            self.start_local_position_[2] + self.setpoint_[2]
-        ])
+        self.offboard(
+            position=[
+                self.start_local_position_[0] + self.setpoint_[0],
+                self.start_local_position_[1] + self.setpoint_[1],
+                self.start_local_position_[2] + self.setpoint_[2]
+            ],
+            velocity=[
+                self.setpoint_[3],
+                self.setpoint_[4],
+                self.setpoint_[5]
+            ],
+            yaw=self.setpoint_[6]
+        )
+
+    def check_height(self):
+        """Check if the requested height is in the boundaries or set the
+        standard one.
+        """
+
+        if self.setpoint_[2] == NULL or self.setpoint_[2] < MIN_HEIGHT or self.setpoint_[2] > MAX_HEIGHT:
+            self.get_logger().warn(f"""
+                                   Setting standard height of {STD_HEIGHT}, instead of {self.setpoint_[2]}. Check bounds.
+                                   """)
+            self.setpoint_[2] = STD_HEIGHT
 
     def publish_vehicle_command(self, command, param1, param2):
+        """This function publish the VehicleCommand to PX4.
+
+        Args:
+            command (int): ID code of the command.
+            param1 (any): first positional parameter.
+            param2 (any): second positional parameter.
+        """
+
         msg = VehicleCommand()
         msg.timestamp = self.timestamp_
         msg.param1 = param1
@@ -198,16 +265,19 @@ class DroneController(Node):
         msg.source_component = 1
         msg.from_external = True
 
-        self.vehicle_command_publisher_.publish(msg)
+        self.vehicle_command_pub_.publish(msg)
 
     def arm(self):
+        """Arming routine and check
+        """
+
         # Arm if disarmed
         if not self.arming_state_:
             # Check if disarmed by RC
             if self.disarm_reason_ == VehicleStatus.ARM_DISARM_REASON_RC_STICK or \
                     self.disarm_reason_ == VehicleStatus.ARM_DISARM_REASON_RC_SWITCH:
                 self.get_logger().info(
-                    f"""Disarmed by {self.disarm_reason_}, cannot arm""")
+                    f"""Disarmed by RC, cannot arm""")
                 self.control_mode_ = "idle"
                 return
 
@@ -215,24 +285,41 @@ class DroneController(Node):
             self.publish_vehicle_command(400, 1.0, 0.0)
 
     def disarm(self):
+        """Disarming routine and check
+        """
+
         # Disarm if armed
         if self.arming_state_:
             self.get_logger().info("Disarming")
             self.publish_vehicle_command(400, 0.0, 1.0)
 
-    def offboard(self, position=[NULL]*3, velocity=[NULL]*3):
+    def offboard(self, position=[NULL]*3, velocity=[NULL]*3, yaw=NULL):
+        """This function send the requested offboard command
+
+        Args:
+            position (list of 3 float, optional): The requested position.
+            Defaults to [NULL]*3.
+            velocity (list of 3 float, optional): The requested velocity.
+            Defaults to [NULL]*3.
+            yaw (float, optional): The requested yaw.
+            Defaults to NULL.
+        """
+
+        # Counting offboard command to initiate offboard control
         self.sent_offboard_ += 1
 
+        # Setting up offboard control mode
         msg = OffboardControlMode()
         msg.timestamp = self.timestamp_
-        msg.position = not all(check_null(position))
-        msg.velocity = not all(check_null(velocity))
+        msg.position = True
+        msg.velocity = True
         msg.acceleration = False
-        msg.attitude = False
+        msg.attitude = True
         msg.body_rate = False
 
-        self.offboard_control_mode_publisher_.publish(msg)
+        self.offboard_control_mode_pub_.publish(msg)
 
+        # Setting up requested setpoint
         msg = TrajectorySetpoint()
         msg.timestamp = self.timestamp_
 
@@ -243,8 +330,9 @@ class DroneController(Node):
         msg.vx = velocity[1]
         msg.vy = velocity[0]
         msg.vz = -velocity[2]
+        msg.yaw = yaw
 
-        self.trajectory_setpoint_publisher_.publish(msg)
+        self.trajectory_setpoint_pub_.publish(msg)
 
 
 def main(args=None):

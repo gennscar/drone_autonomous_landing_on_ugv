@@ -13,18 +13,23 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='gennscar',
-    maintainer_email='gennscar97@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer=[
+        'Cosimo Conte'
+        'Gennaro Scarati'
+        'Matteo Celada'
+    ],
+    maintainer_email=[
+        'cosimocon@gmail.com'
+        'gennscar97@gmail.com'
+        'matte.celada@gmail.com'
+    ],
+    description='This package contains nodes to control the drone interfacing with PX4',
+    license='GNU GPLv3',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "hand_of_god_nav = ros2_px4_control.hand_of_god_nav:main",
             "drone_controller = ros2_px4_control.drone_controller:main",
-            "drone_controller_old = ros2_px4_control.drone_controller_old:main",
-            "rover_controller = ros2_px4_control.rover_controller:main",
-            "offboard_control = ros2_px4_control.offboard_control:main"
+            "odometry_sender = ros2_px4_control.odometry_sender:main"
         ],
     },
 )
