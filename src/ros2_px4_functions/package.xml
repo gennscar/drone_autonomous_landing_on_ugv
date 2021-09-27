@@ -3,17 +3,14 @@
 <package format="3">
   <name>ros2_px4_functions</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="gennscar97@gmail.com">gennscar</maintainer>
-  <license>TODO: License declaration</license>
+  <description>This package contains all functions that are not directly ROS2 nodes used by nodes</description>
+  <maintainer email="cosimocon@gmail.com">Cosimo Conte</maintainer>
+  <maintainer email="gennscar97@gmail.com">Gennaro Scarati</maintainer>
+  <maintainer email="matte.celada@gmail.com">Matteo Celada</maintainer>
+  <license>GNU GPLv3</license>
 
   <depend>numpy</depend>
   <depend>scipy</depend>
-
-  <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
 
   <export>
     <build_type>ament_python</build_type>

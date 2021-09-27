@@ -3,9 +3,11 @@
 <package format="3">
   <name>ros2_px4_launch_files</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="gennscar97@gmail.com">gennscar</maintainer>
-  <license>TODO: License declaration</license>
+  <description>This package contains all the launch files to perform automatic action with multiple nodes</description>
+  <maintainer email="cosimocon@gmail.com">Cosimo Conte</maintainer>
+  <maintainer email="gennscar97@gmail.com">Gennaro Scarati</maintainer>
+  <maintainer email="matte.celada@gmail.com">Matteo Celada</maintainer>
+  <license>GNU GPLv3</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

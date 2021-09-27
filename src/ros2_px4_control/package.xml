@@ -3,9 +3,11 @@
 <package format="3">
   <name>ros2_px4_control</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="gennscar97@gmail.com">gennscar</maintainer>
-  <license>TODO: License declaration</license>
+  <description>This package contains nodes to control the drone interfacing with PX4</description>
+  <maintainer email="cosimocon@gmail.com">Cosimo Conte</maintainer>
+  <maintainer email="gennscar97@gmail.com">Gennaro Scarati</maintainer>
+  <maintainer email="matte.celada@gmail.com">Matteo Celada</maintainer>
+  <license>GNU GPLv3</license>
 
   <depend>rclpy</depend>
   <depend>random</depend>
@@ -14,14 +16,11 @@
   <depend>px4_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>math</depend>
+  <depend>px4_msgs</depend>
+
   <depend>ros2_px4_interfaces</depend>
   <depend>ros2_px4_functions</depend>
   <depend>tf2_ros</depend>
-
-  <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
 
   <export>
     <build_type>ament_python</build_type>

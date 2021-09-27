@@ -13,10 +13,18 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='gennscar',
-    maintainer_email='gennscar97@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer=[
+        'Cosimo Conte'
+        'Gennaro Scarati'
+        'Matteo Celada'
+    ],
+    maintainer_email=[
+        'cosimocon@gmail.com'
+        'gennscar97@gmail.com'
+        'matte.celada@gmail.com'
+    ],
+    description='This package contains state estimation nodes for the drone or other components',
+    license='GNU GPLv3',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
@@ -33,8 +41,8 @@ setup(
             "magnetometer_yaw_estimator = ros2_px4_estimation.magnetometer_yaw_estimator:main",
             "drone_rover_kf_pos_theta = ros2_px4_estimation.drone_rover_kf_pos_theta:main",
             "gazebo_yaw_estimator = ros2_px4_estimation.gazebo_yaw_estimator:main",
-            "drone_rover_kf_new = ros2_px4_estimation.drone_rover_kf_new:main"
-
-       ],
+            "drone_rover_kf_new = ros2_px4_estimation.drone_rover_kf_new:main",
+            "gps_positioning = ros2_px4_estimation.gps_positioning:main"
+        ],
     },
 )

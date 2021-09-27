@@ -6,6 +6,7 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
+from px4_msgs.msg import VehicleLocalPosition
 from ros2_px4_interfaces.msg import DistanceStamped, DistanceStampedArray, UwbSensor
 
 
@@ -43,7 +44,7 @@ class PerformanceAnalyzer(Node):
         # Subscribers initialization
         for i in range(self.N):
             self.anchorsPositionGroundTruthSubs.append(self.create_subscription(Odometry, "X500_" + str(i) + "/GroundTruth/odom", partial(self.anchorsPositionGroundTruthCallback, droneId=i), self.QUEUE_SIZE))
-            self.anchorsPositionSubs.append(self.create_subscription(Odometry, "X500_" + str(i) + "/VehicleLocalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
+            # self.anchorsPositionSubs.append(self.create_subscription(VehicleLocalPosition, "X500_" + str(i) + "/VehicleLocalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
         if self.NUM_TARGET == 1:
             self.targetPositionSub = self.create_subscription(Odometry, "targetRover/GroundTruth/odom", self.targetPositionCallback, self.QUEUE_SIZE)
             self.targetUwbSensorSub = self.create_subscription(UwbSensor, "uwb_sensor_" + str(self.TARGET_ID), self.targetUwbSensorCallback, self.QUEUE_SIZE)
@@ -64,9 +65,9 @@ class PerformanceAnalyzer(Node):
         yCenter = 0.0
         zCenter = 0.0
         for i in range(self.N):
-            xCenter += self.anchorsPosition[i].pose.pose.position.x
-            yCenter += self.anchorsPosition[i].pose.pose.position.y
-            zCenter += self.anchorsPosition[i].pose.pose.position.z
+            xCenter += self.anchorsPositionGroundTruth[i].pose.pose.position.x
+            yCenter += self.anchorsPositionGroundTruth[i].pose.pose.position.y
+            zCenter += self.anchorsPositionGroundTruth[i].pose.pose.position.z
         xCenter /= self.N
         yCenter /= self.N
         zCenter /= self.N
@@ -90,7 +91,7 @@ class PerformanceAnalyzer(Node):
             for j in range(i + 1, self.N):
                 msg.destination_drone_id = i
                 msg.start_drone_id = j
-                msg.distance = math.sqrt((self.anchorsPosition[i].pose.pose.position.x - self.anchorsPosition[j].pose.pose.position.x)**2 + (self.anchorsPosition[i].pose.pose.position.y - self.anchorsPosition[j].pose.pose.position.y)**2 + (self.anchorsPosition[i].pose.pose.position.z - self.anchorsPosition[j].pose.pose.position.z)**2)
+                msg.distance = math.sqrt((self.anchorsPositionGroundTruth[i].pose.pose.position.x - self.anchorsPositionGroundTruth[j].pose.pose.position.x)**2 + (self.anchorsPositionGroundTruth[i].pose.pose.position.y - self.anchorsPositionGroundTruth[j].pose.pose.position.y)**2 + (self.anchorsPositionGroundTruth[i].pose.pose.position.z - self.anchorsPositionGroundTruth[j].pose.pose.position.z)**2)
                 interAnchorsDistances.append(copy.deepcopy(msg))
         result.data = interAnchorsDistances
         return result
@@ -104,7 +105,7 @@ class PerformanceAnalyzer(Node):
             msg.destination_drone_id = i
             msg.start_drone_id = 200
             try:
-                msg.distance = math.sqrt((self.anchorsPosition[i].pose.pose.position.x - self.targetPosition.pose.pose.position.x)**2 + (self.anchorsPosition[i].pose.pose.position.y - self.targetPosition.pose.pose.position.y)**2 + (self.anchorsPosition[i].pose.pose.position.z - self.targetPosition.pose.pose.position.z)**2)
+                msg.distance = math.sqrt((self.anchorsPositionGroundTruth[i].pose.pose.position.x - self.targetPosition.pose.pose.position.x)**2 + (self.anchorsPositionGroundTruth[i].pose.pose.position.y - self.targetPosition.pose.pose.position.y)**2 + (self.anchorsPositionGroundTruth[i].pose.pose.position.z - self.targetPosition.pose.pose.position.z)**2)
             except:
                 msg.distance = 0.0
             targetAnchorsDistances.append(copy.deepcopy(msg))
@@ -124,7 +125,7 @@ class PerformanceAnalyzer(Node):
 
     # Callbacks
     def timerCallback(self):
-        if len(self.anchorsPosition) == self.N:
+        if len(self.anchorsPositionGroundTruth) == self.N:
             self.interAnchorsDistancesPub.publish(self.computeInterAnchorsDistances())
             self.targetAnchorsDistancesPub.publish(self.computeTargetAnchorsDistances())
             swarmCenter = self.computeSwarmCenter()
@@ -144,8 +145,6 @@ class PerformanceAnalyzer(Node):
 
     def anchorsPositionCallback(self, msg, droneId):
         self.anchorsPosition[droneId] = msg
-        if droneId == 0:
-            self.get_logger().info("%f" % msg.z)
 
     def targetPositionCallback(self, msg):
         self.targetPosition = msg
