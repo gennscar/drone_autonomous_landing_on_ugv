@@ -364,10 +364,19 @@ function targetroversquare() {
 # region Test commands
 function ddsserver() {
   fastdds discovery -i 0 -l 192.168.1.99 -p 11811
+#  cd $HOME || exec $SHELL
+#  export FASTRTPS_DEFAULT_PROFILES_FILE=discovery_server_configuration_file.xml
+#  ros2 daemon stop
+#  ros2 daemon start
 }
 
 function rds() {
+#  export FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/ros2_px4_ws/utils/super_client_configuration_file.xml
   export ROS_DISCOVERY_SERVER=192.168.1.99:11811
+}
+
+function superclient() {
+  export FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/ros2_px4_ws/utils/super_client_configuration_file.xml
 }
 
 function sendpackage() {

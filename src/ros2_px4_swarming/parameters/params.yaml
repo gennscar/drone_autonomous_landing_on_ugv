@@ -13,7 +13,7 @@
         MAX_SWARMING_SPEED: 1.0
         TIMEOUT: 5
         UWB_ON: false
-        SINGLE_DRONE_FOR_TEST: true
+        SINGLE_DRONE_FOR_TEST: false
 
 targetRover:
     targetRover:
