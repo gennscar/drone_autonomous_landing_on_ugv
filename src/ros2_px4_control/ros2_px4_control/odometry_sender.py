@@ -16,7 +16,7 @@ class OdometrySender(Node):
     """
 
     def __init__(self):
-        super().__init__("odometry_sender")
+        super().__init__("OdometrySender")
 
         # Variables declaration
         self.timestamp_ = 0
@@ -31,8 +31,8 @@ class OdometrySender(Node):
         if(self.odometry_sub_name_ == ""):
             self.get_logger().error("Missing odometry sub name")
             return
-        
-        # Subscribers initialization        
+
+        # Subscribers initialization
         self.odometry_sub_ = self.create_subscription(
             PoseWithCovarianceStamped, self.odometry_sub_name_,
             self.callback_odometry, QUEUE_SIZE
@@ -40,12 +40,14 @@ class OdometrySender(Node):
 
         # Publishers initialization
         self.visual_odometry_pub_ = self.create_publisher(
-            VehicleVisualOdometry, "VehicleVisualOdometry_PubSubTopic", 
+            VehicleVisualOdometry, "VehicleVisualOdometry_PubSubTopic",
             QUEUE_SIZE
         )
 
         # Timer initialization
         self.timer_ = self.create_timer(SENDER_DT, self.callback_timer)
+
+        self.get_logger().info("Node has started")
 
     def callback_timesync(self, msg):
         """This callback retrieve the timesync value from PX4.
@@ -107,7 +109,6 @@ class OdometrySender(Node):
 
         self.visual_odometry_pub_.publish(msg)
 
-        
 
 def main(args=None):
     rclpy.init(args=args)

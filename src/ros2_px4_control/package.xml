@@ -10,12 +10,12 @@
   <license>GNU GPLv3</license>
 
   <depend>rclpy</depend>
+  <depend>math</depend>
   <depend>random</depend>
   <depend>numpy</depend>
-  <depend>nav_msgs</depend>
-  <depend>px4_msgs</depend>
+
   <depend>geometry_msgs</depend>
-  <depend>math</depend>
+  <depend>nav_msgs</depend>
   <depend>px4_msgs</depend>
 
   <depend>ros2_px4_interfaces</depend>
