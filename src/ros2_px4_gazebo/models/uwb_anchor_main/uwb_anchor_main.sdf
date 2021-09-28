@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<sdf version='1.6'>
+  <model name='uwb_anchor_main'>
+    <static>1</static>
+    <pose>0 0 0 0 0 0</pose>
+    <link name="uwb_anchor_head">
+      <visual name='uwb_anchor_head_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.1 0.1 0.1</radius>
+          </sphere>
+        </geometry>
+      </visual>
+      <sensor name="anchor_gps" type="gps">
+        <always_on>true</always_on>
+        <update_rate>1</update_rate>
+        <plugin name="anchor_gps_plugin" filename="libgazebo_ros_gps_sensor.so">
+          <ros>
+            <namespace>/Gps</namespace>
+            <remapping>~/out:=data</remapping>
+          </ros>
+        </plugin>
+      </sensor>
+    </link>
+    <plugin name="gazebo_ros_uwb" filename="libros2_px4_gazebo_uwb.so">
+      <link_name>uwb_anchor_head</link_name>
+      <update_rate>20</update_rate>
+    </plugin>
+  </model>
+</sdf>
