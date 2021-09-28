@@ -28,6 +28,20 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            "uwb_positioning = ros2_px4_estimation.uwb_positioning:main",
+            "px4_positioning = ros2_px4_estimation.px4_positioning:main",
+            "kf_loose_positioning = ros2_px4_estimation.kf_loose_positioning:main",
+            "ukf_positioning = ros2_px4_estimation.ukf_positioning:main",
+            "uwb_estimate_2_px4 = ros2_px4_estimation.uwb_estimate_2_px4:main",
+            "apriltag_yaw_estimator = ros2_px4_estimation.apriltag_yaw_estimator:main",
+            "px4_yaw_estimator = ros2_px4_estimation.px4_yaw_estimator:main",
+            "drone_rover_uwb_positioning = ros2_px4_estimation.drone_rover_uwb_positioning:main",
+            "uwb_driver = ros2_px4_estimation.uwb_driver:main",
+            "drone_rover_kf_pos = ros2_px4_estimation.drone_rover_kf_pos:main",
+            "magnetometer_yaw_estimator = ros2_px4_estimation.magnetometer_yaw_estimator:main",
+            "drone_rover_kf_pos_theta = ros2_px4_estimation.drone_rover_kf_pos_theta:main",
+            "gazebo_yaw_estimator = ros2_px4_estimation.gazebo_yaw_estimator:main",
+            "drone_rover_kf_new = ros2_px4_estimation.drone_rover_kf_new:main",
             "gps_positioning = ros2_px4_estimation.gps_positioning:main"
         ],
     },
