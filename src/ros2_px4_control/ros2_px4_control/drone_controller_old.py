@@ -12,8 +12,8 @@ from ros2_px4_interfaces.srv import ControlMode
 # TO MODIFY: remove get logger spamming
 
 # Control parameters
-KP = 1.3 # 1.3
-KI = 0.1 # 0.1
+KP = 1.0 # 1.3
+KI = 0.07 # 0.1
 KD = 0.05 # 0.05
 POS_GAIN_SWITCH = 3.0
 V_MAX = 1.3

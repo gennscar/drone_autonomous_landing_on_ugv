@@ -39,7 +39,7 @@ class UwbPositioning(Node):
         self.sensor_id_ = self.declare_parameter("sensor_id", "Iris")
         self.method_ = self.declare_parameter("method", "LS")
         self.iterations_ = self.declare_parameter("iterations", 1)
-        self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e8)
+        self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e7)
         self.max_range = self.declare_parameter("max_range", 30.0)
 
         # Retrieve parameter values
@@ -63,7 +63,7 @@ class UwbPositioning(Node):
 
         # Setting up sensors subscriber for the UWB plugin
         self.sensor_subscriber_ = self.create_subscription(
-            UwbSensor, "/uwb_sensor/" + self.sensor_id_, self.callback_sensor_subscriber, 10)
+            UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
 
         # Setting up a publishers to send the estimated position
         self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
@@ -108,7 +108,7 @@ class UwbPositioning(Node):
         ranges = ranges[0:N]
 
         # Only if trilateration is possible
-        if N > 2:
+        if N > 3:
             # Perform Least-Square
             if(self.method_ == "LS"):
                 self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
