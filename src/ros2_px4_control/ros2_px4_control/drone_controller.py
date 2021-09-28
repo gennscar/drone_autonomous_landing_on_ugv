@@ -28,7 +28,7 @@ class DroneController(Node):
     """
 
     def __init__(self):
-        super().__init__("drone_controller")
+        super().__init__("DroneController")
 
         # Controller state name map to controllers function
         self.CONTROLLERS = {
@@ -82,6 +82,8 @@ class DroneController(Node):
 
         # Control loop timer
         self.timer = self.create_timer(OFFBOARD_DT, self.callback_timer)
+
+        self.get_logger().info("Node has started")
 
     def callback_timesync(self, msg):
         """This callback retrieve the timesync value from PX4.

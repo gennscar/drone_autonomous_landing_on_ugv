@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from math import radians
 import rclpy
 from rclpy.node import Node
 import numpy as np
@@ -12,6 +13,9 @@ from filterpy.common import Q_discrete_white_noise
 from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
 from ros2_px4_interfaces.msg import UwbSensor
 
+QUEUE_SIZE = 10
+FILTER_DIM = 9
+
 
 class UkfPositioning(Node):
     """
@@ -19,11 +23,11 @@ class UkfPositioning(Node):
     """
 
     def __init__(self):
-        super().__init__("ukf_positioning")
+        super().__init__("UkfPositioning")
 
-        self.declare_parameter('deltaT', 0.005)
-        self.declare_parameter('R_uwb', 0.05)
-        self.declare_parameter('Q', 0.05)
+        self.declare_parameter('deltaT', 0.1)
+        self.declare_parameter('R_uwb', 1e-4)
+        self.declare_parameter('Q', 1.0)
 
         self.deltaT_ = self.get_parameter(
             'deltaT').get_parameter_value().double_value
@@ -35,7 +39,9 @@ class UkfPositioning(Node):
 
         # Kalman Filter
         sigmas = MerweScaledSigmaPoints(
-            9, alpha=1e-3, beta=2., kappa=0., sqrt_method=scipy.linalg.sqrtm)
+            FILTER_DIM, alpha=1e-3, beta=2., kappa=0.,
+            sqrt_method=scipy.linalg.sqrtm
+        )
 
         def f_(x, dt):
             f = np.array([
@@ -47,11 +53,12 @@ class UkfPositioning(Node):
             return F @ x
 
         self.kalman_filter_ = UKF(
-            dim_x=9, dim_z=9, dt=self.deltaT_, fx=f_, hx=None, points=sigmas)
+            dim_x=FILTER_DIM, dim_z=FILTER_DIM, dt=self.deltaT_, fx=f_, hx=None,
+            points=sigmas
+        )
 
-        # Initial estimate
-        self.kalman_filter_.x = np.array(
-            [0., 0., 0., 0., 0., 0., 0., 0., 0.])
+        # Initial estimate @todo: put the home position
+        self.kalman_filter_.x = np.zeros(FILTER_DIM)
 
         # Covariance matrix
         self.kalman_filter_.P *= 10.
@@ -62,13 +69,24 @@ class UkfPositioning(Node):
 
         # Setting up sensors subscribers
         self.sensor_subscriber_ = self.create_subscription(
-            UwbSensor, "/uwb_sensor/Iris", self.callback_uwb_subscriber, 10)
+            UwbSensor, "/uwb_sensor/Iris", self.callback_uwb_subscriber,
+            QUEUE_SIZE
+        )
+        self.gps_subscriber_ = self.create_subscription(
+            PoseWithCovarianceStamped, "GpsPositioning/EstimatedPos",
+            self.callback_gps_subscriber,
+            QUEUE_SIZE
+        )
 
         # Setting up position and velocity publisher
         self.est_pos_publisher_ = self.create_publisher(
-            PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
+            PoseWithCovarianceStamped, "~/EstimatedPos",
+            QUEUE_SIZE
+        )
         self.est_vel_publisher_ = self.create_publisher(
-            TwistWithCovarianceStamped, self.get_namespace() + "/estimated_vel", 10)
+            TwistWithCovarianceStamped, "~/EstimatedVel",
+            QUEUE_SIZE
+        )
 
         # Prediction timer
         self.timer = self.create_timer(self.deltaT_, self.predict_callback)
@@ -80,6 +98,13 @@ class UkfPositioning(Node):
                                """)
 
     def callback_uwb_subscriber(self, msg):
+        """Measuring UWB range sensor
+
+        Args:
+            msg (ros2_px4_interfaces.msg.UwbSensor): The UWB message
+        """
+
+        # Must predict once first
         if(not self.predicted_):
             return
 
@@ -93,6 +118,7 @@ class UkfPositioning(Node):
             msg.anchor_pose.pose.position.z
         ])
 
+        # Measurement model for a range sensor
         def h_uwb(x):
             r = np.linalg.norm(x[[0, 3, 6]] - anchor_position)
             return np.array([r, 0., 0., 0., 0., 0., 0., 0., 0.])
@@ -100,13 +126,42 @@ class UkfPositioning(Node):
         # Filter update
         self.kalman_filter_.update(z, R=self.R_uwb_, hx=h_uwb)
 
-    def predict_callback(self):
-        cov_norm = np.linalg.norm(self.kalman_filter_.P, ord=np.Inf)
+    def callback_gps_subscriber(self, msg):
+        """Measuring GPS positioning sensor
 
-        if(cov_norm > 10 or True):
+        Args:
+            msg (geometry_msgs.msg.PoseWithCovarianceStamped): The GPS message
+        """
+
+        # Must predict once first
+        if(not self.predicted_):
+            return
+
+        # Storing measurements in a np.array
+        z = np.array([
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y,
+            msg.pose.pose.position.z,
+            0., 0., 0., 0., 0., 0.
+        ])
+
+        # Measurement model for a GPS sensor
+        def h_gps(x):
+            return np.array([x[0], x[3], x[6], 0., 0., 0., 0., 0., 0.])
+
+        # Filter update
+        self.kalman_filter_.update(z, R=self.R_uwb_, hx=h_gps)
+
+    def predict_callback(self):
+        """This callback perform the filter predict and forward the current
+        estimate
+        """
+
+        # @todo: Check something wtr of covariance
+        if(True):
             # Sending the estimated position
             msg = PoseWithCovarianceStamped()
-            msg.header.frame_id = self.get_namespace() + "/estimated_pos"
+            msg.header.frame_id = "UkfPositioning"
             msg.header.stamp = self.get_clock().now().to_msg()
 
             msg.pose.pose.position.x = self.kalman_filter_.x[0]
@@ -127,7 +182,7 @@ class UkfPositioning(Node):
 
             # Sending the estimated velocity
             msg = TwistWithCovarianceStamped()
-            msg.header.frame_id = self.get_namespace() + "/estimated_vel"
+            msg.header.frame_id = "UkfPositioning"
             msg.header.stamp = self.get_clock().now().to_msg()
 
             msg.twist.twist.linear.x = self.kalman_filter_.x[1]
