@@ -65,6 +65,11 @@ class UwbPositioning(Node):
         self.norot_position_publisher = self.create_publisher(
             PoseWithCovarianceStamped, self.norot_estimator_topic_name_, 10)
 
+        self.tag_0_publisher = self.create_publisher(
+            PoseWithCovarianceStamped, "tag_0", 10)
+        self.tag_1_publisher = self.create_publisher(
+            PoseWithCovarianceStamped,"tag_1", 10)
+
         self.yaw_publisher_topic = self.get_namespace() + "/estimated_yaw"
         self.yaw_publisher = self.create_publisher(Yaw, self.yaw_publisher_topic , 10)
 
@@ -82,8 +87,10 @@ class UwbPositioning(Node):
 
     def callback_tag_0(self, msg):
         # Saving the message in a dict
-        if msg.anchor_pose.header.frame_id != "tag_1":
-            self.anchors_0_[msg.anchor_pose.header.frame_id] = msg
+        if msg.anchor_pose.header.frame_id == "tag_1":
+            return
+        
+        self.anchors_0_[msg.anchor_pose.header.frame_id] = msg
 
         # Extract anchor positions and ranges
         i = 0
@@ -106,18 +113,27 @@ class UwbPositioning(Node):
 
         if N > 2:
             
-            tag_0_est_pos, Q_0 = ros2_px4_functions.ls_trilateration(
+            tag_0_est_pos = ros2_px4_functions.ls_trilateration(
                 anchor_pos, ranges, N)
-            #self.get_logger().info(f"{Q_0}")
-            if np.linalg.norm(tag_0_est_pos[0:2], ord=2) <= self.max_range:
 
+            if np.linalg.norm(tag_0_est_pos[0:2], ord=2) <= self.max_range:
                 self.tag_0_est_pos = tag_0_est_pos
+
+                tag_0_pub_pos = PoseWithCovarianceStamped()
+                tag_0_pub_pos.header.frame_id = "tag_0"
+                tag_0_pub_pos.header.stamp = self.get_clock().now().to_msg()
+                tag_0_pub_pos.pose.pose.position.x = tag_0_est_pos[0]
+                tag_0_pub_pos.pose.pose.position.y = tag_0_est_pos[1]
+                tag_0_pub_pos.pose.pose.position.z = tag_0_est_pos[2]
+                self.tag_0_publisher.publish(tag_0_pub_pos)
 
     def callback_tag_1(self, msg):
 
         # Saving the message in a dict
-        if msg.anchor_pose.header.frame_id != "tag_0":
-            self.anchors_1_[msg.anchor_pose.header.frame_id] = msg
+        if msg.anchor_pose.header.frame_id == "tag_0":
+            return
+        
+        self.anchors_1_[msg.anchor_pose.header.frame_id] = msg
 
         # Extract anchor positions and ranges
         i = 0
@@ -140,13 +156,19 @@ class UwbPositioning(Node):
 
         if N > 2:
             
-            tag_1_est_pos, Q_1 = ros2_px4_functions.ls_trilateration(
+            tag_1_est_pos= ros2_px4_functions.ls_trilateration(
                 anchor_pos, ranges, N)
-            self.get_logger().info(f"{Q_1}")
             if np.linalg.norm(tag_1_est_pos[0:2], ord=2) <= self.max_range:
 
                 self.tag_1_est_pos = tag_1_est_pos
 
+                tag_1_pub_pos = PoseWithCovarianceStamped()
+                tag_1_pub_pos.header.frame_id = "tag_1"
+                tag_1_pub_pos.header.stamp = self.get_clock().now().to_msg()
+                tag_1_pub_pos.pose.pose.position.x = tag_1_est_pos[0]
+                tag_1_pub_pos.pose.pose.position.y = tag_1_est_pos[1]
+                tag_1_pub_pos.pose.pose.position.z = tag_1_est_pos[2]
+                self.tag_1_publisher.publish(tag_1_pub_pos)
 
     def callback_timer(self):
         

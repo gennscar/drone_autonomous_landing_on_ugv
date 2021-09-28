@@ -26,10 +26,8 @@ def ls_trilateration(anchor_pos, ranges, N):
 
     # Resolve LS: y = pinv(A)*b
     y = pinvA.dot(b)
-    
-    # HDOP
-    Q = np.sqrt(pinvA[0][0] + pinvA[1][1])
-    return y[1:], Q
+
+    return y[1:]
 
 
 def gauss_newton_trilateration(old_pos, anchor_pos, ranges):
