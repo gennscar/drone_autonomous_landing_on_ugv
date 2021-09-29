@@ -18,7 +18,7 @@ def generate_launch_description():
         ]
         ))
 
-    
+
     ld.add_entity(Node(
         package='ros2_px4_testing',
         executable='rover_yaw_error',
@@ -26,5 +26,5 @@ def generate_launch_description():
         parameters=[
             {"vehicle_namespace": "/rover"}
         ]))
-    
+
     return ld

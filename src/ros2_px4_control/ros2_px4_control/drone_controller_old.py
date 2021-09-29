@@ -5,6 +5,7 @@ from rclpy.node import Node
 import ros2_px4_functions
 import numpy as np
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, VehicleCommand, VehicleLocalPosition, VehicleStatus
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from ros2_px4_interfaces.srv import ControlMode
 
@@ -12,9 +13,9 @@ from ros2_px4_interfaces.srv import ControlMode
 # TO MODIFY: remove get logger spamming
 
 # Control parameters
-KP = 1.0 # 1.3
-KI = 0.07 # 0.1
-KD = 0.05 # 0.05
+KP = 1.0# 1.3
+KI = 0.1 # 0.1
+KD = 0.1 # 0.05
 POS_GAIN_SWITCH = 3.0
 V_MAX = 1.3
 
@@ -119,16 +120,16 @@ class DroneController(Node):
         self.vz = msg.vz
         
         self.watchdog_counter[0][0] += 1
-    
+
     def callback_target_uwb_position(self, msg):
 
         # From rover ENU frame to drone NED frame
         self.estimated_rel_target_pos = [
-             msg.pose.pose.position.x,  msg.pose.pose.position.y]
+            - msg.pose.pose.position.y, - msg.pose.pose.position.x]
         self.e = np.array(self.estimated_rel_target_pos)
 
         self.estimated_rel_target_vel = [
-             msg.twist.twist.linear.x,  msg.twist.twist.linear.y]
+            - msg.twist.twist.linear.y, - msg.twist.twist.linear.x]
         self.e_dot = np.array(self.estimated_rel_target_vel)
 
         self.z_dist_sensor = msg.pose.pose.position.z
@@ -199,15 +200,14 @@ class DroneController(Node):
 
 
         self.norm_e = np.linalg.norm(self.e, ord=2)
+        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
         if (self.norm_e) < POS_GAIN_SWITCH:
-            [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
+            [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = False
         else:
-            [msg.vx, msg.vy], self.e_dot, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
+            [msg.vx, msg.vy], _, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = True
-
-        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
         #elif ((self.norm_e) < LAND_ERR_TOLL) and ((self.norm_e_dot) < LAND_VEL_TOLL) and (self.z_dist_sensor <= TURN_OFF_MOT_HEIGHT):
         #     self.publish_vehicle_command(185, 1.0, 0.0)
@@ -232,12 +232,13 @@ class DroneController(Node):
         msg.z = - FOLLOW_HOVERING_HEIGHT
 
         self.norm_e = np.linalg.norm(self.e, ord=2)
+        self.norm_e_dot = np.linalg.norm(self.e_dot, ord=2)
 
         if (self.norm_e) < POS_GAIN_SWITCH:
-            [msg.vx, msg.vy], self.e_dot, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
+            [msg.vx, msg.vy], _, _ = self.PID_1.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = False
         else:
-            [msg.vx, msg.vy], self.e_dot, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
+            [msg.vx, msg.vy], _, _ = self.PID_2.PID(self.e, self.e_dot, [self.vx, self.vy], self.RESET_INT)
             self.RESET_INT = True
 
         return msg
