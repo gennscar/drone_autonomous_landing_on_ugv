@@ -13,7 +13,7 @@
     <!-- Anchor 0 -->
     <include>
       <name>uwb_anchor_0</name>
-      <uri>model://uwb_anchor_main</uri>
+      <uri>model://uwb_anchor</uri>
       <pose>0 0 0 0 0 0</pose>
     </include>
     <!-- Anchor 1 -->
