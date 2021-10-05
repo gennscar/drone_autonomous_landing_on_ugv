@@ -92,22 +92,6 @@ def generate_launch_description():
                 params,
                 {'N': numDrones},
                 {'NUM_TARGET': numTarget}
-            ],
-            remappings=[
-                ('/trackingVelocityCalculator/uwb_sensor_200', '/uwb_sensor_200'),
-                ('/trackingVelocityCalculator/unitVectorsCalculator/unitVectors', '/unitVectorsCalculator/unitVectors'),
-                ('/trackingVelocityCalculator/X500_0/VehicleGlobalPosition_PubSubTopic', '/X500_0/VehicleGlobalPosition_PubSubTopic'),
-                ('/trackingVelocityCalculator/X500_1/VehicleGlobalPosition_PubSubTopic', '/X500_1/VehicleGlobalPosition_PubSubTopic'),
-                ('/trackingVelocityCalculator/X500_2/VehicleGlobalPosition_PubSubTopic', '/X500_2/VehicleGlobalPosition_PubSubTopic'),
-                ('/trackingVelocityCalculator/X500_3/VehicleGlobalPosition_PubSubTopic', '/X500_3/VehicleGlobalPosition_PubSubTopic'),
-                ('/trackingVelocityCalculator/X500_4/VehicleGlobalPosition_PubSubTopic', '/X500_4/VehicleGlobalPosition_PubSubTopic'),
-                ('/trackingVelocityCalculator/X500_5/VehicleGlobalPosition_PubSubTopic', '/X500_5/VehicleGlobalPosition_PubSubTopic'),
-                ('/trackingVelocityCalculator/X500_0/readyForSwarming', '/X500_0/readyForSwarming'),
-                ('/trackingVelocityCalculator/X500_1/readyForSwarming', '/X500_1/readyForSwarming'),
-                ('/trackingVelocityCalculator/X500_2/readyForSwarming', '/X500_2/readyForSwarming'),
-                ('/trackingVelocityCalculator/X500_3/readyForSwarming', '/X500_3/readyForSwarming'),
-                ('/trackingVelocityCalculator/X500_4/readyForSwarming', '/X500_4/readyForSwarming'),
-                ('/trackingVelocityCalculator/X500_5/readyForSwarming', '/X500_5/readyForSwarming')
             ]
         )
         ld.add_action(trackingVelocityCalculator)
@@ -125,14 +109,28 @@ def generate_launch_description():
         # ld.add_action(rqtPlot)
 
     if RECORD_ON:
-        # Launch ros2bag
-        bagName = datetime.datetime.now().strftime('rosbag2_%Y_%m_%d-%H_%M_%S')
-        cmdVector = ['ros2', 'bag', 'record', '-a', '-o', bagfiles + '/' + bagName]
-        ros2Record = ExecuteProcess(
-            cmd=cmdVector,
-            output='screen'
+        # # Launch ros2bag
+        # bagName = datetime.datetime.now().strftime('rosbag2_%Y_%m_%d-%H_%M_%S')
+        # cmdVector = ['ros2', 'bag', 'record', '-a', '-o', bagfiles + '/' + bagName]
+        # ros2Record = ExecuteProcess(
+        #     cmd=cmdVector,
+        #     output='screen'
+        # )
+        # ld.add_action(ros2Record)
+
+        # Launch topicsRecorder
+        topicsRecorder = Node(
+            package='ros2_px4_swarming',
+            namespace='topicsRecorder',
+            executable='topicsRecorder',
+            name='topicsRecorder',
+            parameters=[
+                params,
+                {'N': numDrones},
+                {'NUM_TARGET': numTarget}
+            ]
         )
-        ld.add_action(ros2Record)
+        ld.add_action(topicsRecorder)
 
     if SIMULATED_GPS:
         for i in range(numDrones):
@@ -158,22 +156,6 @@ def generate_launch_description():
             params,
             {'N': numDrones},
             {'NUM_TARGET': numTarget}
-        ],
-        remappings=[
-            ('/performanceAnalyzer/uwb_sensor_200', '/uwb_sensor_200'),
-            ('/performanceAnalyzer/targetRover/GroundTruth/odom', '/targetRover/GroundTruth/odom'),
-            ('/performanceAnalyzer/X500_0/GroundTruth/odom', '/X500_0/GroundTruth/odom'),
-            ('/performanceAnalyzer/X500_1/GroundTruth/odom', '/X500_1/GroundTruth/odom'),
-            ('/performanceAnalyzer/X500_2/GroundTruth/odom', '/X500_2/GroundTruth/odom'),
-            ('/performanceAnalyzer/X500_3/GroundTruth/odom', '/X500_3/GroundTruth/odom'),
-            ('/performanceAnalyzer/X500_4/GroundTruth/odom', '/X500_4/GroundTruth/odom'),
-            ('/performanceAnalyzer/X500_5/GroundTruth/odom', '/X500_5/GroundTruth/odom'),
-            ('/performanceAnalyzer/X500_0/VehicleLocalPosition_PubSubTopic', '/X500_0/VehicleLocalPosition_PubSubTopic'),
-            ('/performanceAnalyzer/X500_1/VehicleLocalPosition_PubSubTopic', '/X500_1/VehicleLocalPosition_PubSubTopic'),
-            ('/performanceAnalyzer/X500_2/VehicleLocalPosition_PubSubTopic', '/X500_2/VehicleLocalPosition_PubSubTopic'),
-            ('/performanceAnalyzer/X500_3/VehicleLocalPosition_PubSubTopic', '/X500_3/VehicleLocalPosition_PubSubTopic'),
-            ('/performanceAnalyzer/X500_4/VehicleLocalPosition_PubSubTopic', '/X500_4/VehicleLocalPosition_PubSubTopic'),
-            ('/performanceAnalyzer/X500_5/VehicleLocalPosition_PubSubTopic', '/X500_5/VehicleLocalPosition_PubSubTopic')
         ]
     )
     ld.add_action(performanceAnalyzer)
@@ -186,9 +168,6 @@ def generate_launch_description():
         name='printInformationNode',
         parameters=[
             params
-        ],
-        remappings=[
-            ('/printInformationNode/vehiclesInfo', '/vehiclesInfo')
         ]
     )
     ld.add_action(printInformationNode)
