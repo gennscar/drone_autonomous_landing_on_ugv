@@ -13,10 +13,18 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='gennscar',
-    maintainer_email='gennscar97@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer=[
+        'Cosimo Conte'
+        'Gennaro Scarati'
+        'Matteo Celada'
+    ],
+    maintainer_email=[
+        'cosimocon@gmail.com'
+        'gennscar97@gmail.com'
+        'matte.celada@gmail.com'
+    ],
+    description='This package contains all functions that are not directly ROS2 nodes used by nodes',
+    license='GNU GPLv3',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

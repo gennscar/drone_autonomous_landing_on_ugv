@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
-
+from px4_msgs.msg import DistanceSensor
 from sensor_msgs.msg import Range
 from ros2_px4_interfaces.msg import Yaw
 
@@ -26,7 +26,7 @@ class TopicRecorder(Node):
         self.KF_0_topic_ = self.declare_parameter("KF_0_topic", "/KF_pos_estimator_0/estimated_pos")
         self.range_sensor_topic_ = self.declare_parameter("range_sensor_topic", "/DistanceSensor_PubSubTopic")
         self.yaw_sensor_topic_ = self.declare_parameter("yaw_sensor_topic", "/yaw_sensor/estimated_yaw")
-        self.vehicle_namespace_ = self.declare_parameter("vehicle_namespace", "/drone")
+        self.vehicle_namespace_ = self.declare_parameter("vehicle_namespace", "/X500_3")
 
         # Retrieve parameter values
         self.LS_rot_topic_ = self.get_parameter("LS_rot_topic").get_parameter_value().string_value
@@ -47,7 +47,7 @@ class TopicRecorder(Node):
         self.LS_norot_pos_estimator_subscriber_ = self.create_subscription(
             PoseWithCovarianceStamped, self.LS_norot_topic_, self.callback_LS_norot_pos_estimator, 3)
         self.range_sensor_subscriber_ = self.create_subscription(
-            Range, self.vehicle_namespace_ + self.range_sensor_topic_, self.callback_range_sensor, 3)
+            DistanceSensor, self.vehicle_namespace_ + self.range_sensor_topic_, self.callback_range_sensor, 3)
         self.yaw_sensor_subscriber_ = self.create_subscription(
             Yaw, self.yaw_sensor_topic_, self.callback_yaw_sensor, 3)
 
@@ -82,7 +82,7 @@ class TopicRecorder(Node):
     def callback_range_sensor(self, msg):
         time_ = self.get_clock().now().to_msg()
         sec_ = (time_.sec - self.starting_time_.sec) + time_.nanosec*1e-9
-        data_ = [sec_, msg.range]
+        data_ = [sec_, msg.current_distance]
         self.range_sensor_writer_.writerow(data_)
 
     def callback_yaw_sensor(self, msg):

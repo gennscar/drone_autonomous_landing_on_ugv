@@ -26,6 +26,7 @@ def ls_trilateration(anchor_pos, ranges, N):
 
     # Resolve LS: y = pinv(A)*b
     y = pinvA.dot(b)
+
     return y[1:]
 
 
