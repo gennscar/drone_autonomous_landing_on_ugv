@@ -383,7 +383,7 @@ function sendpackage() {
   n=${1:-0}
   ipEnd=$((10 + n))
   ip="192.168.1.$ipEnd"
-  rsync -vrh --exclude={'build','install','log','rosbags','.git','.gitignore','src/ros2_px4_gazebo','src/ros2_px4_swarming/bagfiles'} $HOME/ros2_px4_ws ubuntu@$ip:/home/ubuntu
+  rsync -vrh --exclude={'build','install','log','rosbags','.git','.idea','.gitignore','src/ros2_px4_gazebo','src/ros2_px4_swarming/bagfiles','src/ros2_px4_swarming/csvfiles','px4_logs','src/ros2_px4_swarming/models'} $HOME/ros2_px4_ws ubuntu@$ip:/home/ubuntu
 }
 
 function sendparams() {

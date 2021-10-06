@@ -22,7 +22,7 @@ class PrintInformationNode(Node):
         # endregion
 
         # Subscribers initialization
-        self.vehiclesInfoSub = self.create_subscription(String, "vehiclesInfo", self.vehiclesInfoCallback, self.QUEUE_SIZE)
+        self.vehiclesInfoSub = self.create_subscription(String, "/vehiclesInfo", self.vehiclesInfoCallback, self.QUEUE_SIZE)
 
     # region Callbacks
     def vehiclesInfoCallback(self, msg):

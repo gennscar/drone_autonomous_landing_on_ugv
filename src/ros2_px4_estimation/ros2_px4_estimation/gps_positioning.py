@@ -6,7 +6,7 @@ import rclpy
 from rclpy.node import Node
 
 from px4_msgs.msg import VehicleGpsPosition, VehicleLocalPosition
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
 
 import ros2_px4_functions
 
@@ -14,7 +14,7 @@ QUEUE_SIZE = 10
 
 
 class GpsPositioning(Node):
-    """Node to obtain the position from the GPS sensor in a local ENU frame"""
+    """Node to obtain the data from the GPS sensor in a local ENU frame"""
 
     def __init__(self):
         super().__init__("GpsPositioning")
@@ -35,7 +35,9 @@ class GpsPositioning(Node):
 
         # Setting up position publisher
         self.est_pos_publisher_ = self.create_publisher(
-            PoseWithCovarianceStamped, "~/EstimatedPos", QUEUE_SIZE)
+            PoseWithCovarianceStamped, "~/EstimatedPosition", QUEUE_SIZE)
+        self.est_vel_publisher_ = self.create_publisher(
+            TwistWithCovarianceStamped, "~/EstimatedVelocity", QUEUE_SIZE)
 
         self.get_logger().info("Node has started")
 
@@ -55,7 +57,7 @@ class GpsPositioning(Node):
         self.is_ref_valid = True
 
     def callback_gpspos_subscriber(self, msg):
-        """Retrieve GPS position from sensors and convert them in the local ENU
+        """Retrieve GPS data from sensors and convert them in the local ENU
         reference frame
 
         Args:
@@ -78,14 +80,35 @@ class GpsPositioning(Node):
         self.pos_ = ros2_px4_functions.WGS84_to_ENU(
             coordinates, self.reference_)
 
-        # Filling estimated point message
+        # Filling estimated position message
         est_pos = PoseWithCovarianceStamped()
         est_pos.header.stamp = self.get_clock().now().to_msg()
         est_pos.header.frame_id = "GpsPositioning"
+
         est_pos.pose.pose.position.x = self.pos_[0]
         est_pos.pose.pose.position.y = self.pos_[1]
         est_pos.pose.pose.position.z = self.pos_[2]
+
+        est_pos.pose.covariance[0] = msg.eph
+        est_pos.pose.covariance[7] = msg.eph
+        est_pos.pose.covariance[15] = msg.epv
+
         self.est_pos_publisher_.publish(est_pos)
+
+        # Filling estimated velocity message
+        est_vel = TwistWithCovarianceStamped()
+        est_vel.header.stamp = self.get_clock().now().to_msg()
+        est_vel.header.frame_id = "GpsPositioning"
+
+        est_vel.twist.twist.linear.x = msg.vel_e_m_s
+        est_vel.twist.twist.linear.y = msg.vel_n_m_s
+        est_vel.twist.twist.linear.z = -msg.vel_d_m_s
+
+        est_vel.twist.covariance[0] = msg.s_variance_m_s
+        est_vel.twist.covariance[7] = msg.s_variance_m_s
+        est_vel.twist.covariance[15] = msg.s_variance_m_s
+
+        self.est_vel_publisher_.publish(est_vel)
 
 
 def main(args=None):

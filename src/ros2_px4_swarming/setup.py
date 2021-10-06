@@ -31,7 +31,8 @@ setup(
             'performanceAnalyzer = ros2_px4_swarming.performanceAnalyzer:main',
             'numAnchorsNode = ros2_px4_swarming.numAnchorsNode:main',
             'GPSSimulator = ros2_px4_swarming.GPSSimulator:main',
-            'printInformationNode = ros2_px4_swarming.printInformationNode:main'
+            'printInformationNode = ros2_px4_swarming.printInformationNode:main',
+            'topicsRecorder = ros2_px4_swarming.topicsRecorder:main'
         ],
     },
 )

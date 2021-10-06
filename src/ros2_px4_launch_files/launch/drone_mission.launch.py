@@ -42,8 +42,8 @@ def generate_launch_description():
         package="ros2_px4_estimation",
         name="UkfPositioning",
         namespace=LaunchConfiguration("drone_namespace"),
-        parameters=[{"delta_t": 0.001}, {"q": 0.1},
-                    {"r_uwb": 0.05}, {"r_gps": 0.005}]
+        parameters=[{"delta_t": 0.1}, {"q": 1e-4},
+                    {"r_uwb": 5e-2}, {"r_gps": 1e-5}]
     )
 
     return LaunchDescription([
@@ -51,6 +51,6 @@ def generate_launch_description():
         odometry_sender_sub_arg,
         drone_controller_node,
         odometry_sender_node,
-        # gps_positioning_node,
+        gps_positioning_node,
         ukf_positioning_node,
     ])
