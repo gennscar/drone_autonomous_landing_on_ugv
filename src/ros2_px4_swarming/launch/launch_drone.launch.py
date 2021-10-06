@@ -26,24 +26,6 @@ def generate_launch_description():
         parameters=[
             params,
             {'ID': ID}
-        ],
-        remappings=[
-            ('/X500_' + str(ID) + '/uwb_sensor_' + str(ID), '/uwb_sensor_' + str(ID)),
-            ('/X500_' + str(ID) + '/trackingVelocityCalculator/trackingVelocity', '/trackingVelocityCalculator/trackingVelocity'),
-            ('/X500_' + str(ID) + '/numAnchorsNode/N', '/numAnchorsNode/N'),
-            ('/X500_' + str(ID) + '/X500_0/readyForSwarming', '/X500_0/readyForSwarming'),
-            ('/X500_' + str(ID) + '/X500_1/readyForSwarming', '/X500_1/readyForSwarming'),
-            ('/X500_' + str(ID) + '/X500_2/readyForSwarming', '/X500_2/readyForSwarming'),
-            ('/X500_' + str(ID) + '/X500_3/readyForSwarming', '/X500_3/readyForSwarming'),
-            ('/X500_' + str(ID) + '/X500_4/readyForSwarming', '/X500_4/readyForSwarming'),
-            ('/X500_' + str(ID) + '/X500_5/readyForSwarming', '/X500_5/readyForSwarming'),
-            ('/X500_' + str(ID) + '/X500_0/readyForTakeoff', '/X500_0/readyForTakeoff'),
-            ('/X500_' + str(ID) + '/X500_1/readyForTakeoff', '/X500_1/readyForTakeoff'),
-            ('/X500_' + str(ID) + '/X500_2/readyForTakeoff', '/X500_2/readyForTakeoff'),
-            ('/X500_' + str(ID) + '/X500_3/readyForTakeoff', '/X500_3/readyForTakeoff'),
-            ('/X500_' + str(ID) + '/X500_4/readyForTakeoff', '/X500_4/readyForTakeoff'),
-            ('/X500_' + str(ID) + '/X500_5/readyForTakeoff', '/X500_5/readyForTakeoff'),
-            ('/X500_' + str(ID) + '/vehiclesInfo', '/vehiclesInfo')
         ]
     )
     ld.add_action(anchorDrone)

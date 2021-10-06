@@ -7,7 +7,7 @@ from itertools import combinations, permutations
 import rclpy
 from rclpy.node import Node
 from px4_msgs.msg import Timesync, VehicleGlobalPosition
-from std_msgs.msg import Bool
+from std_msgs.msg import UInt64
 from ros2_px4_interfaces.srv import SwarmCommand
 from ros2_px4_interfaces.msg import UnitVector, UwbSensor, VelocityVector
 from ros2_px4_functions import swarming_functions
@@ -68,10 +68,10 @@ class TrackingVelocityCalculator(Node):
 
         # Subscribers initialization
         if self.NUM_TARGET == 1:
-            self.targetUwbSensorSub = self.create_subscription(UwbSensor, "uwb_sensor_" + str(self.TARGET_ID), self.targetUwbSensorCallback, self.QUEUE_SIZE)
+            self.targetUwbSensorSub = self.create_subscription(UwbSensor, "/uwb_sensor_" + str(self.TARGET_ID), self.targetUwbSensorCallback, self.QUEUE_SIZE)
         for i in range(self.N):
-            self.anchorsPositionSubs.append(self.create_subscription(VehicleGlobalPosition, "X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
-            self.create_subscription(Bool, "X500_" + str(i) + "/readyForSwarming", partial(self.anchorReadyForSwarmingCallback, droneId=i), self.QUEUE_SIZE)
+            self.anchorsPositionSubs.append(self.create_subscription(VehicleGlobalPosition, "/X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
+            self.anchorsReadyForSwarmingSub = self.create_subscription(UInt64, "/readyForSwarming", self.anchorsReadyForSwarmingCallback, self.QUEUE_SIZE)
 
         # Services initialization
         self.droneCommandSrv = self.create_service(SwarmCommand, "SwarmCommand", self.swarmCommandCallback)
@@ -271,8 +271,8 @@ class TrackingVelocityCalculator(Node):
         # for dis in self.uwbDistances.values():
         #     self.get_logger().info(str(dis))
 
-    def anchorReadyForSwarmingCallback(self, msg, droneId):
-        self.anchorsReadyForSwarming[droneId] = msg.data
+    def anchorsReadyForSwarmingCallback(self, msg):
+        self.anchorsReadyForSwarming[msg.data] = True
 
 
 def main():

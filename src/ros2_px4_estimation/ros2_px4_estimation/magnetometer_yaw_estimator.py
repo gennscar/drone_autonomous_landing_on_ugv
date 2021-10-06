@@ -66,27 +66,29 @@ class MagnetometerNode(Node):
         if raw_data == serial.to_bytes([]):
             self.get_logger().warn("No data received from serial port")
         else:
-            data = re.split(':\s|\s|:', raw_data.decode())[:-1]
-            mag_x = float(data[3])
-            mag_y = float(data[5])
-            angle_deg_ = np.arctan2(mag_y, mag_x)*180/np.pi
+            try:
+                data = re.split(':\s|\s|:', raw_data.decode())[:-1]
+                mag_x = float(data[3])
+                mag_y = float(data[5])
+                angle_deg_ = np.arctan2(mag_y, mag_x)*180/np.pi
 
-            if angle_deg_ >= -180 and angle_deg_ <= 180:
-                if angle_deg_ - self.old_angle_deg_ > 300.0:
-                    self.n_turns_ -= 1
-                elif angle_deg_ - self.old_angle_deg_ < - 300.0:
-                    self.n_turns_ += 1
-                self.old_angle_deg_ = angle_deg_
+                if angle_deg_ >= -180 and angle_deg_ <= 180:
+                    if angle_deg_ - self.old_angle_deg_ > 300.0:
+                        self.n_turns_ -= 1
+                    elif angle_deg_ - self.old_angle_deg_ < - 300.0:
+                        self.n_turns_ += 1
+                    self.old_angle_deg_ = angle_deg_
 
-                angle_deg_ = angle_deg_ + self.n_turns_*360.0
+                    angle_deg_ = angle_deg_ + self.n_turns_*360.0
 
-                msg = Yaw()
-                msg.yaw = angle_deg_
-                msg.header.frame_id = self.yaw_publisher_topic
-                msg.header.stamp = self.get_clock().now().to_msg()
+                    msg = Yaw()
+                    msg.yaw = angle_deg_
+                    msg.header.frame_id = self.yaw_publisher_topic
+                    msg.header.stamp = self.get_clock().now().to_msg()
 
-                self.publisher_.publish(msg)
-
+                    self.publisher_.publish(msg)
+            except:
+                pass
 
 
 def main(args=None):

@@ -8,11 +8,10 @@ from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
-from px4_msgs.msg import VehicleLocalPosition
+from px4_msgs.msg import VehicleLocalPosition, DistanceSensor
 from scipy.spatial.transform import Rotation as R
 
 from ros2_px4_interfaces.msg import Yaw
-from sensor_msgs.msg import Range
 
 class kf_xyz_estimator(Node):
 
@@ -102,7 +101,7 @@ class kf_xyz_estimator(Node):
         self.px4_drone_subscriber = self.create_subscription(
             VehicleLocalPosition, self.vehicle_namespace + "/VehicleLocalPosition_PubSubTopic", self.callback_px4_drone_subscriber, 10)
         self.range_sensor_subscriber = self.create_subscription(
-            Range, self.vehicle_namespace + "/DistanceSensor_PubSubTopic", self.callback_range_sensor_subscriber, 10)
+            DistanceSensor, self.vehicle_namespace + "/DistanceSensor_PubSubTopic", self.callback_range_sensor_subscriber, 10)
         self.compass_subscriber = self.create_subscription(
             Yaw, self.yaw_subscriber_topic, self.callback_compass_subscriber, 10)
             
@@ -128,14 +127,15 @@ class kf_xyz_estimator(Node):
 
     def callback_uwb_subscriber(self, msg):
 
-        rover_rotation = (R.from_euler(
+        rover_inv_rotation = (R.from_euler(
             'z', self.kalman_filter_.x[13][0], degrees=True))
+        rover_rotation = R.inv(rover_inv_rotation)
         norot_pos = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, 0.])
         ENU_pos = rover_rotation.apply(norot_pos)
         # Storing current estimate in a np.array
         z = np.array([
             ENU_pos[0],
-            ENU_pos[1],
+            - ENU_pos[1],
             0.,
             0.,
             0.,
@@ -164,12 +164,12 @@ class kf_xyz_estimator(Node):
 
     def callback_px4_drone_subscriber(self, msg):
         z = np.array([
-            msg.y,
-            msg.vy,
-            msg.ay,
             msg.x,
             msg.vx,
             msg.ax,
+            msg.y,
+            msg.vy,
+            msg.ay,
             -msg.z,
             -msg.vz,
             0.,
@@ -193,11 +193,11 @@ class kf_xyz_estimator(Node):
 
         if self.norm_rel_xy_pos != -1.0 and \
            self.norm_rel_xy_pos <= self.rng_sensor_fuse_radius_ and \
-           msg.range <= self.rng_sensor_max_height_ and \
-           msg.range >= self.rng_sensor_min_height_:
+           msg.current_distance <= self.rng_sensor_max_height_ and \
+           msg.current_distance >= self.rng_sensor_min_height_:
             
             z = np.array([
-                msg.range,
+                msg.current_distance,
                 0.,
                 0.,
                 0.,
@@ -222,11 +222,11 @@ class kf_xyz_estimator(Node):
 
         elif self.norm_rel_xy_pos != -1.0 and \
              self.norm_rel_xy_pos >= self.rng_sensor_out_radius_ and \
-             msg.range <= self.rng_sensor_max_height_ and \
-             msg.range >= self.rng_sensor_min_height_:
+             msg.current_distance <= self.rng_sensor_max_height_ and \
+             msg.current_distance >= self.rng_sensor_min_height_:
 
             z = np.array([
-                msg.range,
+                msg.current_distance,
                 0.,
                 0.,
                 0.,

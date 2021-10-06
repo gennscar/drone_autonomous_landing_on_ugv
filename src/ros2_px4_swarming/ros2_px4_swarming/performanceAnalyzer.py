@@ -43,11 +43,11 @@ class PerformanceAnalyzer(Node):
 
         # Subscribers initialization
         for i in range(self.N):
-            self.anchorsPositionGroundTruthSubs.append(self.create_subscription(Odometry, "X500_" + str(i) + "/GroundTruth/odom", partial(self.anchorsPositionGroundTruthCallback, droneId=i), self.QUEUE_SIZE))
-            # self.anchorsPositionSubs.append(self.create_subscription(VehicleLocalPosition, "X500_" + str(i) + "/VehicleLocalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
+            self.anchorsPositionGroundTruthSubs.append(self.create_subscription(Odometry, "/X500_" + str(i) + "/GroundTruth/odom", partial(self.anchorsPositionGroundTruthCallback, droneId=i), self.QUEUE_SIZE))
+            # self.anchorsPositionSubs.append(self.create_subscription(VehicleLocalPosition, "/X500_" + str(i) + "/VehicleLocalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
         if self.NUM_TARGET == 1:
-            self.targetPositionSub = self.create_subscription(Odometry, "targetRover/GroundTruth/odom", self.targetPositionCallback, self.QUEUE_SIZE)
-            self.targetUwbSensorSub = self.create_subscription(UwbSensor, "uwb_sensor_" + str(self.TARGET_ID), self.targetUwbSensorCallback, self.QUEUE_SIZE)
+            self.targetPositionSub = self.create_subscription(Odometry, "/targetRover/GroundTruth/odom", self.targetPositionCallback, self.QUEUE_SIZE)
+            self.targetUwbSensorSub = self.create_subscription(UwbSensor, "/uwb_sensor_" + str(self.TARGET_ID), self.targetUwbSensorCallback, self.QUEUE_SIZE)
 
         # Publishers initialization
         if self.NUM_TARGET == 1:

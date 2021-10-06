@@ -5,7 +5,7 @@ from functools import partial
 from rclpy.node import Node
 from px4_msgs.msg import Timesync, OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleGlobalPosition, VehicleStatus
 from geometry_msgs.msg import Point, Twist
-from std_msgs.msg import Bool, UInt64, String
+from std_msgs.msg import UInt64, String
 from ros2_px4_interfaces.msg import UnitVector, UwbSensor, VelocityVector
 from ros2_px4_interfaces.srv import DroneCustomCommand
 from ros2_px4_functions import swarming_functions
@@ -111,8 +111,8 @@ class Drone(Node):
         self.numAnchorsSub = None                       # subscription to get number of drones in the swarm
         self.localPositionSub = None                    # subscription to current drone's local position
         self.vehicleStatusSub = None                    # subscription to current drone's status
-        self.readyForTakeoffSubs = None                 # subscriptions to get which member of the swarm is ready for takeoff
-        self.readyForSwarmingSubs = None                # subscriptions to get which member of the swarm is ready for swarming
+        self.readyForTakeoffSub = None                  # subscriptions to get which member of the swarm is ready for takeoff
+        self.readyForSwarmingSub = None                 # subscriptions to get which member of the swarm is ready for swarming
         self.anchorsPositionSubs = None                 # subscriptions to swarm members' GPS position
         self.trackingVelocitySub = None                 # subscription to tracking velocity centralized controller
         if self.UWB_ON:
@@ -176,23 +176,23 @@ class Drone(Node):
 
         # Subscribers initialization
         self.timesyncSub = self.create_subscription(Timesync, "Timesync_PubSubTopic", self.timesyncCallback, self.QUEUE_SIZE)
-        self.numAnchorsSub = self.create_subscription(UInt64, "numAnchorsNode/N", self.numAnchorsCallback, self.QUEUE_SIZE)
+        self.numAnchorsSub = self.create_subscription(UInt64, "/numAnchorsNode/N", self.numAnchorsCallback, self.QUEUE_SIZE)
         self.localPositionSub = self.create_subscription(VehicleLocalPosition, "VehicleLocalPosition_PubSubTopic", self.localPositionCallback, self.QUEUE_SIZE)
         self.vehicleStatusSub = self.create_subscription(VehicleStatus, "VehicleStatus_PubSubTopic", self.vehicleStatusCallback, self.QUEUE_SIZE)
-        self.readyForTakeoffSubs = {}
-        self.readyForSwarmingSubs = {}
+        self.readyForTakeoffSub = self.create_subscription(UInt64, "/readyForTakeoff", self.anchorReadyForTakeoffCallback, self.QUEUE_SIZE)
+        self.readyForSwarmingSub = self.create_subscription(UInt64, "/readyForSwarming", self.anchorReadyForSwarmingCallback, self.QUEUE_SIZE)
         self.anchorsPositionSubs = {}
-        self.trackingVelocitySub = self.create_subscription(VelocityVector, "trackingVelocityCalculator/trackingVelocity", self.trackingVelocityCallback, self.QUEUE_SIZE)
+        self.trackingVelocitySub = self.create_subscription(VelocityVector, "/trackingVelocityCalculator/trackingVelocity", self.trackingVelocityCallback, self.QUEUE_SIZE)
         if self.UWB_ON:
-            self.uwbSensorSub = self.create_subscription(UwbSensor, "uwb_sensor_" + str(self.ID), self.uwbSensorCallback, self.QUEUE_SIZE)
+            self.uwbSensorSub = self.create_subscription(UwbSensor, "/uwb_sensor_" + str(self.ID), self.uwbSensorCallback, self.QUEUE_SIZE)
 
         # Publishers initialization
         self.vehicleCommandPub = self.create_publisher(VehicleCommand, "VehicleCommand_PubSubTopic", self.QUEUE_SIZE)
         self.offboardControlModePub = self.create_publisher(OffboardControlMode, "OffboardControlMode_PubSubTopic", self.QUEUE_SIZE)
-        self.readyForTakeoffPub = self.create_publisher(Bool, "readyForTakeoff", self.QUEUE_SIZE)
-        self.readyForSwarmingPub = self.create_publisher(Bool, "readyForSwarming", self.QUEUE_SIZE)
+        self.readyForTakeoffPub = self.create_publisher(UInt64, "/readyForTakeoff", self.QUEUE_SIZE)
+        self.readyForSwarmingPub = self.create_publisher(UInt64, "/readyForSwarming", self.QUEUE_SIZE)
         self.trajectorySetpointPub = self.create_publisher(TrajectorySetpoint, "TrajectorySetpoint_PubSubTopic", self.QUEUE_SIZE)
-        self.vehiclesInfoPub = self.create_publisher(String, "vehiclesInfo", self.QUEUE_SIZE)
+        self.vehiclesInfoPub = self.create_publisher(String, "/vehiclesInfo", self.QUEUE_SIZE)
 
         # Services initialization
         self.droneCommandSrv = self.create_service(DroneCustomCommand, "DroneCustomCommand", self.droneCommandCallback)
@@ -276,14 +276,14 @@ class Drone(Node):
             # Communicate to the other anchors that I am ready to takeoff
             self.readyForTakeoff = True
             self.anchorsReadyForTakeoff[self.ID] = True
-            msg = Bool()
-            msg.data = True
+            msg = UInt64()
+            msg.data = self.ID
             self.readyForTakeoffPub.publish(msg)
 
         if not self.SINGLE_DRONE_FOR_TEST and len(self.anchorsReadyForTakeoff) < self.N:
             # The other anchors are not ready to takeoff yet
-            msg = Bool()
-            msg.data = True
+            msg = UInt64()
+            msg.data = self.ID
             self.readyForTakeoffPub.publish(msg)
             return
 
@@ -327,14 +327,14 @@ class Drone(Node):
             # Communicate to the other anchors that I am ready to start swarming
             self.readyForSwarming = True
             self.anchorsReadyForSwarming[self.ID] = True
-            msg = Bool()
-            msg.data = True
+            msg = UInt64()
+            msg.data = self.ID
             self.readyForSwarmingPub.publish(msg)
 
         if not self.SINGLE_DRONE_FOR_TEST and len(self.anchorsReadyForSwarming) < self.N:
             # The other anchors are not ready to swarm yet
-            msg = Bool()
-            msg.data = True
+            msg = UInt64()
+            msg.data = self.ID
             self.readyForSwarmingPub.publish(msg)
             # self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
             self.returnHome()
@@ -356,7 +356,7 @@ class Drone(Node):
                         assert type(dataStructure) is dict, self.get_logger().error("Something wrong with the data structures")
                         if key in dataStructure.keys():
                             dataStructure.pop(key)
-                for subscriber in [self.readyForTakeoffSubs, self.readyForSwarmingSubs, self.anchorsPositionSubs]:
+                for subscriber in [self.anchorsPositionSubs]:
                     assert type(subscriber) is dict, self.get_logger().error("Something wrong with the subscribers")
                     if key in subscriber.keys():
                         subscriber[key].destroy()
@@ -480,14 +480,14 @@ class Drone(Node):
                 # Communicate to the other anchors that I am ready to takeoff
                 self.readyForTakeoff = True
                 self.anchorsReadyForTakeoff[self.ID] = True
-                msg = Bool()
-                msg.data = True
+                msg = UInt64()
+                msg.data = self.ID
                 self.readyForTakeoffPub.publish(msg)
 
             if len(self.anchorsReadyForTakeoff) < self.N:
                 # The other anchors are not ready to takeoff yet
-                msg = Bool()
-                msg.data = True
+                msg = UInt64()
+                msg.data = self.ID
                 self.readyForTakeoffPub.publish(msg)
                 return
 
@@ -495,14 +495,14 @@ class Drone(Node):
                 # Communicate to the other anchors that I am ready to start swarming
                 self.readyForSwarming = True
                 self.anchorsReadyForSwarming[self.ID] = True
-                msg = Bool()
-                msg.data = True
+                msg = UInt64()
+                msg.data = self.ID
                 self.readyForSwarmingPub.publish(msg)
 
             if len(self.anchorsReadyForSwarming) < self.N:
                 # The other anchors are not ready to swarm yet
-                msg = Bool()
-                msg.data = True
+                msg = UInt64()
+                msg.data = self.ID
                 self.readyForSwarmingPub.publish(msg)
                 self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
                 return
@@ -552,11 +552,11 @@ class Drone(Node):
             self.authorizedForOffboard = False
             self.droneMode = "idle"
 
-    def anchorReadyForTakeoffCallback(self, msg, droneId):
-        self.anchorsReadyForTakeoff[droneId] = msg.data
+    def anchorReadyForTakeoffCallback(self, msg):
+        self.anchorsReadyForTakeoff[msg.data] = True
 
-    def anchorReadyForSwarmingCallback(self, msg, droneId):
-        self.anchorsReadyForSwarming[droneId] = msg.data
+    def anchorReadyForSwarmingCallback(self, msg):
+        self.anchorsReadyForSwarming[msg.data] = True
 
     def anchorsPositionCallback(self, msg, droneId):
         self.anchorsPosition[droneId] = msg
@@ -572,10 +572,10 @@ class Drone(Node):
         for i in range(self.N):
             self.activeDrones[i] = True
             self.lastPositionReceivedTimer[i] = 0
-            self.anchorsPositionSubs[i] = self.create_subscription(VehicleGlobalPosition, "X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE)
-            if i != self.ID:
-                self.readyForTakeoffSubs[i] = self.create_subscription(Bool, "X500_" + str(i) + "/readyForTakeoff", partial(self.anchorReadyForTakeoffCallback, droneId=i), self.QUEUE_SIZE)
-                self.readyForSwarmingSubs[i] = self.create_subscription(Bool, "X500_" + str(i) + "/readyForSwarming", partial(self.anchorReadyForSwarmingCallback, droneId=i), self.QUEUE_SIZE)
+            self.anchorsPositionSubs[i] = self.create_subscription(VehicleGlobalPosition, "/X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE)
+            # if i != self.ID:
+            #     self.readyForTakeoffSubs[i] = self.create_subscription(UInt64, "/readyForTakeoff", self.anchorReadyForTakeoffCallback, self.QUEUE_SIZE)
+            #     self.readyForSwarmingSubs[i] = self.create_subscription(UInt64, "/readyForSwarming", self.anchorReadyForSwarmingCallback, self.QUEUE_SIZE)
 
         self.destroy_subscription(self.numAnchorsSub)
 

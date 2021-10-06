@@ -67,8 +67,9 @@ class UwbPositioning(Node):
 
     def callback_rover_attitude(self, msg):
 
-        self.rover_rotation = (R.from_euler(
+        rover_inv_rotation = (R.from_euler(
             'z', msg.yaw, degrees=True))
+        self.rover_rotation = R.inv(rover_inv_rotation)
         self.watchdog_counter += 1
 
     def callback_sensor_subscriber(self, msg):
@@ -128,7 +129,7 @@ class UwbPositioning(Node):
                     msg.header.frame_id = self.estimator_topic_name_
                     msg.header.stamp = self.get_clock().now().to_msg()
                     msg.pose.pose.position.x = self.rotated_sensor_est_pos_[0]
-                    msg.pose.pose.position.y = self.rotated_sensor_est_pos_[1]
+                    msg.pose.pose.position.y = - self.rotated_sensor_est_pos_[1]
                     msg.pose.pose.position.z = self.rotated_sensor_est_pos_[2]
 
                     self.rotated_position_publisher.publish(msg)
