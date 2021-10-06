@@ -125,11 +125,11 @@ class DroneController(Node):
 
         # From rover ENU frame to drone NED frame
         self.estimated_rel_target_pos = [
-            - msg.pose.pose.position.y, - msg.pose.pose.position.x]
+            - msg.pose.pose.position.x, - msg.pose.pose.position.y]
         self.e = np.array(self.estimated_rel_target_pos)
 
         self.estimated_rel_target_vel = [
-            - msg.twist.twist.linear.y, - msg.twist.twist.linear.x]
+            - msg.twist.twist.linear.x, - msg.twist.twist.linear.y]
         self.e_dot = np.array(self.estimated_rel_target_vel)
 
         self.z_dist_sensor = msg.pose.pose.position.z

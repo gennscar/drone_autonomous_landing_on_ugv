@@ -62,9 +62,9 @@ class GazeboYawNode(Node):
             self.old_rover_yaw_raw = self.rover_yaw_raw
 
             if self.yaw_std_dev != 0.0:
-                self.rover_yaw = self.rover_yaw_raw + self.n_turns_*360.0 + gauss(- self.yaw_offset, self.yaw_std_dev)
+                self.rover_yaw = - (self.rover_yaw_raw + self.n_turns_*360.0 + gauss(- self.yaw_offset, self.yaw_std_dev) - 90.0)
             else:
-                self.rover_yaw = self.rover_yaw_raw + self.n_turns_*360.0 - self.yaw_offset
+                self.rover_yaw = - (self.rover_yaw_raw + self.n_turns_*360.0 - self.yaw_offset - 90.0)
 
             msg = Yaw()
             msg.yaw = self.rover_yaw 
