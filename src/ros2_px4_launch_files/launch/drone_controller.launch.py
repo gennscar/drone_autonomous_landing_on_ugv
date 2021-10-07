@@ -6,14 +6,15 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
 
     drone_namespace_arg = DeclareLaunchArgument(
-        "drone_namespace", default_value="/drone"
+        "drone_namespace", default_value="/X500_1"
     )
 
     drone_controller_node = Node(
         executable="drone_controller",
         package="ros2_px4_control",
         name="DroneController",
-        namespace=LaunchConfiguration("drone_namespace")
+        namespace=LaunchConfiguration("drone_namespace"),
+        parameters=[{"vehicle_number": 2}]
     )
     
     
