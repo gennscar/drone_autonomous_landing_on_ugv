@@ -15,21 +15,19 @@ def generate_launch_description():
         name="DroneController",
         namespace=LaunchConfiguration("drone_namespace")
     )
+    
+    
+    fake_gps_node = Node(
+        executable="GPSSimulator",
+        package="ros2_px4_swarming",
+        name="GPSSimulator",
+        namespace=LaunchConfiguration("drone_namespace"),
+        parameters=[{"QUEUE_SIZE": 1}]
+    )
 
-    """
-    drone_controller_node = Node(
-        package = "ros2_px4_control",
-        executable = "drone_controller_old",
-        name = "drone_controller_old",
-        parameters = [
-        {"control_mode": 1},
-        {"vehicle_namespace": "/drone"},
-        {"vehicle_number": 1},
-        {"uwb_estimator": "/KF_pos_estimator_0/estimated_pos"}
-        ]
-    )"""
 
     return LaunchDescription([
         drone_namespace_arg,
-        drone_controller_node
+        drone_controller_node,
+        #fake_gps_node
     ])

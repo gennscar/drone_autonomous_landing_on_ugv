@@ -21,15 +21,15 @@ PID_SWITCH_POS = 3.0           # Distance from target to switch from PID1 to PID
 V_MAX_INT = 1.2                # Anti windup drone velocity limit
 KP = 0.8                       # Proportional gain
 KI = 0.1                       # Integral gain
-KD = 0.1                       # Derivative gain
-LAND_ERR_TOLL = 0.4            # Maximum XY relative position allowed to perform landing
-LAND_VEL_TOLL = 0.5            # Maximum XY relative velocity allowed to perform landing
-LAND_DESC_VEL = - 0.5            # Z velocity when descending on target
+KD = 0.05                      # Derivative gain
+LAND_ERR_TOLL = 0.35           # Maximum XY relative position allowed to perform landing
+LAND_VEL_TOLL = 0.4            # Maximum XY relative velocity allowed to perform landing
+LAND_DESC_VEL = - 0.3          # Z velocity when descending on target
 TURN_OFF_MOT_HEIGHT = 0.25     # Relative height allowed to shutdown motors
 TURN_OFF_MOT_Z_VEL = - 0.1     # Relative z velocity allowed to shut down motors
 DETECT_LANDING_COUNT = 3       # Landing conditions verified consecutively for this numer of times
 FOLLOW_HOVERING_HEIGHT = 2.0   # Drone height kept in target follower mode
-WATCHDOG_DT = 1.0              # Watchdog period
+WATCHDOG_DT = 0.5              # Watchdog period
 
 # NULL definition and check function
 NULL = float("NaN")
@@ -110,7 +110,6 @@ class DroneController(Node):
             Odometry, "/KF_pos_estimator_0/estimated_pos", self.callback_target_uwb_position, 3)
         self.distance_sensor_sub_= self.create_subscription(
             DistanceSensor, "DistanceSensor_PubSubTopic", self.callback_distance_sensor, 1)
-
         # Services
         self.control_mode_service = self.create_service(
             ControlMode, "ControlMode_Service", self.callback_control_mode)
@@ -383,6 +382,8 @@ class DroneController(Node):
                     if self.detect_landing_counter_ == DETECT_LANDING_COUNT:
                         self.control_mode_ = "idle"
                         self.detect_landing_counter_ = 0
+                else:
+                    self.detect_landing_counter_ = 0
             else:
                 z_setpoint_ = FOLLOW_HOVERING_HEIGHT
                 vz_setpoint_ = float("NaN")
@@ -408,6 +409,7 @@ class DroneController(Node):
         if self.control_mode_ != "follow_target" and self.control_mode_ != "land_on_target":
             return
         if self.watchdog_counter_ == 0:
+            self.get_logger().info("No target position, waiting..")
             self.rel_pos_ = []
             self.rel_vel_ = []
         
