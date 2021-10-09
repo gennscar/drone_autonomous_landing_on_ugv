@@ -13,6 +13,17 @@ def generate_launch_description():
         "drone_namespace", default_value=""
     )
 
+    uwb_driver_node = Node(
+        package='ros2_px4_estimation',
+        executable='uwb_driver',
+        namespace='uwb_driver',
+        parameters=[
+            {"topic_name": "tag_0"},
+            {"uwbPort": '/dev/ttyACM0'},
+            {"anchors_pos_file_path": '/home/ubuntu/ros2_px4_ws/json/anchors_landing_pad.json'},
+        ]
+    )
+
     drone_controller_node = Node(
         executable="drone_controller",
         package="ros2_px4_control",
@@ -47,6 +58,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        uwb_driver_node,
         drone_namespace_arg,
         odometry_sender_sub_arg,
         drone_controller_node,
