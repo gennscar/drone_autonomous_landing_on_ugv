@@ -8,7 +8,7 @@ import numpy as np
 import scipy
 from scipy.spatial.transform import Rotation as R
 
-from filterpy.kalman import MerweScaledSigmaPoints
+from filterpy.kalman import MerweScaledSigmaPoints, kalman_filter
 from filterpy.kalman import UnscentedKalmanFilter as UKF
 from filterpy.common import Q_discrete_white_noise
 
@@ -17,7 +17,7 @@ from ros2_px4_interfaces.msg import UwbSensor
 from px4_msgs.msg import VehicleLocalPositionGroundtruth
 
 QUEUE_SIZE = 10
-FILTER_DIM = 9+7
+FILTER_DIM = 9+4
 SIMULATION = True
 
 
@@ -41,7 +41,13 @@ class UkfPositioning(Node):
             )
         }
 
-        self.predicted_ = False
+        self.filter_state_ = "Offline"
+        self.calibration_counter_ = 0
+        self.measurement_wd_ = {
+            "uwb": 0,
+            "gps_pos": 0,
+            "gps_vel": 0
+        }
 
         # Kalman Filter
         sigmas = MerweScaledSigmaPoints(
@@ -55,7 +61,7 @@ class UkfPositioning(Node):
                 [0., 1.,         dt],
                 [0., 0.,         1.]
             ])
-            F = scipy.linalg.block_diag(*[f]*3, np.eye(7))
+            F = scipy.linalg.block_diag(*[f]*3, np.eye(4))
             return F @ x
 
         self.kalman_filter_ = UKF(
@@ -67,21 +73,21 @@ class UkfPositioning(Node):
         )
 
         # Initial estimate
-        self.kalman_filter_.x[12:16] = 0.5
+        self.kalman_filter_.x *= 1.
 
         # Covariance matrix
-        self.kalman_filter_.P *= 100.
+        self.kalman_filter_.P *= 1.
 
         # Process noise
         self.kalman_filter_.Q = scipy.linalg.block_diag(
             Q_discrete_white_noise(
                 dim=3, dt=self.params_["delta_t"], var=self.params_["q"], block_size=3),
-            np.zeros((7, 7))
+            np.zeros((4, 4))
         )
 
         # Setting up sensors subscribers
         self.sensor_subscriber_ = self.create_subscription(
-            UwbSensor, "/uwb_sensor_Iris", self.callback_uwb_subscriber,
+            UwbSensor, "/uwb_sensor_tag_0", self.callback_uwb_subscriber,
             QUEUE_SIZE
         )
         self.gps_pos_subscriber_ = self.create_subscription(
@@ -119,7 +125,7 @@ class UkfPositioning(Node):
         """
 
         # Must predict once first
-        if(not self.predicted_):
+        if(self.filter_state_ != "Calibrated"):
             return
 
         # Storing measurement in a np.array
@@ -133,23 +139,26 @@ class UkfPositioning(Node):
             msg.anchor_pose.pose.position.z
         ])
 
+        r = R.from_rotvec([0., 0., math.pi/3])
+        anchor_position = r.apply(anchor_position)
+
         # Measurement model for a range sensor
         def h_uwb(x):
             h = np.zeros(FILTER_DIM)
-            anc_pos = anchor_position
 
             # Transform the anchor position in the local frame
-            r = R.from_quat(x[12:16])
+            r = R.from_rotvec([0., 0., x[12]])
 
-            anc_pos = r.apply(anc_pos)
-            anc_pos += x[9:12]
+            offset_anc_pos = anchor_position + x[9:12]
+            rot_anc_pos = r.apply(offset_anc_pos)
 
             # Range measurement
-            h[0] = np.linalg.norm(x[[0, 3, 6]] - anc_pos)
+            h[0] = np.linalg.norm(x[[0, 3, 6]] - rot_anc_pos)
             return h
 
         # Filter update
         self.kalman_filter_.update(z, R=self.params_["r_uwb"], hx=h_uwb)
+        self.measurement_wd_["uwb"] += 1
 
     def callback_gps_pos_subscriber(self, msg):
         """Measuring GPS positioning sensor
@@ -159,7 +168,7 @@ class UkfPositioning(Node):
         """
 
         # Must predict once first
-        if(not self.predicted_):
+        if(self.filter_state_ == "Offline"):
             return
 
         # Storing measurements in a np.array
@@ -181,6 +190,7 @@ class UkfPositioning(Node):
 
         # Filter update
         self.kalman_filter_.update(z, R=self.params_["r_gps"], hx=h_gps)
+        self.measurement_wd_["gps_pos"] += 1
 
     def callback_gps_vel_subscriber(self, msg):
         """Measuring GPS velocity sensor
@@ -190,7 +200,7 @@ class UkfPositioning(Node):
         """
 
         # Must predict once first
-        if(not self.predicted_):
+        if(self.filter_state_ == "Offline"):
             return
 
         # Storing measurements in a np.array
@@ -212,17 +222,32 @@ class UkfPositioning(Node):
 
         # Filter update
         self.kalman_filter_.update(z, R=self.params_["r_gps"], hx=h_gps)
-
-    def callback_truth_subscriber(self, msg):
-        self.truth_ = msg
+        self.measurement_wd_["gps_vel"] += 1
 
     def predict_callback(self):
         """This callback perform the filter predict and forward the current
         estimate
         """
 
-        # @todo: Check something wtr of covariance
-        if(np.linalg.norm(self.kalman_filter_.x[[0, 3, 6]]) < 30):
+        if (self.filter_state_ == "Initialized"):
+            if(np.linalg.norm(self.kalman_filter_.x - self.kalman_filter_.x_prior) < 1.):
+                self.calibration_counter_ += 1
+            else:
+                self.calibration_counter_ = 0
+
+        if (self.filter_state_ == "Initialized" and self.calibration_counter_ > 100):
+            self.get_logger().info("Filter calibrated")
+            self.filter_state_ = "Calibrated"
+
+        if (self.filter_state_ == "Calibrated"):
+            for watchdog in self.measurement_wd_:
+                if self.measurement_wd_[watchdog] == 0:
+                    self.get_logger().warn(
+                        f"Measurement of {watchdog} is missing")
+
+        # Send estimation only id calibrated
+        if(self.filter_state_ == "Calibrated"):
+
             # Sending the estimated position
             msg = PoseWithCovarianceStamped()
             msg.header.frame_id = "UkfPositioning"
@@ -231,6 +256,12 @@ class UkfPositioning(Node):
             msg.pose.pose.position.x = self.kalman_filter_.x[0]
             msg.pose.pose.position.y = self.kalman_filter_.x[3]
             msg.pose.pose.position.z = self.kalman_filter_.x[6]
+
+            # Adding other filter states
+            msg.pose.pose.orientation.x = self.kalman_filter_.x[9]
+            msg.pose.pose.orientation.y = self.kalman_filter_.x[10]
+            msg.pose.pose.orientation.z = self.kalman_filter_.x[11]
+            msg.pose.pose.orientation.w = self.kalman_filter_.x[12]
 
             msg.pose.covariance[0] = self.kalman_filter_.P[0][0]
             msg.pose.covariance[1] = self.kalman_filter_.P[0][3]
@@ -267,7 +298,9 @@ class UkfPositioning(Node):
 
         # Filter predict
         self.kalman_filter_.predict()
-        self.predicted_ = True
+
+        if(self.filter_state_ == "Offline"):
+            self.filter_state_ = "Initialized"
 
 
 def main(args=None):
