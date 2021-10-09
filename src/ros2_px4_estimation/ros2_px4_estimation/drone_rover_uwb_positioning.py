@@ -17,7 +17,8 @@ class UwbPositioning(Node):
         super().__init__("uwb_positioning")
 
         self.anchors_ = {}
-        self.sensor_est_pos_ = [0.01, 0.01, 0.01] 
+        self.sensor_est_pos_ = np.random.rand(3)*0.01
+        self.sensor_old_est_pos_ = np.random.rand(3)*0.01
 
         self.rover_rotation = R.from_matrix(
             [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
@@ -31,6 +32,9 @@ class UwbPositioning(Node):
         self.yaw_subscriber_topic = self.declare_parameter("yaw_subscriber_topic", '/yaw_sensor/estimated_yaw')
         self.allowed_delay_ns = self.declare_parameter("allowed_delay_ns", 1e2)
         self.max_range = self.declare_parameter("max_range", 50.0)
+        self.method_ = self.declare_parameter("method", "LS")
+        self.max_iterations_ = self.declare_parameter("max_iterations", 10)
+        self.reset_starting_point_ = self.declare_parameter("reset_starting_point", True)
 
         # Retrieve parameter values
         self.sensor_id_ = self.get_parameter(
@@ -41,6 +45,12 @@ class UwbPositioning(Node):
             "allowed_delay_ns").get_parameter_value().double_value
         self.max_range = self.get_parameter(
             "max_range").get_parameter_value().double_value
+        self.method_ = self.get_parameter(
+            "method").get_parameter_value().string_value
+        self.max_iterations_ = self.get_parameter(
+            "max_iterations").get_parameter_value().integer_value
+        self.reset_starting_point_ = self.get_parameter(
+            "reset_starting_point").get_parameter_value().bool_value
 
         # Namespace check
         if(self.get_namespace() == '/'):
@@ -105,9 +115,23 @@ class UwbPositioning(Node):
         # Only if trilateration is possible
         if N > 2:
             # Perform Least-Square
-            
-            self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
-                anchor_pos, ranges, N)
+            if(self.method_ == "LS"):
+                self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
+                    anchor_pos, ranges, N)
+
+            # Perform Gauss-Newton
+            if(self.method_ == "GN"):
+                if self.reset_starting_point_:
+                    self.sensor_old_est_pos_ = np.random.rand(3)*0.01
+
+                # Perform N iterations of GN
+                for _ in range(self.max_iterations_):
+                    self.sensor_est_pos_ = ros2_px4_functions.gauss_newton_trilateration(
+                        self.sensor_old_est_pos_, anchor_pos, ranges)  
+                    self.innovation_ = np.linalg.norm(self.sensor_est_pos_[0:2] - self.sensor_old_est_pos_[0:2], ord=2)    
+                    if self.innovation_ < 1e-3:
+                        break  
+                    self.sensor_old_est_pos_ = self.sensor_est_pos_
                 
             if np.linalg.norm(self.sensor_est_pos_[0:2], ord=2) <= self.max_range:
                 

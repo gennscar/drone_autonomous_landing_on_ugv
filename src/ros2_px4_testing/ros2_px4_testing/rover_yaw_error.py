@@ -76,7 +76,7 @@ class YawError(Node):
                 self.n_turns_ += 1
             self.old_true_yaw_raw = self.true_yaw_raw
 
-            self.true_yaw = self.true_yaw_raw + self.n_turns_*360.0
+            self.true_yaw = - (self.true_yaw_raw + self.n_turns_*360.0 - 90)
 
             msg = Yaw()
             msg.yaw = self.true_yaw 

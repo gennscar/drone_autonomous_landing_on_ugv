@@ -3,16 +3,33 @@
 import rclpy
 from rclpy.node import Node
 
+import numpy as np
+from nav_msgs.msg import Odometry
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, Timesync, \
-    VehicleCommand, VehicleLocalPosition, VehicleStatus
+    VehicleCommand, VehicleLocalPosition, VehicleStatus, DistanceSensor
 from ros2_px4_interfaces.srv import ControlMode
+import ros2_px4_functions
 
 # Parameters
-OFFBOARD_DT = 0.1   # Offboard control period
-MIN_HEIGHT = 1.0    # Minimum height accepted by the ControlMode service
-MAX_HEIGHT = 10.0   # Maximum height accepted by the ControlMode service
-STD_HEIGHT = 3.0    # Standard height used if out of bound
+OFFBOARD_DT = 0.1              # Offboard control period
+MIN_HEIGHT = 1.0               # Minimum height accepted by the ControlMode service
+MAX_HEIGHT = 10.0              # Maximum height accepted by the ControlMode service
+STD_HEIGHT = 2.0               # Standard height used if out of bound
 
+# Autonomous control parameters
+PID_SWITCH_POS = 3.0           # Distance from target to switch from PID1 to PID2
+V_MAX_INT = 1.2                # Anti windup drone velocity limit
+KP = 0.8                       # Proportional gain
+KI = 0.1                       # Integral gain
+KD = 0.05                      # Derivative gain
+LAND_ERR_TOLL = 0.35           # Maximum XY relative position allowed to perform landing
+LAND_VEL_TOLL = 0.4            # Maximum XY relative velocity allowed to perform landing
+LAND_DESC_VEL = - 0.3          # Z velocity when descending on target
+TURN_OFF_MOT_HEIGHT = 0.25     # Relative height allowed to shutdown motors
+TURN_OFF_MOT_Z_VEL = - 0.1     # Relative z velocity allowed to shut down motors
+DETECT_LANDING_COUNT = 3       # Landing conditions verified consecutively for this numer of times
+FOLLOW_HOVERING_HEIGHT = 2.0   # Drone height kept in target follower mode
+WATCHDOG_DT = 0.5              # Watchdog period
 
 # NULL definition and check function
 NULL = float("NaN")
@@ -35,7 +52,9 @@ class DroneController(Node):
             "idle": self.idle_controller,
             "takeoff": self.takeoff_controller,
             "land": self.land_controller,
-            "setpoint": self.setpoint_controller
+            "setpoint": self.setpoint_controller,
+            "follow_target": self.target_follower_controller,
+            "land_on_target": self.land_on_target_controller
         }
 
         # Control state
@@ -49,6 +68,18 @@ class DroneController(Node):
         self.arming_state_ = False
         self.disarm_reason_ = -1
         self.takeoff_state_ = False
+
+        # Autonomous state
+        self.rel_pos_ = []
+        self.rel_vel_ = []
+        self.distance_sensor_height_ = []
+        self.reset_int_ = False
+        self.PID_1 = ros2_px4_functions.PID_controller(
+            KP, KI, KD, V_MAX_INT, 2, True, OFFBOARD_DT)
+        self.PID_2 = ros2_px4_functions.PID_controller(
+            KP, 0.0, 0.0, V_MAX_INT, 2, True, OFFBOARD_DT)
+        self.watchdog_counter_ = 0
+        self.detect_landing_counter_ = 0
 
         # Parameters declaration
         self.control_mode_ = self.declare_parameter("control_mode", "idle")
@@ -75,13 +106,19 @@ class DroneController(Node):
             Timesync, "Timesync_PubSubTopic", self.callback_timesync, 1)
         self.drone_position_sub_ = self.create_subscription(
             VehicleLocalPosition, "VehicleLocalPosition_PubSubTopic", self.callback_local_position, 1)
-
+        self.target_uwb_position_sub_ = self.create_subscription(
+            Odometry, "/KF_pos_estimator_0/estimated_pos", self.callback_target_uwb_position, 3)
+        self.distance_sensor_sub_= self.create_subscription(
+            DistanceSensor, "DistanceSensor_PubSubTopic", self.callback_distance_sensor, 1)
         # Services
         self.control_mode_service = self.create_service(
             ControlMode, "ControlMode_Service", self.callback_control_mode)
 
         # Control loop timer
         self.timer = self.create_timer(OFFBOARD_DT, self.callback_timer)
+
+        # Watchdog timer
+        self.watchdog_timer = self.create_timer(WATCHDOG_DT, self.watchdog_callback)
 
         self.get_logger().info("Node has started")
 
@@ -112,6 +149,31 @@ class DroneController(Node):
             message
         """
         self.local_position_ = [msg.y, msg.x, -msg.z]
+        self.local_velocity_ = [msg.vy, msg.vx, -msg.vz]
+
+    def callback_target_uwb_position(self, msg):
+        """This callback retrieves the current relative position between drone and
+        rover and converts it in ENU frame.
+
+        Args:
+            msg (nav_msgs.msg.Odometry): Odometry
+            message
+        """
+        # From rover NED frame to drone ENU frame
+        self.rel_pos_ = np.array([
+            - msg.pose.pose.position.y, - msg.pose.pose.position.x])
+        self.rel_vel_ = np.array([
+            - msg.twist.twist.linear.y, - msg.twist.twist.linear.x])
+        # Increment watchdog counter if uwb info received
+        self.watchdog_counter_ += 1
+
+    def callback_distance_sensor(self, msg):
+        """This callback retrieves the distance sensor height value
+        Args:
+            msg (px4_msgs.msg.DistanceSensor_PubSubTopic): DistanceSensor
+            message
+        """
+        self.distance_sensor_height_ = msg.current_distance
 
     def callback_timer(self):
         """This callback send the required messages to enact the offboard
@@ -201,7 +263,7 @@ class DroneController(Node):
         ])
 
     def land_controller(self):
-        """Controller for land mode: send the landind message and stop the
+        """Controller for land mode: send the landing message and stop the
         offboard control
         """
 
@@ -236,6 +298,122 @@ class DroneController(Node):
             ],
             yaw=self.setpoint_[6]
         )
+
+    def target_follower_controller(self):
+        """Controller for target landing mode: sends xy velocity outputs proportional 
+        to the relative distance between drone and rover.
+        """
+
+        if self.rel_pos_ == [] or self.rel_vel_ == []:
+            x_setpoint_ = NULL
+            y_setpoint_ = NULL
+            z_setpoint_ = self.start_local_position_[2] + FOLLOW_HOVERING_HEIGHT
+            vx_setpoint_ = 0.0
+            vy_setpoint_ = 0.0
+            vz_setpoint_ = NULL
+            yaw_setpoint_ = NULL
+            
+        else:
+            x_setpoint_ = NULL
+            y_setpoint_ = NULL
+            z_setpoint_ = self.start_local_position_[2] + FOLLOW_HOVERING_HEIGHT
+            vz_setpoint_ = NULL
+            yaw_setpoint_ = NULL
+
+            self.norm_rel_pos_ = np.linalg.norm(self.rel_pos_, ord=2)
+            self.norm_rel_vel_ = np.linalg.norm(self.rel_vel_, ord=2)
+
+            if (self.norm_rel_pos_) < PID_SWITCH_POS:
+                [vx_setpoint_, vy_setpoint_], _, _ = self.PID_1.PID(self.rel_pos_, self.rel_vel_, [self.local_velocity_[0], self.local_velocity_[1]], self.reset_int_)
+                self.reset_int_ = False
+            else:
+                [vx_setpoint_, vy_setpoint_], _, _ = self.PID_2.PID(self.rel_pos_, self.rel_vel_, [self.local_velocity_[0], self.local_velocity_[1]], self.reset_int_)
+                self.reset_int_ = True
+
+        self.arm()
+        self.offboard(
+            position=[
+                x_setpoint_,
+                y_setpoint_,
+                z_setpoint_
+            ],
+            velocity=[
+                vx_setpoint_,
+                vy_setpoint_,
+                vz_setpoint_
+            ],
+            yaw = yaw_setpoint_
+        )
+
+    def land_on_target_controller(self):
+        """Controller for target landing mode: sends setpoints according to a state machine
+        and xy velocity outputs proportional to the relative distance between drone and rover.
+        """
+
+        if self.rel_pos_ == [] or self.rel_vel_ == [] or self.distance_sensor_height_ == []:
+            x_setpoint_ = NULL
+            y_setpoint_ = NULL
+            z_setpoint_ = self.start_local_position_[2] + FOLLOW_HOVERING_HEIGHT
+            vx_setpoint_ = 0.0
+            vy_setpoint_ = 0.0
+            vz_setpoint_ = NULL
+            yaw_setpoint_ = NULL
+            
+        else:
+            x_setpoint_ = NULL
+            y_setpoint_ = NULL
+            yaw_setpoint_ = NULL
+
+            self.norm_rel_pos_ = np.linalg.norm(self.rel_pos_, ord=2)
+            self.norm_rel_vel_ = np.linalg.norm(self.rel_vel_, ord=2)
+
+            if (self.norm_rel_pos_) < PID_SWITCH_POS:
+                [vx_setpoint_, vy_setpoint_], _, _ = self.PID_1.PID(self.rel_pos_, self.rel_vel_, [self.local_velocity_[0], self.local_velocity_[1]], self.reset_int_)
+                self.reset_int_ = False
+            else:
+                [vx_setpoint_, vy_setpoint_], _, _ = self.PID_2.PID(self.rel_pos_, self.rel_vel_, [self.local_velocity_[0], self.local_velocity_[1]], self.reset_int_)
+                self.reset_int_ = True
+            
+            if ((self.norm_rel_pos_) < LAND_ERR_TOLL) and ((self.norm_rel_vel_) < LAND_VEL_TOLL):
+                z_setpoint_ = float("NaN")
+                vz_setpoint_ = LAND_DESC_VEL
+                if self.local_velocity_[2] > TURN_OFF_MOT_Z_VEL and self.local_velocity_[2] < - TURN_OFF_MOT_Z_VEL and self.distance_sensor_height_ < TURN_OFF_MOT_HEIGHT:
+                    self.detect_landing_counter_ += 1
+                    if self.detect_landing_counter_ == DETECT_LANDING_COUNT:
+                        self.control_mode_ = "idle"
+                        self.detect_landing_counter_ = 0
+                else:
+                    self.detect_landing_counter_ = 0
+            else:
+                z_setpoint_ = FOLLOW_HOVERING_HEIGHT
+                vz_setpoint_ = float("NaN")
+                
+        self.arm()
+        self.offboard(
+            position=[
+                x_setpoint_,
+                y_setpoint_,
+                z_setpoint_
+            ],
+            velocity=[
+                vx_setpoint_,
+                vy_setpoint_,
+                vz_setpoint_
+            ],
+            yaw = yaw_setpoint_
+        )
+
+    def watchdog_callback(self):
+        """Stop the drone if no uwb information arrives for WATCHDOG_DT time.
+        """
+        if self.control_mode_ != "follow_target" and self.control_mode_ != "land_on_target":
+            return
+        if self.watchdog_counter_ == 0:
+            self.get_logger().info("No target position, waiting..")
+            self.rel_pos_ = []
+            self.rel_vel_ = []
+        
+        self.watchdog_counter_ = 0
 
     def check_height(self):
         """Check if the requested height is in the boundaries or set the
