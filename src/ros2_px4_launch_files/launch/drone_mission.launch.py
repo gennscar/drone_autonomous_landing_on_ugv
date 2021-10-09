@@ -43,7 +43,7 @@ def generate_launch_description():
         name="UkfPositioning",
         namespace=LaunchConfiguration("drone_namespace"),
         parameters=[{"delta_t": 0.1}, {"q": 1e-4},
-                    {"r_uwb": 5e-2}, {"r_gps": 1e-5}]
+                    {"r_uwb": 0.05}, {"r_gps": 1e-5}]
     )
 
     return LaunchDescription([

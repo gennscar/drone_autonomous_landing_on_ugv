@@ -21,16 +21,12 @@ class GpsPositioning(Node):
 
         # Reference of ENU frame
         self.reference_ = np.zeros(3)
-        self.is_ref_valid = False
+        self.ref_counter_ = 0
 
         # Setting up PX4 subscribers
         self.gpspos_subscriber_ = self.create_subscription(
             VehicleGpsPosition, "VehicleGpsPosition_PubSubTopic",
             self.callback_gpspos_subscriber, QUEUE_SIZE
-        )
-        self.gpspos_subscriber_ = self.create_subscription(
-            VehicleLocalPosition, "VehicleLocalPosition_PubSubTopic",
-            self.callback_local_subscriber, QUEUE_SIZE
         )
 
         # Setting up position publisher
@@ -41,21 +37,6 @@ class GpsPositioning(Node):
 
         self.get_logger().info("Node has started")
 
-    def callback_local_subscriber(self, msg):
-        """This callback ask to PX4 the position of the ENU reference frame
-
-        Args:
-            msg (from px4_msgs.msg.VehicleLocalPosition): The PX4 messages
-            containing info about the local frame positioning
-        """
-
-        self.reference_ = np.array([
-            math.radians(msg.ref_lat),
-            math.radians(msg.ref_lon),
-            msg.ref_alt
-        ])
-        self.is_ref_valid = True
-
     def callback_gpspos_subscriber(self, msg):
         """Retrieve GPS data from sensors and convert them in the local ENU
         reference frame
@@ -65,16 +46,19 @@ class GpsPositioning(Node):
             GPS data
         """
 
-        # Check if the reference is valid
-        if not self.is_ref_valid:
-            self.get_logger().warn("Waiting for local reference frame definition")
-
         # Converting into the right measurements units
         coordinates = np.array([
             math.radians(msg.lat*1e-7),
             math.radians(msg.lon*1e-7),
             msg.alt*1e-3
         ])
+
+        # Check if the reference is valid
+        if self.ref_counter_ < 20:
+            self.reference_ += (coordinates - self.reference_) / \
+                (self.ref_counter_ + 1)
+            self.ref_counter_ += 1
+            return
 
         # Converting from WGS84 to local ENU frame
         self.pos_ = ros2_px4_functions.WGS84_to_ENU(

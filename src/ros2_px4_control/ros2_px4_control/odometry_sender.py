@@ -106,6 +106,9 @@ class OdometrySender(Node):
             covariance and timestamp
         """
 
+        if(self.timestamp_ == 0):
+            return
+
         self.vis_.timestamp = self.timestamp_
         self.vis_.timestamp_sample = self.timestamp_
         self.vis_.local_frame = VehicleVisualOdometry.LOCAL_FRAME_NED
