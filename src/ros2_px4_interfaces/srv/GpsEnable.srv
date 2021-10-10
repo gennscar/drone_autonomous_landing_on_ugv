@@ -1,0 +1,5 @@
+# Gps Enable allow the control of the node that forward the GPS to other nodes
+
+bool enable         # Enable
+---
+string message      # Return message

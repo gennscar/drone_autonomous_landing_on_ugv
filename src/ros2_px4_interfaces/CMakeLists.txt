@@ -35,9 +35,10 @@ set(msg_files
 
 set(srv_files
   "srv/ControlMode.srv"
-  "srv/TargetCustomCommand.srv"
   "srv/DroneCustomCommand.srv"
+  "srv/GpsEnable.srv"
   "srv/SwarmCommand.srv"
+  "srv/TargetCustomCommand.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
