@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
-from scipy.linalg.decomp import eigvals_banded
 import rclpy
 from rclpy.node import Node
 
-import math
 import numpy as np
 import scipy
 from scipy.spatial.transform import Rotation as R
@@ -14,11 +12,12 @@ from filterpy.kalman import UnscentedKalmanFilter as UKF
 from filterpy.common import Q_discrete_white_noise
 
 from nav_msgs.msg import Odometry
+from px4_msgs.msg import SensorCombined
 from ros2_px4_interfaces.msg import UwbSensor
 
 
 QUEUE_SIZE = 10
-FILTER_DIM = 9+4
+FILTER_DIM = 9+4+4+3  # Linear kinematic + quaternion kinematic + uwb + bias
 IS_SENSOR_ALIVE_TIMEOUT = 5.  # s
 
 
@@ -32,13 +31,14 @@ class UkfPositioning(Node):
         self.declare_parameters("", [
             ("delta_t", 0.),
             ("q", 0.),
-            ("r_gps", 0.),
             ("r_uwb", 0.),
+            ("r_gps", 0.),
+            ("r_imu", 0.),
         ])
 
         self.params_ = {
             x.name: x.value for x in self.get_parameters(
-                ["delta_t", "q", "r_gps", "r_uwb"]
+                ["delta_t", "q", "r_uwb", "r_gps", "r_imu"]
             )
         }
 
@@ -48,6 +48,7 @@ class UkfPositioning(Node):
         self.sensor_wd_ = {
             "uwb": 0,
             "gps": 0,
+            "imu": 0
         }
 
         # Kalman Filter
@@ -62,7 +63,7 @@ class UkfPositioning(Node):
                 [0., 1.,         dt],
                 [0., 0.,         1.]
             ])
-            F = scipy.linalg.block_diag(*[f]*3, np.eye(4))
+            F = scipy.linalg.block_diag(*[f]*3, np.eye(11))
             return F @ x
 
         self.kalman_filter_ = UKF(
@@ -83,24 +84,26 @@ class UkfPositioning(Node):
         self.kalman_filter_.Q = scipy.linalg.block_diag(
             Q_discrete_white_noise(
                 dim=3, dt=self.params_["delta_t"], var=self.params_["q"], block_size=3),
-            np.zeros((4, 4))
+            np.zeros((11, 11))
         )
 
         # Setting up sensors subscribers
         self.uwb_subscriber_ = self.create_subscription(
-            UwbSensor, "/uwb_sensor_tag_0", self.callback_uwb_subscriber,
-            QUEUE_SIZE
+            UwbSensor, "/uwb_sensor_tag_0",
+            self.callback_uwb_subscriber, QUEUE_SIZE
         )
         self.gps_subscriber_ = self.create_subscription(
             Odometry, "GpsPositioning/Odometry",
-            self.callback_gps_subscriber,
-            QUEUE_SIZE
+            self.callback_gps_subscriber, QUEUE_SIZE
+        )
+        self.imu_subscriber_ = self.create_subscription(
+            SensorCombined, "SensorCombined_PubSubTopic",
+            self.callback_imu_subscriber, QUEUE_SIZE
         )
 
         # Setting up position and velocity publisher
         self.odometry_publisher_ = self.create_publisher(
-            Odometry, "~/Odometry",
-            QUEUE_SIZE
+            Odometry, "~/Odometry", QUEUE_SIZE
         )
 
         # Prediction timer
@@ -127,6 +130,10 @@ class UkfPositioning(Node):
         z = np.zeros(FILTER_DIM)
         z[0] = msg.range
 
+        if any(np.isnan(z)):
+            self.get_logger().error(f"Invalid UWB data")
+            return
+
         # Storing anchor position in a np.array
         anchor_position = np.array([
             msg.anchor_pose.pose.position.x,
@@ -138,18 +145,18 @@ class UkfPositioning(Node):
         #r = R.from_rotvec([0., 0., math.pi/3])
         #anchor_position = r.apply(anchor_position)
 
-        if (self.sensor_wd_["uwb"] - self.sensor_wd_["gps"] < IS_SENSOR_ALIVE_TIMEOUT):
+        if (True or self.sensor_wd_["uwb"] - self.sensor_wd_["gps"] < IS_SENSOR_ALIVE_TIMEOUT):
             # Measurement model for a rotated range sensor
             def h_uwb(x):
                 h = np.zeros(FILTER_DIM)
 
                 # Transform the anchor position in the local frame
-                r = R.from_rotvec([0., 0., x[12]])
+                r = R.from_rotvec([0., 0., x[16]])
 
-                offset_anc_pos = anchor_position + x[9:12]
+                offset_anc_pos = anchor_position + x[13:16]
                 rot_anc_pos = r.apply(offset_anc_pos)
 
-                # Range measurement
+                # Range measurements
                 h[0] = np.linalg.norm(x[[0, 3, 6]] - rot_anc_pos)
                 return h
         else:
@@ -202,10 +209,51 @@ class UkfPositioning(Node):
         # Filter update
         self.kalman_filter_.update(z, R=self.params_["r_gps"], hx=h_gps)
 
+    def callback_imu_subscriber(self, msg):
+        """Measuring accelerometer and gyroscope sensor
+
+        Args:
+            msg (px4_msgs.msg.SensorCombined): The sensors message
+        """
+
+        # Must predict once first
+        if(self.filter_state_ == "Offline"):
+            return
+
+        # Storing timestamp
+        self.sensor_wd_["imu"] = self.get_clock().now().nanoseconds
+
+        # Storing measurements in a np.array
+        z = np.zeros(FILTER_DIM)
+        z[0:6] = np.array([
+            msg.gyro_rad[0],
+            msg.gyro_rad[1],
+            msg.gyro_rad[2],
+            msg.accelerometer_m_s2[0],
+            msg.accelerometer_m_s2[1],
+            msg.accelerometer_m_s2[2]
+        ])
+
+        if any(np.isnan(z)):
+            self.get_logger().error(f"Invalid IMU data")
+            return
+
+        # Measurement model for IMU sensor
+        def h_imu(x):
+            h = np.zeros(FILTER_DIM)
+            h[3:6] = np.array(
+                [x[5] - x[17], x[2] - x[18], -x[8] - x[19] - 9.805])
+            return h
+
+        # Filter update
+        self.kalman_filter_.update(z, R=self.params_["r_imu"], hx=h_imu)
+
     def predict_callback(self):
         """This callback perform the filter predict and forward the current
         estimate
         """
+
+        # self.get_logger().info(f"{self.kalman_filter_.x}")
 
         if (self.filter_state_ == "Initialized"):
             if(np.linalg.norm(self.kalman_filter_.x - self.kalman_filter_.x_prior) < 1.):
