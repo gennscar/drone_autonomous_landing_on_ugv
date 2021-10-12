@@ -1,6 +1,7 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
+from launch.actions import Shutdown
 from launch.substitutions import LaunchConfiguration
 
 
@@ -20,7 +21,7 @@ def generate_launch_description():
         parameters=[
             {"topic_name": "tag_0"},
             {"uwbPort": '/dev/ttyACM0'},
-            {"anchors_pos_file_path": '/home/ubuntu/ros2_px4_ws/json/anchors_landing_pad.json'},
+            {"anchors_pos_file_path": '/home/ubuntu/ros2_px4_ws/json/anchors_covivio_3.json'},
         ]
     )
 
@@ -28,7 +29,10 @@ def generate_launch_description():
         executable="drone_controller",
         package="ros2_px4_control",
         name="DroneController",
-        namespace=LaunchConfiguration("drone_namespace")
+        namespace=LaunchConfiguration("drone_namespace"),
+	parameters=[
+	    {"vehicle_number": 3}
+	]
     )
 
     odometry_sender_node = Node(
@@ -54,7 +58,8 @@ def generate_launch_description():
         name="UkfPositioning",
         namespace=LaunchConfiguration("drone_namespace"),
         parameters=[{"delta_t": 0.05}, {"q": 1e-3},
-                    {"r_uwb": 0.05}, {"r_gps": 1e-5}]
+                    {"r_uwb": 0.05}, {"r_gps": 1e-5}],
+	on_exit=Shutdown()
     )
 
     return LaunchDescription([
