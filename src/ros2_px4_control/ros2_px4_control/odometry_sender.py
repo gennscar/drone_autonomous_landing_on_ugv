@@ -87,18 +87,18 @@ class OdometrySender(Node):
         self.vis_.y = msg.pose.pose.position.x
         self.vis_.z = -msg.pose.pose.position.z
 
-        self.vis_.pose_covariance[0] = 0.0
-        self.vis_.pose_covariance[6] = 0.0
-        self.vis_.pose_covariance[11] = 0.0
+        self.vis_.pose_covariance[0] = msg.pose.covariance[1]
+        self.vis_.pose_covariance[6] = msg.pose.covariance[0]
+        self.vis_.pose_covariance[11] = msg.pose.covariance[2]
 
         # Velocity
         self.vis_.vx = msg.twist.twist.linear.y
         self.vis_.vy = msg.twist.twist.linear.x
         self.vis_.vz = -msg.twist.twist.linear.z
 
-        self.vis_.velocity_covariance[0] = 0.0
-        self.vis_.velocity_covariance[6] = 0.0
-        self.vis_.velocity_covariance[11] = 0.0
+        self.vis_.velocity_covariance[0] = msg.twist.covariance[1]
+        self.vis_.velocity_covariance[6] = msg.twist.covariance[0]
+        self.vis_.velocity_covariance[11] = msg.twist.covariance[2]
 
         self.visual_odometry_pub_.publish(self.vis_)
 

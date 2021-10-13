@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
-from scipy.linalg.decomp import eigvals_banded
 import rclpy
 from rclpy.node import Node
 
-import math
 import numpy as np
 import scipy
 from scipy.spatial.transform import Rotation as R
@@ -18,7 +16,7 @@ from ros2_px4_interfaces.msg import UwbSensor
 
 
 QUEUE_SIZE = 10
-FILTER_DIM = 9+4
+FILTER_DIM = 9+4  # Linear kinematic + uwb bias
 IS_SENSOR_ALIVE_TIMEOUT = 5.  # s
 
 
@@ -32,13 +30,13 @@ class UkfPositioning(Node):
         self.declare_parameters("", [
             ("delta_t", 0.),
             ("q", 0.),
-            ("r_gps", 0.),
             ("r_uwb", 0.),
+            ("r_gps", 0.)
         ])
 
         self.params_ = {
             x.name: x.value for x in self.get_parameters(
-                ["delta_t", "q", "r_gps", "r_uwb"]
+                ["delta_t", "q", "r_uwb", "r_gps"]
             )
         }
 
@@ -88,19 +86,17 @@ class UkfPositioning(Node):
 
         # Setting up sensors subscribers
         self.uwb_subscriber_ = self.create_subscription(
-            UwbSensor, "/uwb_sensor_tag_0", self.callback_uwb_subscriber,
-            QUEUE_SIZE
+            UwbSensor, "/uwb_sensor_tag_0",
+            self.callback_uwb_subscriber, QUEUE_SIZE
         )
         self.gps_subscriber_ = self.create_subscription(
             Odometry, "GpsPositioning/Odometry",
-            self.callback_gps_subscriber,
-            QUEUE_SIZE
+            self.callback_gps_subscriber, QUEUE_SIZE
         )
 
         # Setting up position and velocity publisher
         self.odometry_publisher_ = self.create_publisher(
-            Odometry, "~/Odometry",
-            QUEUE_SIZE
+            Odometry, "~/Odometry", QUEUE_SIZE
         )
 
         # Prediction timer
@@ -127,6 +123,10 @@ class UkfPositioning(Node):
         z = np.zeros(FILTER_DIM)
         z[0] = msg.range
 
+        if any(np.isnan(z)):
+            self.get_logger().error(f"Invalid UWB data")
+            return
+
         # Storing anchor position in a np.array
         anchor_position = np.array([
             msg.anchor_pose.pose.position.x,
@@ -134,32 +134,16 @@ class UkfPositioning(Node):
             msg.anchor_pose.pose.position.z
         ])
 
-        # Simulation rotation TO REMOVE
-        #r = R.from_rotvec([0., 0., math.pi/3])
-        #anchor_position = r.apply(anchor_position)
+        # Measurement model for a rotated range sensor
+        def h_uwb(x):
+            h = np.zeros(FILTER_DIM)
 
-        if (self.sensor_wd_["uwb"] - self.sensor_wd_["gps"] < IS_SENSOR_ALIVE_TIMEOUT):
-            # Measurement model for a rotated range sensor
-            def h_uwb(x):
-                h = np.zeros(FILTER_DIM)
+            # Transform the anchor position in the local frame
+            offset_anc_pos = anchor_position + x[9:12]
 
-                # Transform the anchor position in the local frame
-                r = R.from_rotvec([0., 0., x[12]])
-
-                offset_anc_pos = anchor_position + x[9:12]
-                rot_anc_pos = r.apply(offset_anc_pos)
-
-                # Range measurement
-                h[0] = np.linalg.norm(x[[0, 3, 6]] - rot_anc_pos)
-                return h
-        else:
-            # Measurement model for a range sensor
-            def h_uwb(x):
-                h = np.zeros(FILTER_DIM)
-
-                # Range measurement
-                h[0] = np.linalg.norm(x[[0, 3, 6]] - anchor_position)
-                return h
+            # Range measurements
+            h[0] = np.linalg.norm(x[[0, 3, 6]] - offset_anc_pos)
+            return h
 
         # Filter update
         self.kalman_filter_.update(z, R=self.params_["r_uwb"], hx=h_uwb)
@@ -217,48 +201,31 @@ class UkfPositioning(Node):
             self.get_logger().info("Filter calibrated")
             self.filter_state_ = "Calibrated"
 
-        # Send estimation only id calibrated
+        # Send estimation only if calibrated
         if(self.filter_state_ == "Calibrated"):
 
-            # Sending the estimated position
+            # Sending the estimated odometry
             msg = Odometry()
             msg.header.frame_id = "UkfPositioning"
             msg.header.stamp = self.get_clock().now().to_msg()
 
+            # Position
             msg.pose.pose.position.x = self.kalman_filter_.x[0]
             msg.pose.pose.position.y = self.kalman_filter_.x[3]
             msg.pose.pose.position.z = self.kalman_filter_.x[6]
 
-            # Adding other filter states
-            msg.pose.pose.orientation.x = self.kalman_filter_.x[9]
-            msg.pose.pose.orientation.y = self.kalman_filter_.x[10]
-            msg.pose.pose.orientation.z = self.kalman_filter_.x[11]
-            msg.pose.pose.orientation.w = self.kalman_filter_.x[12]
-
             msg.pose.covariance[0] = self.kalman_filter_.P[0][0]
-            msg.pose.covariance[1] = self.kalman_filter_.P[0][3]
-            msg.pose.covariance[2] = self.kalman_filter_.P[0][6]
-            msg.pose.covariance[6] = self.kalman_filter_.P[3][0]
-            msg.pose.covariance[7] = self.kalman_filter_.P[3][3]
-            msg.pose.covariance[8] = self.kalman_filter_.P[3][6]
-            msg.pose.covariance[12] = self.kalman_filter_.P[6][0]
-            msg.pose.covariance[13] = self.kalman_filter_.P[6][3]
-            msg.pose.covariance[14] = self.kalman_filter_.P[6][6]
+            msg.pose.covariance[1] = self.kalman_filter_.P[3][3]
+            msg.pose.covariance[2] = self.kalman_filter_.P[6][6]
 
-            # Sending the estimated velocity
+            # Velocity
             msg.twist.twist.linear.x = self.kalman_filter_.x[1]
             msg.twist.twist.linear.y = self.kalman_filter_.x[4]
             msg.twist.twist.linear.z = self.kalman_filter_.x[7]
 
             msg.twist.covariance[0] = self.kalman_filter_.P[1][1]
-            msg.twist.covariance[1] = self.kalman_filter_.P[1][4]
-            msg.twist.covariance[2] = self.kalman_filter_.P[1][7]
-            msg.twist.covariance[6] = self.kalman_filter_.P[4][1]
-            msg.twist.covariance[7] = self.kalman_filter_.P[4][4]
-            msg.twist.covariance[8] = self.kalman_filter_.P[4][7]
-            msg.twist.covariance[12] = self.kalman_filter_.P[7][1]
-            msg.twist.covariance[13] = self.kalman_filter_.P[7][4]
-            msg.twist.covariance[14] = self.kalman_filter_.P[7][7]
+            msg.twist.covariance[1] = self.kalman_filter_.P[4][4]
+            msg.twist.covariance[2] = self.kalman_filter_.P[7][7]
 
             self.odometry_publisher_.publish(msg)
 
