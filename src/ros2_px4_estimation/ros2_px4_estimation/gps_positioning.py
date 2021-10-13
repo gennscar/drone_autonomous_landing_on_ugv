@@ -58,6 +58,8 @@ class GpsPositioning(Node):
             ("enabled" if self.enable_ else "disabled")
         self.get_logger().info(f"{response.message}")
 
+        return response
+
     def callback_gpspos_subscriber(self, msg):
         """Retrieve GPS data from sensors and convert them in the local ENU
         reference frame
