@@ -70,11 +70,13 @@ class TopicsRecorder(Node):
         self.vehicleGlobalPositionFiles = list()
         self.vehicleStatusFiles = list()
         self.uwb_sensorFiles = list()
+        self.trajectorySetpointFiles = list()
         for i in range(self.N):
             self.vehicleLocalPositionFiles.append(open(csvFilesPath + today + "/X500_" + str(i) + "_VehicleLocalPosition.csv", "w"))
             self.vehicleGlobalPositionFiles.append(open(csvFilesPath + today + "/X500_" + str(i) + "_VehicleGlobalPosition.csv", "w"))
             self.vehicleStatusFiles.append(open(csvFilesPath + today + "/X500_" + str(i) + "_VehicleStatus.csv", "w"))
             self.uwb_sensorFiles.append(open(csvFilesPath + today + "/uwb_sensor_" + str(i) + ".csv", "w"))
+            self.trajectorySetpointFiles.append(open(csvFilesPath + today + "/X500_" + str(i) + "_TrajectorySetpoint.csv", "w"))
         if self.NUM_TARGET != 0:
             self.uwb_sensor_targetFile = open(csvFilesPath + today + "/uwb_sensor_" + str(self.TARGET_ID) + ".csv", "w")
             self.trackingErrorFile = open(csvFilesPath + today + "/trackingError.csv", "w")
@@ -93,11 +95,13 @@ class TopicsRecorder(Node):
         self.vehicleGlobalPositionWriters = list()
         self.vehicleStatusWriters = list()
         self.uwb_sensorWriters = list()
+        self.trajectorySetpointWriters = list()
         for i in range(self.N):
             self.vehicleLocalPositionWriters.append(csv.writer(self.vehicleLocalPositionFiles[i]))
             self.vehicleGlobalPositionWriters.append(csv.writer(self.vehicleGlobalPositionFiles[i]))
             self.vehicleStatusWriters.append(csv.writer(self.vehicleStatusFiles[i]))
             self.uwb_sensorWriters.append(csv.writer(self.uwb_sensorFiles[i]))
+            self.trajectorySetpointWriters.append(csv.writer(self.trajectorySetpointFiles[i]))
         if self.NUM_TARGET != 0:
             self.uwb_sensor_targetWriter = csv.writer(self.uwb_sensor_targetFile)
             self.trackingErrorWriter = csv.writer(self.trackingErrorFile)
@@ -119,6 +123,7 @@ class TopicsRecorder(Node):
             self.subscribers.append(self.create_subscription(VehicleGlobalPosition, "/X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.vehicleGlobalPositionCallback, droneId=i), self.QUEUE_SIZE))
             self.subscribers.append(self.create_subscription(VehicleStatus, "/X500_" + str(i) + "/VehicleStatus_PubSubTopic", partial(self.vehicleStatusCallback, droneId=i), self.QUEUE_SIZE))
             self.subscribers.append(self.create_subscription(UwbSensor, "/uwb_sensor_" + str(i), partial(self.uwb_sensorCallback, droneId=i), self.QUEUE_SIZE))
+            self.subscribers.append(self.create_subscription(TrajectorySetpoint, "/X500_" + str(i) + "/TrajectorySetpoint_PubSubTopic", partial(self.trajectorySetpointCallback, droneId=i), self.QUEUE_SIZE))
         if self.NUM_TARGET != 0:
             self.subscribers.append(self.create_subscription(UwbSensor, "/uwb_sensor_" + str(self.TARGET_ID), partial(self.uwb_sensorCallback, droneId=self.TARGET_ID), self.QUEUE_SIZE))
             self.subscribers.append(self.create_subscription(DistanceStamped, "/performanceAnalyzer/trackingError", self.trackingErrorCallback, self.QUEUE_SIZE))
@@ -246,6 +251,20 @@ class TopicsRecorder(Node):
             self.uwb_sensor_targetWriter.writerow(data)
         else:
             self.uwb_sensorWriters[droneId].writerow(data)
+
+    def trajectorySetpointCallback(self, msg, droneId):
+        data = [
+            self.getTime(),
+            msg.x,
+            msg.y,
+            msg.z,
+            msg.yaw,
+            msg.yawspeed,
+            msg.vx,
+            msg.vy,
+            msg.vz
+        ]
+        self.trajectorySetpointWriters[droneId].writerow(data)
 
     def trackingErrorCallback(self, msg):
         data = [

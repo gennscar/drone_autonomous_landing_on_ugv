@@ -275,7 +275,7 @@ function swarmrestart() {
 # region Drones commands
 function dronetakeoff() {
   n=${1:-0}
-  z=${2:--1}
+  z=${2:--3}
   eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'takeoff', z: $z}'"
 }
 
