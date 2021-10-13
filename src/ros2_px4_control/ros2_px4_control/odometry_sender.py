@@ -2,7 +2,7 @@
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
+from nav_msgs.msg import Odometry
 from px4_msgs.msg import Timesync, VehicleVisualOdometry
 
 
@@ -47,13 +47,9 @@ class OdometrySender(Node):
             Timesync, "Timesync_PubSubTopic",
             self.callback_timesync, QUEUE_SIZE
         )
-        self.position_odometry_sub_ = self.create_subscription(
-            PoseWithCovarianceStamped, self.odometry_sub_name_ + "/EstimatedPosition",
-            self.callback_position_odometry, QUEUE_SIZE
-        )
-        self.velocity_odometry_sub_ = self.create_subscription(
-            TwistWithCovarianceStamped, self.odometry_sub_name_ + "/EstimatedVelocity",
-            self.callback_velocity_odometry, QUEUE_SIZE
+        self.odometry_sub_ = self.create_subscription(
+            Odometry, self.odometry_sub_name_ + "/Odometry",
+            self.callback_odometry, QUEUE_SIZE
         )
 
         # Publishers initialization
@@ -72,12 +68,12 @@ class OdometrySender(Node):
         """
         self.timestamp_ = msg.timestamp
 
-    def callback_position_odometry(self, msg):
-        """This callback retrieve the odometry information from a Pose sub and
-        forward them to PX4 module through visual odometry topic
+    def callback_odometry(self, msg):
+        """This callback retrieve the odometry information from a Odometry sub
+        and forward them to PX4 module through visual odometry topic
 
         Args:
-            msg (geometry_msgs.msg.PoseWithCovarianceStamped): The pose with
+            msg (nav_msgs.msg.Odometry): The odometry with
             covariance and timestamp
         """
 
@@ -91,34 +87,18 @@ class OdometrySender(Node):
         self.vis_.y = msg.pose.pose.position.x
         self.vis_.z = -msg.pose.pose.position.z
 
-        self.vis_.pose_covariance[0] = 0.0
-        self.vis_.pose_covariance[6] = 0.0
-        self.vis_.pose_covariance[11] = 0.0
-
-        self.visual_odometry_pub_.publish(self.vis_)
-
-    def callback_velocity_odometry(self, msg):
-        """This callback retrieve the odometry information from a Pose sub and
-        forward them to PX4 module through visual odometry topic
-
-        Args:
-            msg (geometry_msgs.msg.PoseWithCovarianceStamped): The pose with
-            covariance and timestamp
-        """
-
-        self.vis_.timestamp = self.timestamp_
-        self.vis_.timestamp_sample = self.timestamp_
-        self.vis_.local_frame = VehicleVisualOdometry.LOCAL_FRAME_NED
-        self.vis_.velocity_frame = VehicleVisualOdometry.LOCAL_FRAME_NED
+        self.vis_.pose_covariance[0] = msg.pose.covariance[1]
+        self.vis_.pose_covariance[6] = msg.pose.covariance[0]
+        self.vis_.pose_covariance[11] = msg.pose.covariance[2]
 
         # Velocity
         self.vis_.vx = msg.twist.twist.linear.y
         self.vis_.vy = msg.twist.twist.linear.x
         self.vis_.vz = -msg.twist.twist.linear.z
 
-        self.vis_.velocity_covariance[0] = 0.0
-        self.vis_.velocity_covariance[6] = 0.0
-        self.vis_.velocity_covariance[11] = 0.0
+        self.vis_.velocity_covariance[0] = msg.twist.covariance[1]
+        self.vis_.velocity_covariance[6] = msg.twist.covariance[0]
+        self.vis_.velocity_covariance[11] = msg.twist.covariance[2]
 
         self.visual_odometry_pub_.publish(self.vis_)
 

@@ -5,8 +5,9 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 
-from px4_msgs.msg import VehicleGpsPosition, VehicleLocalPosition
-from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
+from px4_msgs.msg import VehicleGpsPosition
+from nav_msgs.msg import Odometry
+from ros2_px4_interfaces.srv import GpsEnable
 
 import ros2_px4_functions
 
@@ -19,42 +20,45 @@ class GpsPositioning(Node):
     def __init__(self):
         super().__init__("GpsPositioning")
 
+        # Enable bit
+        self.enable_ = False
+
         # Reference of ENU frame
         self.reference_ = np.zeros(3)
-        self.is_ref_valid = False
+        self.ref_counter_ = 0
 
         # Setting up PX4 subscribers
         self.gpspos_subscriber_ = self.create_subscription(
             VehicleGpsPosition, "VehicleGpsPosition_PubSubTopic",
             self.callback_gpspos_subscriber, QUEUE_SIZE
         )
-        self.gpspos_subscriber_ = self.create_subscription(
-            VehicleLocalPosition, "VehicleLocalPosition_PubSubTopic",
-            self.callback_local_subscriber, QUEUE_SIZE
-        )
 
         # Setting up position publisher
-        self.est_pos_publisher_ = self.create_publisher(
-            PoseWithCovarianceStamped, "~/EstimatedPosition", QUEUE_SIZE)
-        self.est_vel_publisher_ = self.create_publisher(
-            TwistWithCovarianceStamped, "~/EstimatedVelocity", QUEUE_SIZE)
+        self.odometry_publisher_ = self.create_publisher(
+            Odometry, "~/Odometry", QUEUE_SIZE)
+
+        # Services
+        self.control_mode_service = self.create_service(
+            GpsEnable, "GpsEnable_Service", self.callback_service)
 
         self.get_logger().info("Node has started")
 
-    def callback_local_subscriber(self, msg):
-        """This callback ask to PX4 the position of the ENU reference frame
+    def callback_service(self, request, response):
+        """This callback answer to the request to enable/disable the GPS
 
         Args:
-            msg (from px4_msgs.msg.VehicleLocalPosition): The PX4 messages
-            containing info about the local frame positioning
+        request (dict): structure containing the request received.
+        response (dict): structure containing the response to send.
         """
 
-        self.reference_ = np.array([
-            math.radians(msg.ref_lat),
-            math.radians(msg.ref_lon),
-            msg.ref_alt
-        ])
-        self.is_ref_valid = True
+        # Setting up mode
+        self.enable_ = request.enable
+
+        response.message = "Gps is " + \
+            ("enabled" if self.enable_ else "disabled")
+        self.get_logger().info(f"{response.message}")
+
+        return response
 
     def callback_gpspos_subscriber(self, msg):
         """Retrieve GPS data from sensors and convert them in the local ENU
@@ -65,9 +69,9 @@ class GpsPositioning(Node):
             GPS data
         """
 
-        # Check if the reference is valid
-        if not self.is_ref_valid:
-            self.get_logger().warn("Waiting for local reference frame definition")
+        # Access GPS only if enabled
+        if not self.enable_:
+            return
 
         # Converting into the right measurements units
         coordinates = np.array([
@@ -76,39 +80,39 @@ class GpsPositioning(Node):
             msg.alt*1e-3
         ])
 
+        # Check if the reference is valid
+        if self.ref_counter_ < 10:
+            self.reference_ += (coordinates - self.reference_) / \
+                (self.ref_counter_ + 1)
+            self.ref_counter_ += 1
+            return
+
         # Converting from WGS84 to local ENU frame
         self.pos_ = ros2_px4_functions.WGS84_to_ENU(
             coordinates, self.reference_)
 
         # Filling estimated position message
-        est_pos = PoseWithCovarianceStamped()
-        est_pos.header.stamp = self.get_clock().now().to_msg()
-        est_pos.header.frame_id = "GpsPositioning"
+        odom = Odometry()
+        odom.header.stamp = self.get_clock().now().to_msg()
+        odom.header.frame_id = "GpsPositioning"
 
-        est_pos.pose.pose.position.x = self.pos_[0]
-        est_pos.pose.pose.position.y = self.pos_[1]
-        est_pos.pose.pose.position.z = self.pos_[2]
+        odom.pose.pose.position.x = self.pos_[0]
+        odom.pose.pose.position.y = self.pos_[1]
+        odom.pose.pose.position.z = self.pos_[2]
 
-        est_pos.pose.covariance[0] = msg.eph
-        est_pos.pose.covariance[7] = msg.eph
-        est_pos.pose.covariance[15] = msg.epv
+        odom.pose.covariance[0] = msg.eph
+        odom.pose.covariance[7] = msg.eph
+        odom.pose.covariance[15] = msg.epv
 
-        self.est_pos_publisher_.publish(est_pos)
+        odom.twist.twist.linear.x = msg.vel_e_m_s
+        odom.twist.twist.linear.y = msg.vel_n_m_s
+        odom.twist.twist.linear.z = -msg.vel_d_m_s
 
-        # Filling estimated velocity message
-        est_vel = TwistWithCovarianceStamped()
-        est_vel.header.stamp = self.get_clock().now().to_msg()
-        est_vel.header.frame_id = "GpsPositioning"
+        odom.twist.covariance[0] = msg.s_variance_m_s
+        odom.twist.covariance[7] = msg.s_variance_m_s
+        odom.twist.covariance[15] = msg.s_variance_m_s
 
-        est_vel.twist.twist.linear.x = msg.vel_e_m_s
-        est_vel.twist.twist.linear.y = msg.vel_n_m_s
-        est_vel.twist.twist.linear.z = -msg.vel_d_m_s
-
-        est_vel.twist.covariance[0] = msg.s_variance_m_s
-        est_vel.twist.covariance[7] = msg.s_variance_m_s
-        est_vel.twist.covariance[15] = msg.s_variance_m_s
-
-        self.est_vel_publisher_.publish(est_vel)
+        self.odometry_publisher_.publish(odom)
 
 
 def main(args=None):
