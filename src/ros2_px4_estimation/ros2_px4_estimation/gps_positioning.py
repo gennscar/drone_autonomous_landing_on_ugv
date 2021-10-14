@@ -69,10 +69,6 @@ class GpsPositioning(Node):
             GPS data
         """
 
-        # Access GPS only if enabled
-        if not self.enable_:
-            return
-
         # Converting into the right measurements units
         coordinates = np.array([
             math.radians(msg.lat*1e-7),
@@ -90,6 +86,10 @@ class GpsPositioning(Node):
         # Converting from WGS84 to local ENU frame
         self.pos_ = ros2_px4_functions.WGS84_to_ENU(
             coordinates, self.reference_)
+
+        # Send GPS only if enabled
+        if not self.enable_:
+            return
 
         # Filling estimated position message
         odom = Odometry()
