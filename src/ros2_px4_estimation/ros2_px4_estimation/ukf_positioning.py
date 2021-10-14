@@ -12,11 +12,12 @@ from filterpy.kalman import UnscentedKalmanFilter as UKF
 from filterpy.common import Q_discrete_white_noise
 
 from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from ros2_px4_interfaces.msg import UwbSensor
 
 
 QUEUE_SIZE = 10
-FILTER_DIM = 9+4  # Linear kinematic + uwb bias
+FILTER_DIM = 9  # Linear kinematic
 IS_SENSOR_ALIVE_TIMEOUT = 5.  # s
 
 
@@ -28,10 +29,10 @@ class UkfPositioning(Node):
         super().__init__("UkfPositioning")
 
         self.declare_parameters("", [
-            ("delta_t", 0.),
-            ("q", 0.),
-            ("r_uwb", 0.),
-            ("r_gps", 0.)
+            ("delta_t", 0.05),
+            ("q", 0.1),
+            ("r_uwb", 0.05),
+            ("r_gps", 1e-5)
         ])
 
         self.params_ = {
@@ -42,6 +43,8 @@ class UkfPositioning(Node):
 
         self.filter_state_ = "Offline"
         self.calibration_counter_ = 0
+        self.aligning_counter_ = 0
+        self.anchor_offset_ = np.zeros(3)
         self.last_sensor_list_ = []
         self.sensor_wd_ = {
             "uwb": 0,
@@ -60,7 +63,7 @@ class UkfPositioning(Node):
                 [0., 1.,         dt],
                 [0., 0.,         1.]
             ])
-            F = scipy.linalg.block_diag(*[f]*3, np.eye(4))
+            F = scipy.linalg.block_diag(*[f]*3)
             return F @ x
 
         self.kalman_filter_ = UKF(
@@ -81,10 +84,13 @@ class UkfPositioning(Node):
         self.kalman_filter_.Q = scipy.linalg.block_diag(
             Q_discrete_white_noise(
                 dim=3, dt=self.params_["delta_t"], var=self.params_["q"], block_size=3),
-            np.zeros((4, 4))
         )
 
         # Setting up sensors subscribers
+        self.uwb_pos_subscriber_ = self.create_subscription(
+            PoseWithCovarianceStamped, "UwbPositioning/Pose",
+            self.callback_uwb_pos_subscriber, QUEUE_SIZE
+        )
         self.uwb_subscriber_ = self.create_subscription(
             UwbSensor, "/uwb_sensor_tag_0",
             self.callback_uwb_subscriber, QUEUE_SIZE
@@ -105,6 +111,33 @@ class UkfPositioning(Node):
 
         self.get_logger().info(f"Node has started: {self.params_}")
 
+    def callback_uwb_pos_subscriber(self, msg):
+        """Measuring UWB position offset estimate wtr of the navigation frame
+
+        Args:
+            msg (geometry_msgs.msg.PoseWithCovarianceStamped): The UWB pose
+        """
+
+        # Deriving the anchor offset
+        anchor_offset = np.array([
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y,
+            msg.pose.pose.position.z
+        ]) - self.kalman_filter_.x[[0, 3, 6]]
+
+        # Mean values until convergence, than this subscriber can be destroyed
+        if np.linalg.norm(self.anchor_offset_ - anchor_offset) > 1e-3 or self.aligning_counter_ < 100:
+            self.anchor_offset_ += (anchor_offset - self.anchor_offset_) / \
+                (self.aligning_counter_ + 1)
+            self.aligning_counter_ += 1
+        else:
+            self.get_logger().info(f"""
+            Anchor reference frame aligned in {self.aligning_counter_} iterations: 
+            Offset = {self.anchor_offset_}
+            """)
+            self.destroy_subscription(self.uwb_pos_subscriber_)
+            self.aligning_counter_ = -1
+
     def callback_uwb_subscriber(self, msg):
         """Measuring UWB range sensor
 
@@ -112,8 +145,8 @@ class UkfPositioning(Node):
             msg (ros2_px4_interfaces.msg.UwbSensor): The UWB message
         """
 
-        # Must predict once first
-        if(self.filter_state_ == "Offline"):
+        # Must predict once first and anchor must be aligned
+        if(self.filter_state_ == "Offline" or self.aligning_counter_ > -1):
             return
 
         # Storing timestamp
@@ -132,21 +165,27 @@ class UkfPositioning(Node):
             msg.anchor_pose.pose.position.x,
             msg.anchor_pose.pose.position.y,
             msg.anchor_pose.pose.position.z
-        ])
+        ]) - self.anchor_offset_
 
         # Measurement model for a rotated range sensor
         def h_uwb(x):
             h = np.zeros(FILTER_DIM)
 
-            # Transform the anchor position in the local frame
-            offset_anc_pos = anchor_position + x[9:12]
-
             # Range measurements
-            h[0] = np.linalg.norm(x[[0, 3, 6]] - offset_anc_pos)
+            h[0] = np.linalg.norm(x[[0, 3, 6]] - anchor_position)
             return h
 
         # Filter update
         self.kalman_filter_.update(z, R=self.params_["r_uwb"], hx=h_uwb)
+
+        # Gating
+        x = self.kalman_filter_.x.copy()
+        P = self.kalman_filter_.P.copy()
+        if self.kalman_filter_.mahalanobis > 3. and self.filter_state_ == "Calibrated":
+            self.get_logger().warn(
+                f"Gating @: {self.kalman_filter_.mahalanobis}")
+            self.kalman_filter_.x = x.copy()
+            self.kalman_filter_.P = P.copy()
 
     def callback_gps_subscriber(self, msg):
         """Measuring GPS sensor
@@ -192,7 +231,7 @@ class UkfPositioning(Node):
         """
 
         if (self.filter_state_ == "Initialized"):
-            if(np.linalg.norm(self.kalman_filter_.x - self.kalman_filter_.x_prior) < 1.):
+            if(np.linalg.norm(self.kalman_filter_.x - self.kalman_filter_.x_prior) < 0.1 and np.linalg.norm(self.kalman_filter_.x) > 1e-3):
                 self.calibration_counter_ += 1
             else:
                 self.calibration_counter_ = 0
@@ -239,13 +278,14 @@ class UkfPositioning(Node):
         if active_sensor_list != [] or self.filter_state_ == "Offline":
             self.kalman_filter_.predict()
 
-            # Log on sensor list change
-            if (active_sensor_list != self.last_sensor_list_):
-                self.get_logger().info(
-                    f"Fusion using: {active_sensor_list}")
-                self.last_sensor_list_ = active_sensor_list
-        else:
-            self.get_logger().warn(f"No data from sensors")
+        # Log on sensor list change
+        if (active_sensor_list != self.last_sensor_list_):
+            self.get_logger().info(f"Fusion using: {active_sensor_list}")
+            self.last_sensor_list_ = active_sensor_list
+
+            if (active_sensor_list == [] and self.filter_state_ == "Calibrated"):
+                self.get_logger().error(f"Data fusion is not possible without data 0.0")
+                self.filter_state_ == "Offline"
 
         # First predict just happened
         if(self.filter_state_ == "Offline"):

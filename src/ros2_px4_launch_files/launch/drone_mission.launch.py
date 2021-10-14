@@ -30,9 +30,9 @@ def generate_launch_description():
         package="ros2_px4_control",
         name="DroneController",
         namespace=LaunchConfiguration("drone_namespace"),
-	parameters=[
-	    {"vehicle_number": 3}
-	]
+        parameters=[
+            {"vehicle_number": 1}
+        ]
     )
 
     odometry_sender_node = Node(
@@ -43,6 +43,15 @@ def generate_launch_description():
         parameters=[
             {"odometry_sub": LaunchConfiguration("odometry_sub")}
         ]
+    )
+
+    uwb_positioning_node = Node(
+        executable="uwb_positioning",
+        package="ros2_px4_estimation",
+        name="UwbPositioning",
+        namespace=LaunchConfiguration("drone_namespace"),
+        parameters=[{"sensor_id": "tag_0"}],
+        on_exit=Shutdown()
     )
 
     gps_positioning_node = Node(
@@ -57,16 +66,20 @@ def generate_launch_description():
         package="ros2_px4_estimation",
         name="UkfPositioning",
         namespace=LaunchConfiguration("drone_namespace"),
-        parameters=[{"delta_t": 0.05}, {"q": 1e-3},
+        parameters=[{"delta_t": 0.05}, {"q": 0.1},
                     {"r_uwb": 0.05}, {"r_gps": 1e-5}],
-	on_exit=Shutdown()
+        on_exit=Shutdown()
     )
 
     return LaunchDescription([
-        uwb_driver_node,
+        # Arguments
         drone_namespace_arg,
         odometry_sender_sub_arg,
+
+        # Nodes
         drone_controller_node,
+        uwb_driver_node,
+        uwb_positioning_node,
         odometry_sender_node,
         gps_positioning_node,
         ukf_positioning_node,
