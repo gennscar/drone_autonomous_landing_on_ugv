@@ -35,6 +35,7 @@ class Drone(Node):
                 ('UWB_ON', None),                       # if the UWB sensor is on or off on the drone
                 ('SINGLE_DRONE_FOR_TEST', None),        # to fly a single drone with this code
                 ('ID', None),                           # drone ID
+                ('MAVSYS_ID', None),                    # drone MAVSYS ID
                 ('NOT_FLYING_FOR_TEST', None)           # if the drone is thought to just send data without being armed
             ]
         )
@@ -55,6 +56,7 @@ class Drone(Node):
         self.UWB_ON = self.get_parameter('UWB_ON').value
         self.SINGLE_DRONE_FOR_TEST = self.get_parameter('SINGLE_DRONE_FOR_TEST').value
         self.ID = self.get_parameter('ID').value
+        self.MAVSYS_ID = self.get_parameter('MAVSYS_ID').value
         self.NOT_FLYING_FOR_TEST = self.get_parameter('NOT_FLYING_FOR_TEST').value
         # endregion
 
@@ -203,7 +205,7 @@ class Drone(Node):
         msg.param1 = param1
         msg.param2 = param2
         msg.command = command
-        msg.target_system = self.ID + 1
+        msg.target_system = self.MAVSYS_ID
         msg.source_system = 1
         msg.source_component = 1
         msg.from_external = True
@@ -573,9 +575,6 @@ class Drone(Node):
             self.activeDrones[i] = True
             self.lastPositionReceivedTimer[i] = 0
             self.anchorsPositionSubs[i] = self.create_subscription(VehicleGlobalPosition, "/X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE)
-            # if i != self.ID:
-            #     self.readyForTakeoffSubs[i] = self.create_subscription(UInt64, "/readyForTakeoff", self.anchorReadyForTakeoffCallback, self.QUEUE_SIZE)
-            #     self.readyForSwarmingSubs[i] = self.create_subscription(UInt64, "/readyForSwarming", self.anchorReadyForSwarmingCallback, self.QUEUE_SIZE)
 
         self.destroy_subscription(self.numAnchorsSub)
 

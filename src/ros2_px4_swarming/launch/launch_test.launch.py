@@ -61,27 +61,6 @@ def generate_launch_description():
         ld.add_action(targetRover)
 
     if numDrones > 1:
-        # # Launch unitVectorsCalculator
-        # unitVectorsCalculator = Node(
-        #     package='ros2_px4_swarming',
-        #     namespace='unitVectorsCalculator',
-        #     executable='unitVectorsCalculator',
-        #     name='unitVectorsCalculator',
-        #     parameters=[
-        #         params,
-        #         {'N': numDrones}
-        #     ],
-        #     remappings=[
-        #         ('/unitVectorsCalculator/X500_0/VehicleGlobalPosition_PubSubTopic', '/X500_0/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_1/VehicleGlobalPosition_PubSubTopic', '/X500_1/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_2/VehicleGlobalPosition_PubSubTopic', '/X500_2/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_3/VehicleGlobalPosition_PubSubTopic', '/X500_3/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_4/VehicleGlobalPosition_PubSubTopic', '/X500_4/VehicleGlobalPosition_PubSubTopic'),
-        #         ('/unitVectorsCalculator/X500_5/VehicleGlobalPosition_PubSubTopic', '/X500_5/VehicleGlobalPosition_PubSubTopic')
-        #     ]
-        # )
-        # ld.add_action(unitVectorsCalculator)
-
         # Launch trackingVelocityCalculator
         trackingVelocityCalculator = Node(
             package='ros2_px4_swarming',

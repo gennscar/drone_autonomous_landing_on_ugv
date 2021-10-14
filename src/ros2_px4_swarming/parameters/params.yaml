@@ -38,34 +38,40 @@ X500_0:
     X500_0:
         ros__parameters:
             ID: 0
+            MAVSYS_ID: 1
             NOT_FLYING_FOR_TEST: false
 
 X500_1:
     X500_1:
         ros__parameters:
             ID: 1
+            MAVSYS_ID: 2
             NOT_FLYING_FOR_TEST: false
 
 X500_2:
     X500_2:
         ros__parameters:
             ID: 2
+            MAVSYS_ID: 3
             NOT_FLYING_FOR_TEST: false
 
 X500_3:
     X500_3:
         ros__parameters:
             ID: 3
+            MAVSYS_ID: 4
             NOT_FLYING_FOR_TEST: false
 
 X500_4:
     X500_4:
         ros__parameters:
             ID: 4
+            MAVSYS_ID: 5
             NOT_FLYING_FOR_TEST: false
 
 X500_5:
     X500_5:
         ros__parameters:
             ID: 5
+            MAVSYS_ID: 6
             NOT_FLYING_FOR_TEST: false

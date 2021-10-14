@@ -1,3 +1,4 @@
+# region Sources
 source /opt/ros/foxy/setup.bash
 if [[ -f "/usr/share/gazebo/setup.sh" ]]; then
   source /usr/share/gazebo/setup.sh
@@ -7,6 +8,7 @@ if [[ -f "$HOME/gazebo_ros_pkgs/install/setup.bash" ]]; then
   source $HOME/gazebo_ros_pkgs/install/setup.bash
 fi
 source $HOME/ros2_px4_ws/install/setup.bash
+# endregion
 
 # region Build, launch and other
 function buildws() {
@@ -364,26 +366,24 @@ function targetroversquare() {
 # region Test commands
 function ddsserver() {
   fastdds discovery -i 0 -l 192.168.1.99 -p 11811
-#  cd $HOME || exec $SHELL
-#  export FASTRTPS_DEFAULT_PROFILES_FILE=discovery_server_configuration_file.xml
-#  ros2 daemon stop
-#  ros2 daemon start
 }
 
 function rds() {
-#  export FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/ros2_px4_ws/utils/super_client_configuration_file.xml
   export ROS_DISCOVERY_SERVER=192.168.1.99:11811
 }
 
-function superclient() {
-  export FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/ros2_px4_ws/utils/super_client_configuration_file.xml
+function sendworkspace() {
+  n=${1:-0}
+  ipEnd=$((10 + n))
+  ip="192.168.1.$ipEnd"
+  rsync -vrh --exclude={'build','install','log','rosbags','.git','.idea','.gitignore','src/ros2_px4_gazebo','src/ros2_px4_swarming/bagfiles','src/ros2_px4_swarming/csvfiles','px4_logs','src/ros2_px4_swarming/models'} $HOME/ros2_px4_ws ubuntu@$ip:/home/ubuntu
 }
 
 function sendpackage() {
   n=${1:-0}
   ipEnd=$((10 + n))
   ip="192.168.1.$ipEnd"
-  rsync -vrh --exclude={'build','install','log','rosbags','.git','.idea','.gitignore','src/ros2_px4_gazebo','src/ros2_px4_swarming/bagfiles','src/ros2_px4_swarming/csvfiles','px4_logs','src/ros2_px4_swarming/models'} $HOME/ros2_px4_ws ubuntu@$ip:/home/ubuntu
+  rsync -vrh --exclude={'bagfiles','csvfiles','models','resource','test','worlds'} $HOME/ros2_px4_ws/src/ros2_px4_swarming ubuntu@$ip:/home/ubuntu/ros2_px4_ws/src/ros2_px4_swarming
 }
 
 function sendparams() {
@@ -404,7 +404,23 @@ function connectssh() {
 
 function launchdrone() {
   id=${1:-0}
+  mavsys_id=${2:--1}
   export DRONE_ID=$id
+  export MAVSYS_ID=$mavsys_id
   ros2 launch ros2_px4_swarming launch_drone.launch.py
+}
+# endregion
+
+# region Service aliases
+function srvstatus() {
+  sudo systemctl status micrortps.service
+}
+
+function srvrestart() {
+  sudo systemctl restart micrortps.service
+}
+
+function srvstop() {
+  sudo systemctl stop micrortps.service
 }
 # endregion
