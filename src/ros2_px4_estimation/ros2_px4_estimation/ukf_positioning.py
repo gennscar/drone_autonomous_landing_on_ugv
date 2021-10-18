@@ -169,7 +169,7 @@ class UkfPositioning(Node):
         ])
 
         # Anchor position rotation error (only for simulation)
-        # r = R.from_euler('z', 20, degrees=True)
+        # r = R.from_euler('z', 45, degrees=True)
         # anchor_position = r.apply(anchor_position)
 
         # Measurement model for a rotated range sensor
@@ -232,7 +232,16 @@ class UkfPositioning(Node):
             return h
 
         # Filter update
-        self.kalman_filter_.update(z, R=self.params_["r_gps"], hx=h_gps)
+        R = np.eye(FILTER_DIM) * np.array([
+            msg.pose.covariance[0],
+            msg.pose.covariance[7],
+            msg.pose.covariance[15],
+            msg.twist.covariance[0],
+            msg.twist.covariance[7],
+            msg.twist.covariance[15], 1., 1., 1., 1.
+        ])
+
+        self.kalman_filter_.update(z, R, hx=h_gps)
 
     def predict_callback(self):
         """This callback perform the filter predict and forward the current
@@ -253,7 +262,7 @@ class UkfPositioning(Node):
         # Send estimation only if calibrated
         if(self.filter_state_ == "Calibrated"):
             # Check covariance norm
-            if(np.linalg.norm(self.kalman_filter_.P) > 100.):
+            if(np.linalg.norm(self.kalman_filter_.P) > 10.):
                 self.filter_state_ = "Offline"
                 self.get_logger().error("Filter is diverging")
                 return
