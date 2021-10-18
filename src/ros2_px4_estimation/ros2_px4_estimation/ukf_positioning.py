@@ -17,7 +17,7 @@ from ros2_px4_interfaces.msg import UwbSensor
 
 
 QUEUE_SIZE = 10
-FILTER_DIM = 9  # Linear kinematic
+FILTER_DIM = 10  # Linear kinematic
 IS_SENSOR_ALIVE_TIMEOUT = 5.  # s
 
 
@@ -63,7 +63,7 @@ class UkfPositioning(Node):
                 [0., 1.,         dt],
                 [0., 0.,         1.]
             ])
-            F = scipy.linalg.block_diag(*[f]*3)
+            F = scipy.linalg.block_diag(*[f]*3, np.ones(1))
             return F @ x
 
         self.kalman_filter_ = UKF(
@@ -84,6 +84,7 @@ class UkfPositioning(Node):
         self.kalman_filter_.Q = scipy.linalg.block_diag(
             Q_discrete_white_noise(
                 dim=3, dt=self.params_["delta_t"], var=self.params_["q"], block_size=3),
+            np.ones(1)*1e-3
         )
 
         # Setting up sensors subscribers
@@ -165,14 +166,22 @@ class UkfPositioning(Node):
             msg.anchor_pose.pose.position.x,
             msg.anchor_pose.pose.position.y,
             msg.anchor_pose.pose.position.z
-        ]) - self.anchor_offset_
+        ])
+
+        # Anchor position rotation error (only for simulation)
+        # r = R.from_euler('z', 20, degrees=True)
+        # anchor_position = r.apply(anchor_position)
 
         # Measurement model for a rotated range sensor
         def h_uwb(x):
             h = np.zeros(FILTER_DIM)
 
+            anchor_yaw = R.from_euler('z', x[9], degrees=True)
+            rot_anchor_position = anchor_yaw.apply(
+                anchor_position - self.anchor_offset_)
+
             # Range measurements
-            h[0] = np.linalg.norm(x[[0, 3, 6]] - anchor_position)
+            h[0] = np.linalg.norm(x[[0, 3, 6]] - rot_anchor_position)
             return h
 
         # Filter update
@@ -230,18 +239,24 @@ class UkfPositioning(Node):
         estimate
         """
 
-        if (self.filter_state_ == "Initialized"):
-            if(np.linalg.norm(self.kalman_filter_.x - self.kalman_filter_.x_prior) < 0.1 and np.linalg.norm(self.kalman_filter_.x) > 1e-3):
+        if (self.filter_state_ == "Calibrating"):
+            if(np.linalg.norm(self.kalman_filter_.x - self.kalman_filter_.x_prior) < 1.):
                 self.calibration_counter_ += 1
+
+                if (self.calibration_counter_ > 100):
+                    self.get_logger().info("Filter calibrated")
+                    self.filter_state_ = "Calibrated"
+                    self.calibration_counter_ = 0
             else:
                 self.calibration_counter_ = 0
 
-        if (self.filter_state_ == "Initialized" and self.calibration_counter_ > 100):
-            self.get_logger().info("Filter calibrated")
-            self.filter_state_ = "Calibrated"
-
         # Send estimation only if calibrated
         if(self.filter_state_ == "Calibrated"):
+            # Check covariance norm
+            if(np.linalg.norm(self.kalman_filter_.P) > 100.):
+                self.filter_state_ = "Offline"
+                self.get_logger().error("Filter is diverging")
+                return
 
             # Sending the estimated odometry
             msg = Odometry()
@@ -266,6 +281,9 @@ class UkfPositioning(Node):
             msg.twist.covariance[1] = self.kalman_filter_.P[4][4]
             msg.twist.covariance[2] = self.kalman_filter_.P[7][7]
 
+            # Anchor Yaw
+            msg.pose.pose.orientation.x = self.kalman_filter_.x[9]
+
             self.odometry_publisher_.publish(msg)
 
         # Check which sensors are working
@@ -284,12 +302,18 @@ class UkfPositioning(Node):
             self.last_sensor_list_ = active_sensor_list
 
             if (active_sensor_list == [] and self.filter_state_ == "Calibrated"):
-                self.get_logger().error(f"Data fusion is not possible without data 0.0")
+                self.get_logger().error(f"Data fusion is not possible without data ^_^")
                 self.filter_state_ == "Offline"
+
+        # First data just arrived
+        if(self.filter_state_ == "Initialized" and active_sensor_list != []):
+            self.filter_state_ = "Calibrating"
+            self.get_logger().info("Filter is calibrating")
 
         # First predict just happened
         if(self.filter_state_ == "Offline"):
             self.filter_state_ = "Initialized"
+            self.get_logger().info("Filter initialized")
 
 
 def main(args=None):
