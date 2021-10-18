@@ -6,16 +6,20 @@ import numpy as np
 import scipy
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
-from geometry_msgs.msg import PoseWithCovarianceStamped, TwistWithCovarianceStamped
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from px4_msgs.msg import VehicleLocalPosition
+from sensor_msgs.msg import Range
+from scipy.spatial.transform import Rotation as R
 
+from ros2_px4_interfaces.msg import Yaw
 
 class kf_xyz_estimator(Node):
 
     def __init__(self):
         super().__init__("kf_drone_rover")
 
-        self.watchdog_counter = np.zeros((2,1))
+        self.watchdog_counter = np.zeros((3,1))
         self.watchdog_dT_ = 1.0
         self.run_publisher = True
         
@@ -24,29 +28,44 @@ class kf_xyz_estimator(Node):
         self.declare_parameter('R_uwb', 1e-3)
         self.declare_parameter('R_px4', 1e-2)
         self.declare_parameter("R_range_sensor", 1e-2)
+        self.declare_parameter("R_compass", 1e-2)
         self.declare_parameter("rng_sensor_fuse_radius", 0.4)
         self.declare_parameter("rng_sensor_out_radius", 2.0)
+        self.declare_parameter("rng_sensor_max_height", 10.0)
+        self.declare_parameter("rng_sensor_min_height", 0.2)
         self.declare_parameter('Q_drone', 1e-3)
         self.declare_parameter('Q_drone_z', 1e-3)
         self.declare_parameter('Q_rover', 1e-3)
         self.declare_parameter('Q_rover_z', 1e-3)
-        self.declare_parameter('namespace_drone','/drone')
-        self.declare_parameter("uwb_estimator", "/LS_uwb_estimator")
+        self.declare_parameter('Q_compass', 1e-3)
+
+        self.declare_parameter('vehicle_namespace','/drone')
+        self.declare_parameter("uwb_estimator", "/LS_drone_rover_uwb_estimator/norot_pos")
+        self.declare_parameter("yaw_subscriber_topic", "/yaw_sensor/estimated_yaw")
+        self.declare_parameter("enable_watchdog", True)
+
         self.deltaT_ = self.get_parameter('deltaT').get_parameter_value().double_value
         self.R_uwb_ = self.get_parameter('R_uwb').get_parameter_value().double_value
         self.R_px4_ = self.get_parameter('R_px4').get_parameter_value().double_value
-        self.R_range_sensor = self.get_parameter('R_range_sensor').get_parameter_value().double_value
+        self.R_range_sensor_ = self.get_parameter('R_range_sensor').get_parameter_value().double_value
+        self.R_compass_ = self.get_parameter('R_compass').get_parameter_value().double_value
         self.rng_sensor_fuse_radius_ = self.get_parameter('rng_sensor_fuse_radius').get_parameter_value().double_value
         self.rng_sensor_out_radius_ = self.get_parameter('rng_sensor_out_radius').get_parameter_value().double_value
+        self.rng_sensor_max_height_ = self.get_parameter('rng_sensor_max_height').get_parameter_value().double_value
+        self.rng_sensor_min_height_ = self.get_parameter('rng_sensor_min_height').get_parameter_value().double_value
         self.Q_drone = self.get_parameter('Q_drone').get_parameter_value().double_value
         self.Q_drone_z = self.get_parameter('Q_drone_z').get_parameter_value().double_value
         self.Q_rover = self.get_parameter('Q_rover').get_parameter_value().double_value
         self.Q_rover_z= self.get_parameter('Q_rover_z').get_parameter_value().double_value
-        self.namespace_drone = self.get_parameter('namespace_drone').get_parameter_value().string_value
+        self.Q_compass= self.get_parameter('Q_compass').get_parameter_value().double_value
+
+        self.vehicle_namespace = self.get_parameter('vehicle_namespace').get_parameter_value().string_value
         self.uwb_estimator = self.get_parameter("uwb_estimator").get_parameter_value().string_value
+        self.yaw_subscriber_topic = self.get_parameter("yaw_subscriber_topic").get_parameter_value().string_value
+        self.enable_watchdog = self.get_parameter("enable_watchdog").get_parameter_value().bool_value
 
         # Kalman Filter
-        self.kalman_filter_ = KalmanFilter(dim_x=13, dim_z=13)
+        self.kalman_filter_ = KalmanFilter(dim_x=14, dim_z=14)
 
         # State transition matrix
         f_1_ = np.array([
@@ -58,44 +77,45 @@ class kf_xyz_estimator(Node):
             [1., self.deltaT_],
             [0., 1.]
         ])
-        self.kalman_filter_.F = np.block([[scipy.linalg.block_diag(*[f_1_]*2), np.zeros((6,7))],
-                                          [np.zeros((2,6)),  f_2_, np.zeros((2,5))],
-                                          [np.zeros((4,8)),  scipy.linalg.block_diag(*[f_2_]*2), np.zeros((4,1))],
-                                          [np.zeros((1,12)), 1.]])
+        self.kalman_filter_.F = np.block([[scipy.linalg.block_diag(*[f_1_]*2), np.zeros((6,8))],
+                                          [np.zeros((2,6)),  f_2_, np.zeros((2,6))],
+                                          [np.zeros((4,8)),  scipy.linalg.block_diag(*[f_2_]*2), np.zeros((4,2))],
+                                          [np.zeros((1,12)), 1., 0.],
+                                          [np.zeros((1,12)), 0., 1.]])
 
         # Process noise
         Q1_1 = Q_discrete_white_noise(dim=3, dt=self.deltaT_, var=self.Q_drone, block_size=2)
         Q1_2 = Q_discrete_white_noise(dim=2, dt=self.deltaT_, var=self.Q_drone_z, block_size=1)
         Q2 = Q_discrete_white_noise(dim=2, dt=self.deltaT_, var=self.Q_rover, block_size=2)
-        self.kalman_filter_.Q = np.block([[Q1_1, np.zeros((6,7))],
-                                          [np.zeros((2,6)), Q1_2, np.zeros((2,5))],
-                                          [np.zeros((4,8)), Q2,  np.zeros((4,1))],
-                                          [np.zeros((1,12)), self.Q_rover_z*0.25*self.deltaT_**4]])
+        self.kalman_filter_.Q = np.block([[Q1_1, np.zeros((6,8))],
+                                          [np.zeros((2,6)), Q1_2, np.zeros((2,6))],
+                                          [np.zeros((4,8)), Q2,  np.zeros((4,2))],
+                                          [np.zeros((1,12)), self.Q_rover_z*0.25*self.deltaT_**4, 0.],
+                                          [np.zeros((1,12)), 0., self.Q_compass*0.25*self.deltaT_**4]])
 
         # Covariance matrix
         self.kalman_filter_.P *= 10.
 
         # Setting up sensors subscribers
         self.target_uwb_position_subscriber = self.create_subscription(
-            PoseWithCovarianceStamped, self.uwb_estimator + "/estimated_pos", self.callback_uwb_subscriber, 3)
+            PoseWithCovarianceStamped, self.uwb_estimator, self.callback_uwb_subscriber, 3)
         self.px4_drone_subscriber = self.create_subscription(
-            VehicleLocalPosition, self.namespace_drone + "/VehicleLocalPosition_PubSubTopic", self.callback_px4_drone_subscriber, 10)
-
+            VehicleLocalPosition, self.vehicle_namespace + "/VehicleLocalPosition_PubSubTopic", self.callback_px4_drone_subscriber, 10)
         self.range_sensor_subscriber = self.create_subscription(
-            PoseWithCovarianceStamped, "/range_sensor_positioning/estimated_pos", self.callback_range_sensor_subscriber, 10)
-
+            Range, self.vehicle_namespace + "/DistanceSensor_PubSubTopic", self.callback_range_sensor_subscriber, 10)
+        self.compass_subscriber = self.create_subscription(
+            Yaw, self.yaw_subscriber_topic, self.callback_compass_subscriber, 10)
             
         # Setting up position and velocity publisher
-        self.est_pos_publisher_ = self.create_publisher(
-            PoseWithCovarianceStamped, self.get_namespace() + "/estimated_pos", 10)
-        self.est_vel_publisher_ = self.create_publisher(
-            TwistWithCovarianceStamped, self.get_namespace() + "/estimated_vel", 10)
+        self.est_pos_publisher = self.create_publisher(
+            Odometry, self.get_namespace() + "/estimated_pos", 10)
 
         # Prediction timer
         self.timer = self.create_timer(self.deltaT_, self.predict_callback)
 
         # Watchdog timer
-        self.watchdog_timer = self.create_timer(self.watchdog_dT_, self.watchdog_callback)
+        if self.enable_watchdog:
+            self.watchdog_timer = self.create_timer(self.watchdog_dT_, self.watchdog_callback)
 
         # Printing node started
         self.get_logger().info("Node has started")
@@ -107,10 +127,17 @@ class kf_xyz_estimator(Node):
         self.norm_rel_xy_pos = -1.0
 
     def callback_uwb_subscriber(self, msg):
+
+        rover_inv_rotation = (R.from_euler(
+            'z', self.kalman_filter_.x[13][0], degrees=True))
+        rover_rotation = R.inv(rover_inv_rotation)
+        norot_pos = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, 0.])
+        ENU_pos = rover_rotation.apply(norot_pos)
         # Storing current estimate in a np.array
         z = np.array([
-            msg.pose.pose.position.x,
-            msg.pose.pose.position.y,
+            ENU_pos[0],
+            - ENU_pos[1],
+            0.,
             0.,
             0.,
             0.,
@@ -126,9 +153,9 @@ class kf_xyz_estimator(Node):
 
 
         H = np.block([
-            [1., np.zeros((1, 7)), -1., np.zeros((1, 4))],
-            [np.zeros((1, 3)), 1., np.zeros((1, 6)), -1., np.zeros((1, 2))],
-            [np.zeros((11, 13))]
+            [1., np.zeros((1, 7)), -1., np.zeros((1, 5))],
+            [np.zeros((1, 3)), 1., np.zeros((1, 6)), -1., np.zeros((1, 3))],
+            [np.zeros((12, 14))]
         ])
 
         # Filter update
@@ -138,14 +165,15 @@ class kf_xyz_estimator(Node):
 
     def callback_px4_drone_subscriber(self, msg):
         z = np.array([
-            msg.y,
-            msg.vy,
-            msg.ay,
             msg.x,
             msg.vx,
             msg.ax,
+            msg.y,
+            msg.vy,
+            msg.ay,
             -msg.z,
             -msg.vz,
+            0.,
             0.,
             0.,
             0.,
@@ -154,8 +182,8 @@ class kf_xyz_estimator(Node):
         ])
 
         H = np.block([
-            [np.eye(8), np.zeros((8, 5))],
-            [np.zeros((5, 13))]
+            [np.eye(8), np.zeros((8, 6))],
+            [np.zeros((6, 14))]
         ])
         # Filter update
         self.kalman_filter_.update(z, self.R_px4_, H)
@@ -165,10 +193,13 @@ class kf_xyz_estimator(Node):
     def callback_range_sensor_subscriber(self, msg):
 
         if self.norm_rel_xy_pos != -1.0 and \
-           self.norm_rel_xy_pos <= self.rng_sensor_fuse_radius_:
+           self.norm_rel_xy_pos <= self.rng_sensor_fuse_radius_ and \
+           msg.range <= self.rng_sensor_max_height_ and \
+           msg.range >= self.rng_sensor_min_height_:
             
             z = np.array([
-                msg.pose.pose.position.z,
+                msg.range,
+                0.,
                 0.,
                 0.,
                 0.,
@@ -184,17 +215,20 @@ class kf_xyz_estimator(Node):
             ])
 
             H = np.block([
-                [np.zeros((1, 6)), 1., np.zeros((1, 5)), -1.],
-                [np.zeros((12, 13))]
+                [np.zeros((1, 6)), 1., np.zeros((1, 5)), -1., 0.],
+                [np.zeros((13, 14))]
             ])
             # Filter update
-            self.kalman_filter_.update(z, self.R_range_sensor, H)
+            self.kalman_filter_.update(z, self.R_range_sensor_, H)
 
         elif self.norm_rel_xy_pos != -1.0 and \
-             self.norm_rel_xy_pos >= self.rng_sensor_out_radius_:
+             self.norm_rel_xy_pos >= self.rng_sensor_out_radius_ and \
+             msg.range <= self.rng_sensor_max_height_ and \
+             msg.range >= self.rng_sensor_min_height_:
 
             z = np.array([
-                msg.pose.pose.position.z,
+                msg.range,
+                0.,
                 0.,
                 0.,
                 0.,
@@ -210,46 +244,68 @@ class kf_xyz_estimator(Node):
             ])
 
             H = np.block([
-                [np.zeros((1, 6)), 1., np.zeros((1, 6))],
-                [np.zeros((12, 13))]
+                [np.zeros((1, 6)), 1., np.zeros((1, 7))],
+                [np.zeros((13, 14))]
             ])
             # Filter update
-            self.kalman_filter_.update(z, self.R_range_sensor, H)
+            self.kalman_filter_.update(z, self.R_range_sensor_, H)
             
         else:
             pass
 
+    def callback_compass_subscriber(self, msg):
+
+        z = np.array([
+            msg.yaw,
+            0.,
+            0.,
+            0.,
+            0.,
+            0.,
+            0.,
+            0.,
+            0.,
+            0.,
+            0.,
+            0.,
+            0.,
+            0.
+        ])
+
+        H = np.block([
+            [np.zeros((1,13)), 1.],
+            [np.zeros((13, 14))]
+        ])
+        # Filter update
+        self.kalman_filter_.update(z, self.R_compass_, H)
+
+        self.watchdog_counter[2][0] += 1
+
     def predict_callback(self):
 
         if not self.run_publisher:
-            return 
+            return
 
         self.rel_pos_x_ = float(- self.kalman_filter_.x[8][0] + self.kalman_filter_.x[0][0])
         self.rel_pos_y_ = float(- self.kalman_filter_.x[10][0] + self.kalman_filter_.x[3][0])
         self.rel_pos_z_ = float(- self.kalman_filter_.x[12][0] + self.kalman_filter_.x[6][0])
         self.norm_rel_xy_pos = np.linalg.norm([self.rel_pos_x_, self.rel_pos_y_], ord=2)
+        self.rel_vel_x_ = float(- self.kalman_filter_.x[9][0] + self.kalman_filter_.x[1][0])
+        self.rel_vel_y_ = float(- self.kalman_filter_.x[11][0] + self.kalman_filter_.x[4][0])
+        self.rel_vel_z_ = float(+ self.kalman_filter_.x[7][0])
 
-        # Sending the estimated position
-        msg = PoseWithCovarianceStamped()
+        # Sending the estimated pose
+        msg = Odometry()
         msg.header.frame_id = self.get_namespace() + "/estimated_pos"
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.pose.pose.position.x = self.rel_pos_x_
         msg.pose.pose.position.y = self.rel_pos_y_
         msg.pose.pose.position.z = self.rel_pos_z_
-        self.est_pos_publisher_.publish(msg)
-
-        self.rel_vel_x_ = float(- self.kalman_filter_.x[9][0] + self.kalman_filter_.x[1][0])
-        self.rel_vel_y_ = float(- self.kalman_filter_.x[11][0] + self.kalman_filter_.x[4][0])
-        self.rel_vel_z_ = float(+ self.kalman_filter_.x[7][0])
-
-        # Sending the estimated velocity
-        msg = TwistWithCovarianceStamped()
-        msg.header.frame_id = self.get_namespace() + "/estimated_vel"
-        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.pose.pose.orientation.w = float(self.kalman_filter_.x[13][0])
         msg.twist.twist.linear.x = self.rel_vel_x_
         msg.twist.twist.linear.y = self.rel_vel_y_
         msg.twist.twist.linear.z = self.rel_vel_z_
-        self.est_vel_publisher_.publish(msg)
+        self.est_pos_publisher.publish(msg)
 
         # Predict
         self.kalman_filter_.predict()
@@ -258,10 +314,10 @@ class kf_xyz_estimator(Node):
 
         if any(self.watchdog_counter == 0):
             self.run_publisher = False
-            self.get_logger().warn("No sensor data available, not publishing")
+            self.get_logger().warn(f"No sensor data available, not publishing.")
         else:
             self.run_publisher = True
-        self.watchdog_counter = np.zeros((2,1))
+        self.watchdog_counter = np.zeros((3,1))
 
 def main(args=None):
     rclpy.init(args=args)

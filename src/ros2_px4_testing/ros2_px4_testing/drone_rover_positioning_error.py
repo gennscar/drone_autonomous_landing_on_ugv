@@ -87,7 +87,8 @@ class PositioningError(Node):
             # From NED to gazebo frame
             self.estimated_position = rover_rotation.apply([msg.pose.pose.position.x, -msg.pose.pose.position.y, msg.pose.pose.position.z])
             self.true_position = np.subtract(self.drone_true_position, self.rover_true_position)
-            self.positioning_error_vector = np.subtract(self.estimated_position, self.true_position)
+            self.true_position_NED = np.array([self.true_position[1], self.true_position[0], self.true_position[2]])
+            self.positioning_error_vector = np.subtract(self.estimated_position, self.true_position_NED)
             self.positioning_error_xy = np.array([self.positioning_error_vector[0], self.positioning_error_vector[1]])
             self.norm_xy_positioning_error = np.linalg.norm(self.positioning_error_xy, ord=2)
 
@@ -105,9 +106,9 @@ class PositioningError(Node):
     def publish_true_position(self):
         
         true_position = Point()
-        true_position.x = self.true_position[0]
-        true_position.y = self.true_position[1]
-        true_position.z = self.true_position[2]
+        true_position.x = self.true_position_NED[0]
+        true_position.y = self.true_position_NED[1]
+        true_position.z = self.true_position_NED[2]
 
         self.true_position_publisher.publish(true_position)
 
