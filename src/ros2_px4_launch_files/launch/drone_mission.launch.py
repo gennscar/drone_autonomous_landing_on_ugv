@@ -50,7 +50,7 @@ def generate_launch_description():
         package="ros2_px4_estimation",
         name="UwbPositioning",
         namespace=LaunchConfiguration("drone_namespace"),
-        parameters=[{"sensor_id": "tag_0"}],
+        parameters=[{"sensor_id": "tag_0"}, {"allowed_delay_ns": 1e8}],
         on_exit=Shutdown()
     )
 
@@ -68,7 +68,7 @@ def generate_launch_description():
         namespace=LaunchConfiguration("drone_namespace"),
         parameters=[{"delta_t": 0.05}, {"q": 0.1},
                     {"r_uwb": 0.05}, {"r_gps": 1e-5}],
-        on_exit=Shutdown()
+        # on_exit=Shutdown()
     )
 
     return LaunchDescription([

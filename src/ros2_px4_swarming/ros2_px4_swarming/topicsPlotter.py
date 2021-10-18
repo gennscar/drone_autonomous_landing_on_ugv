@@ -279,14 +279,17 @@ def main():
         plt.figure()
         legend = list()
 
-        plt.plot(list(synchronizationErrorUwb[i][0] for i in range(len(synchronizationErrorUwb))),
-                 list(synchronizationErrorUwb[i][1] for i in range(len(synchronizationErrorUwb))))
+        plt.hist(list(synchronizationErrorUwb[i][1] for i in range(len(synchronizationErrorUwb))), bins=50, density=True)
 
-        plt.xlim(timeLimits)
+        # plt.plot(list(synchronizationErrorUwb[i][0] for i in range(len(synchronizationErrorUwb))),
+        #          list(synchronizationErrorUwb[i][1] for i in range(len(synchronizationErrorUwb))))
+
+        # plt.xlim(timeLimits)
         plt.grid()
-        plt.xlabel("$Time \ [s]$")
+        plt.xlabel("$\Delta t \ [s]$")
+        plt.ylabel("$Frequency$")
         plt.legend(legend)
-        plt.title("Synchronization error UWB [s]", size="xx-large", weight="bold")
+        plt.title("Maximum synchronization error UWB [s]", size="xx-large", weight="bold")
 
         plt.savefig(csvFilesPath + folderName + "/synchronizationErrorUwb.png")
     # endregion

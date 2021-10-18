@@ -313,7 +313,7 @@ class kf_xyz_estimator(Node):
 
         if any(self.watchdog_counter == 0):
             self.run_publisher = False
-            self.get_logger().warn(f"No sensor data available, not publishing {self.watchdog_counter}")
+            self.get_logger().warn(f"No sensor data available, not publishing.")
         else:
             self.run_publisher = True
         self.watchdog_counter = np.zeros((3,1))

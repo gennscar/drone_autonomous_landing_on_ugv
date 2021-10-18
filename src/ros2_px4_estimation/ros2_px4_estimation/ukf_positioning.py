@@ -126,7 +126,7 @@ class UkfPositioning(Node):
         ]) - self.kalman_filter_.x[[0, 3, 6]]
 
         # Mean values until convergence, than this subscriber can be destroyed
-        if np.linalg.norm(self.anchor_offset_ - anchor_offset) > 1e-3 or self.aligning_counter_ < 100:
+        if np.linalg.norm(self.anchor_offset_ - anchor_offset) > 1e-2 or self.aligning_counter_ < 100:
             self.anchor_offset_ += (anchor_offset - self.anchor_offset_) / \
                 (self.aligning_counter_ + 1)
             self.aligning_counter_ += 1

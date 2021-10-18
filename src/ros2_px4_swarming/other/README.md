@@ -110,10 +110,14 @@ This file, which should be sourced in the *.bashrc*, generates some aliases, use
 + `targetroversquare`: commands the target to move describing a square
 * `ddsserver`: opens a DDS server at 192.168.1.99:11811
 * `rds`: exports ROS\_DISCOVERY\_SERVER
+* `sendworkspace 0`: sends the *ros2_px4_ws* workspace to drone 0
 * `sendpackage 0`: sends the *ros2_px4_swarming* package to drone 0
 * `sendparams 0`: sends *drone_params&#46;yaml* to drone 0
 * `connectssh 0`: connects via ssh to drone 0
-* `launchdrone 0`: command to launch *anchorDrone&#46;py* on the RaspberryPi
+* `launchdrone 0 1`: command to launch *anchorDrone&#46;py* on the RaspberryPi, with ID=0 and MAVSYS_ID=1
+* `srvstatus`: command to check the status of the service on the RaspberryPi
+* `srvrestart`: command to restart the service on the RaspberryPi
+* `srvstop`: command to stop the service on the RaspberryPi
 
 So for example, to launch a simulation with 4 drones and 1 target, the commands should be:
 1. `source ~/ros2_px4_ws/src/ros2_px4_swarming/other/ros2_px4_swarming_aliases.sh`

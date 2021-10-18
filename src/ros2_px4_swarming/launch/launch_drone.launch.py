@@ -9,6 +9,10 @@ def generate_launch_description():
 
     # Environment variables
     ID = int(os.environ['DRONE_ID'])
+    MAVSYS_ID = int(os.environ['MAVSYS_ID'])
+
+    if MAVSYS_ID == -1:
+        MAVSYS_ID = ID + 1
 
     # Parameters file path
     params = os.path.join(
@@ -25,7 +29,8 @@ def generate_launch_description():
         name='X500_' + str(ID),
         parameters=[
             params,
-            {'ID': ID}
+            {'ID': ID},
+            {'MAVSYS_ID': MAVSYS_ID}
         ]
     )
     ld.add_action(anchorDrone)

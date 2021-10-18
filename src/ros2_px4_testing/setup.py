@@ -21,11 +21,13 @@ setup(
     entry_points={
         'console_scripts': [
             "positioning_error = ros2_px4_testing.positioning_error:main",
-            "test_camera = ros2_px4_testing.test_camera:main",
+            "test_apriltag = ros2_px4_testing.test_apriltag:main",
             "setpoints_flight = ros2_px4_testing.setpoints_flight:main",
             "drone_rover_positioning_error = ros2_px4_testing.drone_rover_positioning_error:main",
             "rover_yaw_error = ros2_px4_testing.rover_yaw_error:main",
-            "drone_rover_topic_recorder = ros2_px4_testing.drone_rover_topic_recorder:main"
+            "drone_rover_topic_recorder = ros2_px4_testing.drone_rover_topic_recorder:main",
+            "compass_testing = ros2_px4_testing.compass_testing:main",
+            "test_camera_raspberry = ros2_px4_testing.test_camera_raspberry:main",
         ],
     },
 )

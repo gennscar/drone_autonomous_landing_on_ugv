@@ -117,7 +117,7 @@ class PerformanceAnalyzer(Node):
         syncErr = 0.0
         for i in range(self.N):
             for j in range(i + 1, self.N):
-                tmp = abs((self.targetUwbDistances[i].anchor_pose.header.stamp.sec + self.targetUwbDistances[i].anchor_pose.header.stamp.nanosec * 1e-9) - (self.targetUwbDistances[j].anchor_pose.header.stamp.sec + self.targetUwbDistances[i].anchor_pose.header.stamp.nanosec * 1e-9))
+                tmp = abs((self.targetUwbDistances[i].anchor_pose.header.stamp.sec + self.targetUwbDistances[i].anchor_pose.header.stamp.nanosec * 1e-9) - (self.targetUwbDistances[j].anchor_pose.header.stamp.sec + self.targetUwbDistances[j].anchor_pose.header.stamp.nanosec * 1e-9))
                 if tmp > syncErr:
                     syncErr = tmp
         msg.data = syncErr
