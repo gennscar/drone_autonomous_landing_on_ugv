@@ -10,12 +10,11 @@ import numpy as np
 from dt_apriltags import Detector
 from ros2_px4_interfaces.msg import Yaw
 from px4_msgs.msg import VehicleAttitude
-
+from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 
-camera_params = [277.19135641132203, 277.19135641132203, 160.5, 120.5]
-tag_size = 0.793 # act_tag/full tag
-
+camera_params = [570.97921243, 573.57453263, 309.42078176, 239.79832231]
+tag_size = 0.16 # act_tag/full tag
 
 class VideoStreamerNode(Node):
     """
@@ -29,7 +28,7 @@ class VideoStreamerNode(Node):
         super().__init__('node')
         # Create the publisher. This publisher will publish an Image
         # to the video_frames topic. The queue size is 10 messages.
-        self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '')
+        self.vehicle_namespace = self.declare_parameter("vehicle_namespace", '/drone')
         self.vehicle_namespace = self.get_parameter(
             "vehicle_namespace").get_parameter_value().string_value
 
@@ -55,12 +54,13 @@ class VideoStreamerNode(Node):
         self.rot_90 = R.from_matrix([[0,-1,0],[1,0,0],[0,0,1]])
         self.rot_inv = R.from_matrix([[1,0,0],[0,1,0],[0,0,-1]])
         self.rot_m90 = R.from_matrix([[0,1,0],[-1,0,0],[0,0,1]])
+        self.n_turns_ = 0
+        self.old_yaw_NED_raw = 0.0
 
         self.drone_orientation_subscriber = self.create_subscription(VehicleAttitude, self.vehicle_namespace + "/VehicleAttitude_PubSubTopic", self.callback_drone_orientation, 1) 
-        self.estimator_topic_name_ = "/AprilTag_estimator/estimated_yaw"
-        self.tag_yaw_publisher = self.create_publisher(Yaw, self.estimator_topic_name_, 10)
-        
-        
+        self.estimator_topic_name_ = "/AprilTag_estimator/estimated_pos"
+        self.tag_pose_publisher = self.create_publisher(Odometry, self.estimator_topic_name_,3)
+
     def video_callback(self, data):
         """
         Callback function.
@@ -87,33 +87,33 @@ class VideoStreamerNode(Node):
           center_x = int(tags[0].center[0])
           center_y = int(tags[0].center[1])
 
-          frame_rgb = cv2.polylines(frame_rgb,[pts],True,(0,0,255), 2)
-          frame_rgb = cv2.circle(frame_rgb, (center_x, center_y), 3, (0, 0, 255), -1)
-          font = cv2.FONT_HERSHEY_SIMPLEX
-          org = (center_x - 80, center_y - 50)
-          fontScale = 0.7
-          frame_rgb = cv2.putText(frame_rgb, "TAG DETECTED", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
-          
-          pose_R = tags[0].pose_R
-          pose_t = np.array([tags[0].pose_t[0][0],tags[0].pose_t[1][0], tags[0].pose_t[2][0]])
-       
-          self.rot_camera2chassis = R.from_matrix(pose_R)
+          pose_R_B = tags[0].pose_R
+          self.rot_camera2tag = R.from_matrix(pose_R_B)
           self.rot_local2camera = R.from_quat(self.drone_orientation)
-          self.rot_global2chassis = self.rot_global2local*self.rot_m90*self.rot_inv*self.rot_local2camera*self.rot_90*(self.rot_camera2chassis.inv())          
-          self.global_yaw = - (self.rot_global2chassis.as_euler('xyz', degrees=True))[2]
-          
-          msg = Yaw()
-          msg.yaw = self.global_yaw
+          self.rot_global2tag = self.rot_global2local*self.rot_m90*self.rot_inv*self.rot_local2camera*self.rot_90*(self.rot_camera2tag.inv())    
+          self.yaw_NED_raw =  (self.rot_global2tag.as_euler('xyz', degrees=True))[2] - 90
+
+
+          pose_t_B = np.array([tags[0].pose_t[0][0], tags[0].pose_t[1][0] + 0.15, tags[0].pose_t[2][0]])
+          self.pose_t_rover = self.rot_local2camera.apply(np.array([pose_t_B[0], pose_t_B[1], pose_t_B[2]]))
+          self.pose_t_NED_rover = np.array([self.pose_t_rover[1], self.pose_t_rover[0], - self.pose_t_rover[2]])
+          msg = Odometry()
           msg.header.frame_id = self.estimator_topic_name_
           msg.header.stamp = self.get_clock().now().to_msg()
+          msg.pose.pose.position.x = self.pose_t_NED_rover[0]
+          msg.pose.pose.position.y = self.pose_t_NED_rover[1]
+          msg.pose.pose.position.z = self.pose_t_NED_rover[2]
+          msg.pose.pose.orientation.w = self.yaw_NED_raw
+          self.tag_pose_publisher.publish(msg)
 
-          self.tag_yaw_publisher.publish(msg)
+          frame_rgb = cv2.polylines(frame_rgb,[pts],True,(0,0,255), 2)
+          frame_rgb = cv2.circle(frame_rgb, (center_x, center_y), 3, (0, 0, 255), -1)
 
-          org = (center_x - 80, center_y + 60)
-          fontScale = 0.7
-          frame_rgb = cv2.putText(frame_rgb, f"yaw: {int(self.global_yaw)} deg", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
+          font = cv2.FONT_HERSHEY_SIMPLEX
+          org = (center_x - 120, center_y + 80)
+          fontScale = 0.5
+          frame_rgb = cv2.putText(frame_rgb, f"x: {round(self.pose_t_NED_rover[0],1)}, y: {round(self.pose_t_NED_rover[1],1)}, z: {round(self.pose_t_NED_rover[2],1)}, w: {round(self.yaw_NED_raw,2)} ", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
 
-   
 
         scale_percent = 200 # percent of original size
         width = int(frame_rgb.shape[1] * scale_percent / 100)

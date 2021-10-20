@@ -12,14 +12,14 @@ seed(1)
 
 dt = 0.1
 noise_dt = 2
-t1 = 200 #100 #200
+t1 = 100
 t2 = t1 + 30
 
 lin_vel = 1.0
-ang_vel = 0.3
+ang_vel = 0.2
 
 curvature = True
-noise = False
+noise = True
 
 
 class VehicleController(Node):
@@ -50,7 +50,7 @@ class VehicleController(Node):
             self.publish_rover_command_1()
 
     def noise_timer_callback(self):
-        self.lin_noise_val = gauss(0.2,0.2)
+        self.lin_noise_val = gauss(0.1,0.1)
         self.ang_noise_val = gauss(0,0.05)
 
     def publish_rover_command_1(self):

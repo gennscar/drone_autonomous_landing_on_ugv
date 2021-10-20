@@ -80,34 +80,29 @@ class PositioningError(Node):
 
     def callback_position_estimator(self, msg):
 
-        if self.rover_true_yaw != []:
-            rover_rotation = (R.from_euler(
-                'z', self.rover_true_yaw, degrees=True))
+        estimated_position = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z])
+        self.true_position = np.subtract(self.drone_true_position, self.rover_true_position)
+        self.true_position_NED = np.array([self.true_position[1], self.true_position[0], self.true_position[2]])
+        
+        positioning_error_vector = estimated_position - self.true_position_NED
 
-            # From NED to gazebo frame
-            self.estimated_position = rover_rotation.apply([msg.pose.pose.position.x, -msg.pose.pose.position.y, msg.pose.pose.position.z])
-            self.true_position = np.subtract(self.drone_true_position, self.rover_true_position)
-            self.positioning_error_vector = np.subtract(self.estimated_position, self.true_position)
-            self.positioning_error_xy = np.array([self.positioning_error_vector[0], self.positioning_error_vector[1]])
-            self.norm_xy_positioning_error = np.linalg.norm(self.positioning_error_xy, ord=2)
+        norm_positioning_error_vector_ = Point()
+        norm_positioning_error_vector_.x = positioning_error_vector[0]**2
+        norm_positioning_error_vector_.y = positioning_error_vector[1]**2
+        norm_positioning_error_vector_.z = positioning_error_vector[2]**2
+        
+        self.publish_true_position()
 
-            norm_positioning_error_vector_ = Point()
-            norm_positioning_error_vector_.x = self.positioning_error_vector[0]**2
-            norm_positioning_error_vector_.y = self.positioning_error_vector[1]**2
-            norm_positioning_error_vector_.z = self.positioning_error_vector[2]**2
-            
-            self.publish_true_position()
-
-            # Sending norm_xy_positioning_erroror message only if the estimator is valid
-            if(msg.header.frame_id in self.estimator_topics_.keys()):
-                self.estimator_topics_[msg.header.frame_id].publish(norm_positioning_error_vector_)
+        # Sending norm_xy_positioning_erroror message only if the estimator is valid
+        if(msg.header.frame_id in self.estimator_topics_.keys()):
+            self.estimator_topics_[msg.header.frame_id].publish(norm_positioning_error_vector_)
 
     def publish_true_position(self):
         
         true_position = Point()
-        true_position.x = self.true_position[0]
-        true_position.y = self.true_position[1]
-        true_position.z = self.true_position[2]
+        true_position.x = self.true_position_NED[0]
+        true_position.y = self.true_position_NED[1]
+        true_position.z = self.true_position_NED[2]
 
         self.true_position_publisher.publish(true_position)
 
