@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import sys
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 import csv
 import os
 from ament_index_python.packages import get_package_prefix
@@ -354,14 +357,35 @@ def main():
 
     # region Vehicles 3D trajectories
     if vehicleGlobalPosition:
-        fig = plt.figure().add_subplot(111, projection="3d")
+        # fig = plt.figure().add_subplot(111, projection="3d")
+        fig = Axes3D(plt.figure())
         legend = list()
+        maxRange = 0
 
         for droneId in range(N):
             fig.plot(list(vehicleGlobalPosition[droneId][i][1] for i in range(len(vehicleGlobalPosition[droneId]))),
                      list(vehicleGlobalPosition[droneId][i][2] for i in range(len(vehicleGlobalPosition[droneId]))),
                      list(vehicleGlobalPosition[droneId][i][3] for i in range(len(vehicleGlobalPosition[droneId]))))
             legend.append("$Drone_" + str(droneId) + "$")
+
+        # region Set equal axes
+        xLimits = fig.get_xlim3d()
+        yLimits = fig.get_ylim3d()
+        zLimits = fig.get_zlim3d()
+
+        xRange = abs(xLimits[1] - xLimits[0])
+        xMiddle = np.mean(xLimits)
+        yRange = abs(yLimits[1] - yLimits[0])
+        yMiddle = np.mean(yLimits)
+        zRange = abs(zLimits[1] - zLimits[0])
+        zMiddle = np.mean(zLimits)
+
+        plotRadius = 0.5 * max([xRange, yRange, zRange])
+
+        fig.set_xlim([xMiddle - plotRadius, xMiddle + plotRadius])
+        fig.set_ylim([yMiddle - plotRadius, yMiddle + plotRadius])
+        fig.set_zlim([zMiddle, zMiddle + 2 * plotRadius])
+        # endregion
 
         plt.grid()
         plt.xlabel("$x \ [m]$")
@@ -375,6 +399,7 @@ def main():
     # region Vehicles 2D trajectories
     if vehicleGlobalPosition:
         plt.figure()
+        plt.axis("equal")
         legend = list()
 
         for droneId in range(N):
@@ -610,6 +635,35 @@ def main():
         plt.title("Target-anchors distances [m]", size="xx-large", weight="bold")
 
         plt.savefig(csvFilesPath + folderName + "/targetAnchorsDistances.png")
+    # endregion
+
+    # region Animated 3d trajectories
+    # fig = plt.figure()
+    # ax = plt.axes(xlim=(min(list(vehicleGlobalPosition[0][i][1] for i in range(len(vehicleGlobalPosition[0])))),
+    #                     max(list(vehicleGlobalPosition[0][i][1] for i in range(len(vehicleGlobalPosition[0]))))),
+    #               ylim=(min(list(vehicleGlobalPosition[0][i][2] for i in range(len(vehicleGlobalPosition[0])))),
+    #                     max(list(vehicleGlobalPosition[0][i][2] for i in range(len(vehicleGlobalPosition[0]))))))
+    # ax.set_aspect('equal', adjustable='box')
+    #
+    # trajectory = ax.plot([], [], lw=2)
+    #
+    # xData = list()
+    # yData = list()
+    #
+    # def init():
+    #     trajectory[0].set_data(xData, yData)
+    #     return trajectory
+    #
+    # def animate(counter):
+    #     xData.append(vehicleGlobalPosition[0][counter][1])
+    #     yData.append(vehicleGlobalPosition[0][counter][2])
+    #     trajectory[0].set_data(xData, yData)
+    #     return trajectory
+    #
+    # anim = animation.FuncAnimation(fig, func=animate, init_func=init,
+    #                                frames=len(vehicleGlobalPosition[0]), interval=0,
+    #                                repeat=False, blit=True)
+    # plt.grid()
     # endregion
     # endregion
 

@@ -145,20 +145,6 @@ function launchtest() {
 
   fg 1
 }
-
-# Plot data from bag
-function plotbag() {
-  bagFileName=${1:fileName}
-  cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles || exec $SHELL
-  python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/plotBag.py $bagFileName
-}
-
-function plotlastbag() {
-  cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles || exec $SHELL
-  fileName=$(ls -1 | tail -n 1)
-  python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/plotBag.py $fileName
-  cd || exec $SHELL
-}
 # endregion
 
 # region Swarming commands
@@ -277,7 +263,7 @@ function swarmrestart() {
 # region Drones commands
 function dronetakeoff() {
   n=${1:-0}
-  z=${2:--3}
+  z=${2:-0}
   eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'takeoff', z: $z}'"
 }
 
@@ -422,5 +408,34 @@ function srvrestart() {
 
 function srvstop() {
   sudo systemctl stop micrortps.service
+}
+# endregion
+
+# region Analysis commands
+# Plot data from bag
+function plotbag() {
+  bagFileName=${1:fileName}
+  cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles || exec $SHELL
+  python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/plotBag.py $bagFileName
+}
+
+function plotlastbag() {
+  cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles || exec $SHELL
+  fileName=$(ls -1 | tail -n 1)
+  python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/plotBag.py $fileName
+  cd || exec $SHELL
+}
+
+function plotcsv() {
+  csvFileName=${1:fileName}
+  cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/csvfiles/ || exec $SHELL
+  python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/plotTopics.py $csvFileName
+}
+
+function plotlastcsv() {
+  cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/csvfiles/ || exec $SHELL
+  fileName=$(ls -1 | tail -n 1)
+  python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/topicsPlotter.py $fileName
+  cd || exec $SHELL
 }
 # endregion
