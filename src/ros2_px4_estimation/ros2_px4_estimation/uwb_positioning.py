@@ -9,7 +9,6 @@ from rclpy.time import Time, Duration
 
 from ros2_px4_interfaces.msg import UwbSensor
 from geometry_msgs.msg import PoseWithCovarianceStamped
-from px4_msgs.msg import VehicleVisualOdometry, Timesync
 
 import ros2_px4_functions
 
@@ -54,11 +53,6 @@ class UwbPositioning(Node):
         self.max_range = self.get_parameter(
             "max_range").get_parameter_value().double_value
 
-        # Namespace check
-        if(self.get_namespace() == '/'):
-            self.get_logger().error("uwb_positioning need a namespace")
-            self.destroy_node()
-
         self.timestamp_ = 0
 
         # Setting up sensors subscriber for the UWB plugin
@@ -66,7 +60,7 @@ class UwbPositioning(Node):
             UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
 
         # Setting up a publishers to send the estimated position
-        self.estimator_topic_name_ = self.get_namespace() + "/estimated_pos"
+        self.estimator_topic_name_ = "~/Pose"
         self.position_mse_publisher_ = self.create_publisher(
             PoseWithCovarianceStamped, self.estimator_topic_name_, 10
         )
