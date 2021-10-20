@@ -13,8 +13,8 @@ from px4_msgs.msg import VehicleAttitude
 from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 
-camera_params = [277.19135641132203, 277.19135641132203, 160.5, 120.5]
-tag_size = 0.793 # act_tag/full tag
+camera_params = [570.97921243, 573.57453263, 309.42078176, 239.79832231]
+tag_size = 0.16 # act_tag/full tag
 
 class VideoStreamerNode(Node):
     """
@@ -91,26 +91,19 @@ class VideoStreamerNode(Node):
           self.rot_camera2tag = R.from_matrix(pose_R_B)
           self.rot_local2camera = R.from_quat(self.drone_orientation)
           self.rot_global2tag = self.rot_global2local*self.rot_m90*self.rot_inv*self.rot_local2camera*self.rot_90*(self.rot_camera2tag.inv())    
-          self.yaw_NED_raw =  (self.rot_global2tag.as_euler('xyz', degrees=True))[2]
-          if self.yaw_NED_raw >= -180.0 and self.yaw_NED_raw <= 180.0:
-              if self.yaw_NED_raw - self.old_yaw_NED_raw > 300.0:
-                  self.n_turns_ -= 1
-              elif self.yaw_NED_raw - self.old_yaw_NED_raw < - 300.0:
-                  self.n_turns_ += 1
-              self.old_yaw_NED_raw = self.yaw_NED_raw
+          self.yaw_NED_raw =  (self.rot_global2tag.as_euler('xyz', degrees=True))[2] - 90
 
-              self.yaw_NED = self.yaw_NED_raw + self.n_turns_*360.0 - 90
 
-          pose_t_B = np.array([tags[0].pose_t[0][0], tags[0].pose_t[1][0], tags[0].pose_t[2][0]])
-          self.pose_t_NED_rover = self.rot_local2camera.apply(np.array([pose_t_B[0], pose_t_B[1], pose_t_B[2]]))
-
+          pose_t_B = np.array([tags[0].pose_t[0][0], tags[0].pose_t[1][0] + 0.15, tags[0].pose_t[2][0]])
+          self.pose_t_rover = self.rot_local2camera.apply(np.array([pose_t_B[0], pose_t_B[1], pose_t_B[2]]))
+          self.pose_t_NED_rover = np.array([self.pose_t_rover[1], self.pose_t_rover[0], - self.pose_t_rover[2]])
           msg = Odometry()
           msg.header.frame_id = self.estimator_topic_name_
           msg.header.stamp = self.get_clock().now().to_msg()
           msg.pose.pose.position.x = self.pose_t_NED_rover[0]
           msg.pose.pose.position.y = self.pose_t_NED_rover[1]
           msg.pose.pose.position.z = self.pose_t_NED_rover[2]
-          msg.pose.pose.orientation.w = self.yaw_NED
+          msg.pose.pose.orientation.w = self.yaw_NED_raw
           self.tag_pose_publisher.publish(msg)
 
           frame_rgb = cv2.polylines(frame_rgb,[pts],True,(0,0,255), 2)
@@ -119,7 +112,7 @@ class VideoStreamerNode(Node):
           font = cv2.FONT_HERSHEY_SIMPLEX
           org = (center_x - 120, center_y + 80)
           fontScale = 0.5
-          frame_rgb = cv2.putText(frame_rgb, f"x: {round(self.pose_t_NED_rover[0],1)}, y: {round(self.pose_t_NED_rover[1],1)}, z: {round(self.pose_t_NED_rover[2],1)}, w: {round(self.yaw_NED,2)} ", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
+          frame_rgb = cv2.putText(frame_rgb, f"x: {round(self.pose_t_NED_rover[0],1)}, y: {round(self.pose_t_NED_rover[1],1)}, z: {round(self.pose_t_NED_rover[2],1)}, w: {round(self.yaw_NED_raw,2)} ", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
 
 
         scale_percent = 200 # percent of original size

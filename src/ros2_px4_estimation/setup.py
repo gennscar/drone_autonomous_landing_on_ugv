@@ -38,6 +38,7 @@ setup(
             "uwb_driver = ros2_px4_estimation.uwb_driver:main",
             "drone_rover_kf_pos_theta = ros2_px4_estimation.drone_rover_kf_pos_theta:main",
             "drone_rover_kf_pos_theta_sim = ros2_px4_estimation.drone_rover_kf_pos_theta_sim:main",
+            "drone_rover_kf_pos_theta_bias_sim = ros2_px4_estimation.drone_rover_kf_pos_theta_bias_sim:main",
             "magnetometer_yaw_estimator = ros2_px4_estimation.magnetometer_yaw_estimator:main",
             "gazebo_yaw_estimator = ros2_px4_estimation.gazebo_yaw_estimator:main",
             "gps_positioning = ros2_px4_estimation.gps_positioning:main"

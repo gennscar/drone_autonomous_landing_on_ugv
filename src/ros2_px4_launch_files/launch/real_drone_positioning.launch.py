@@ -3,7 +3,7 @@ from launch_ros.actions import Node
 
 
 yaw_topic_name = "/yaw_sensor/estimated_yaw"
-drone_name = "/X500_1"
+drone_name = "/X500_0"
 
 
 
