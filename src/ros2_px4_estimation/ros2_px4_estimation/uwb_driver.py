@@ -30,17 +30,18 @@ class UwbDevice(Node):
         self.uwb_serial()
 
         # Anchors position file path
-        self.declare_parameter('anchors_pos_file_path', '/home/ros2_px4_ws/json/anchors_covivio_2.json')
+        self.declare_parameter('anchors_pos_file_path',
+                               '/home/cosimocon/Dev/ros2_px4_ws/json/anchors.json')
 
         # Getting anchor info from file
         fp = open(self.get_parameter(
-           'anchors_pos_file_path').get_parameter_value().string_value, 'r')
+            'anchors_pos_file_path').get_parameter_value().string_value, 'r')
         self.anchors = json.load(fp)
         fp.close()
 
         # UWB messages publisher
-        self.publisher_ = self.create_publisher(UwbSensor,  "/uwb_sensor_" +  self.get_parameter(
-           'topic_name').get_parameter_value().string_value, 10)
+        self.publisher_ = self.create_publisher(UwbSensor,  "/uwb_sensor_" + self.get_parameter(
+            'topic_name').get_parameter_value().string_value, 10)
         self.timer = self.create_timer(self.get_parameter(
             'timerPeriod').get_parameter_value().double_value, self.timer_callback)
         self.i = 0
@@ -80,14 +81,17 @@ class UwbDevice(Node):
                 msg.anchor_pose.header.stamp = self.get_clock().now().to_msg()
                 msg.anchor_pose.header.frame_id = data[2]
                 msg.range = float(data[6]) * 1e-2
-                
+
                 id = msg.anchor_pose.header.frame_id
+                if id not in self.anchors.keys():
+                    return
+
                 msg.anchor_pose.pose.position.x = self.anchors[id][0]
                 msg.anchor_pose.pose.position.y = self.anchors[id][1]
                 msg.anchor_pose.pose.position.z = self.anchors[id][2]
 
                 self.publisher_.publish(msg)
-                
+
 
 def main(args=None):
     rclpy.init(args=args)
