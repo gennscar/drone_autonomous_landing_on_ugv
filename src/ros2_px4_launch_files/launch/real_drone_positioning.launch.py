@@ -9,7 +9,7 @@ drone_name = "/X500_0"
 
 kf_params_pos = [
 
-    [{'deltaT': 1e-1}, {'R_uwb': 1e-2}, {'R_px4': 5e-1}, {'R_range_sensor': 5.625e-5},
+    [{'deltaT': 1e-1}, {'R_uwb': 1e-2}, {'R_px4': 5e-1}, {'R_range_sensor': 5e-2},
     {'R_compass': 1e0}, {'Q_drone': 2e-4}, {'Q_rover': 5e-2}, {'Q_compass': 2e3},
     {'Q_rover_z': 1e-8}, {'Q_drone_z': 1e-1}, {'rng_sensor_fuse_radius': 0.30},
     {'vehicle_namespace': drone_name}, {'uwb_estimator': "/LS_uwb_estimator/norot_pos"},
