@@ -21,7 +21,7 @@ def generate_launch_description():
         parameters=[
             {"topic_name": "tag_0"},
             {"uwbPort": '/dev/ttyACM0'},
-            {"anchors_pos_file_path": '/home/ubuntu/ros2_px4_ws/json/anchors_covivio_3.json'},
+            {"anchors_pos_file_path": '/home/ubuntu/ros2_px4_ws/json/anchors.json'},
         ]
     )
 
@@ -68,7 +68,7 @@ def generate_launch_description():
         namespace=LaunchConfiguration("drone_namespace"),
         parameters=[{"delta_t": 0.05}, {"q": 0.1},
                     {"r_uwb": 0.05}, {"r_gps": 1e-5}],
-        # on_exit=Shutdown()
+        on_exit=Shutdown()
     )
 
     return LaunchDescription([

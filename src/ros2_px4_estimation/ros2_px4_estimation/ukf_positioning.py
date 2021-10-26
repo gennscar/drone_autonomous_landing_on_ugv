@@ -17,7 +17,7 @@ from ros2_px4_interfaces.msg import UwbSensor
 
 
 QUEUE_SIZE = 10
-FILTER_DIM = 10  # Linear kinematic
+FILTER_DIM = 9  # Linear kinematic
 IS_SENSOR_ALIVE_TIMEOUT = 5.  # s
 
 
@@ -63,7 +63,7 @@ class UkfPositioning(Node):
                 [0., 1.,         dt],
                 [0., 0.,         1.]
             ])
-            F = scipy.linalg.block_diag(*[f]*3, np.ones(1))
+            F = scipy.linalg.block_diag(*[f]*3)
             return F @ x
 
         self.kalman_filter_ = UKF(
@@ -83,8 +83,7 @@ class UkfPositioning(Node):
         # Process noise
         self.kalman_filter_.Q = scipy.linalg.block_diag(
             Q_discrete_white_noise(
-                dim=3, dt=self.params_["delta_t"], var=self.params_["q"], block_size=3),
-            np.ones(1)*1e-3
+                dim=3, dt=self.params_["delta_t"], var=self.params_["q"], block_size=3)
         )
 
         # Setting up sensors subscribers
@@ -127,9 +126,11 @@ class UkfPositioning(Node):
         ]) - self.kalman_filter_.x[[0, 3, 6]]
 
         # Mean values until convergence, than this subscriber can be destroyed
-        if np.linalg.norm(self.anchor_offset_ - anchor_offset) > 1e-2 or self.aligning_counter_ < 100:
-            self.anchor_offset_ += (anchor_offset - self.anchor_offset_) / \
-                (self.aligning_counter_ + 1)
+        var = (anchor_offset - self.anchor_offset_) / \
+            (self.aligning_counter_ + 1)
+
+        if np.linalg.norm(var) > 1e-3 or self.aligning_counter_ < 100.:
+            self.anchor_offset_ += var
             self.aligning_counter_ += 1
         else:
             self.get_logger().info(f"""
@@ -168,20 +169,13 @@ class UkfPositioning(Node):
             msg.anchor_pose.pose.position.z
         ])
 
-        # Anchor position rotation error (only for simulation)
-        # r = R.from_euler('z', 45, degrees=True)
-        # anchor_position = r.apply(anchor_position)
-
         # Measurement model for a rotated range sensor
         def h_uwb(x):
             h = np.zeros(FILTER_DIM)
 
-            anchor_yaw = R.from_euler('z', x[9], degrees=True)
-            rot_anchor_position = anchor_yaw.apply(
-                anchor_position - self.anchor_offset_)
-
             # Range measurements
-            h[0] = np.linalg.norm(x[[0, 3, 6]] - rot_anchor_position)
+            h[0] = np.linalg.norm(
+                x[[0, 3, 6]] - (anchor_position - self.anchor_offset_))
             return h
 
         # Filter update
@@ -238,7 +232,7 @@ class UkfPositioning(Node):
             msg.pose.covariance[15],
             msg.twist.covariance[0],
             msg.twist.covariance[7],
-            msg.twist.covariance[15], 1., 1., 1., 1.
+            msg.twist.covariance[15], 1., 1., 1.
         ])
 
         self.kalman_filter_.update(z, R, hx=h_gps)
@@ -262,8 +256,8 @@ class UkfPositioning(Node):
         # Send estimation only if calibrated
         if(self.filter_state_ == "Calibrated"):
             # Check covariance norm
-            if(np.linalg.norm(self.kalman_filter_.P) > 10.):
-                self.filter_state_ = "Offline"
+            if(np.linalg.norm(self.kalman_filter_.P) > 100.):
+                self.filter_state_ = "Diverged"
                 self.get_logger().error("Filter is diverging")
                 return
 
@@ -289,9 +283,6 @@ class UkfPositioning(Node):
             msg.twist.covariance[0] = self.kalman_filter_.P[1][1]
             msg.twist.covariance[1] = self.kalman_filter_.P[4][4]
             msg.twist.covariance[2] = self.kalman_filter_.P[7][7]
-
-            # Anchor Yaw
-            msg.pose.pose.orientation.x = self.kalman_filter_.x[9]
 
             self.odometry_publisher_.publish(msg)
 
