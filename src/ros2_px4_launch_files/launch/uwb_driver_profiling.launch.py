@@ -10,7 +10,7 @@ def generate_launch_description():
         parameters=[
             {"topic_name": "tag_0"},
             {"uwbPort": '/dev/ttyACM0'},
-            {"anchors_pos_file_path": '/home/ubuntu/ros2_px4_ws/json/anchors.json'},
+            {"anchors_pos_file_path": '/home/cosimocon/Dev/ros2_px4_ws/json/anchors.json'},
         ],
         prefix=['valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no']
     )
