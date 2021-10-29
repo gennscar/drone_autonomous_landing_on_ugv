@@ -29,7 +29,7 @@ class UkfPositioning(Node):
         super().__init__("UkfPositioning")
 
         self.declare_parameters("", [
-            ("delta_t", 0.05),
+            ("delta_t", 0.02),
             ("q", 0.1),
             ("r_uwb", 0.05),
             ("r_gps", 1e-5)
@@ -75,7 +75,7 @@ class UkfPositioning(Node):
         )
 
         # Initial estimate
-        self.kalman_filter_.x *= 1.
+        self.kalman_filter_.x *= 0.
 
         # Covariance matrix
         self.kalman_filter_.P *= 1.
@@ -184,7 +184,7 @@ class UkfPositioning(Node):
         # Gating
         x = self.kalman_filter_.x.copy()
         P = self.kalman_filter_.P.copy()
-        if self.kalman_filter_.mahalanobis > 3. and self.filter_state_ == "Calibrated":
+        if self.kalman_filter_.mahalanobis > 4. and self.filter_state_ == "Calibrated":
             self.get_logger().warn(
                 f"Gating @: {self.kalman_filter_.mahalanobis}")
             self.kalman_filter_.x = x.copy()
@@ -243,7 +243,7 @@ class UkfPositioning(Node):
         """
 
         if (self.filter_state_ == "Calibrating"):
-            if(np.linalg.norm(self.kalman_filter_.x - self.kalman_filter_.x_prior) < 1.):
+            if(np.linalg.norm(self.kalman_filter_.P) < 10.):
                 self.calibration_counter_ += 1
 
                 if (self.calibration_counter_ > 100):
