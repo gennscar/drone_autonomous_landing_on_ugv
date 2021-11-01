@@ -31,9 +31,9 @@ class UkfPositioning(Node):
         super().__init__("UkfPositioning")
 
         self.declare_parameters("", [
-            ("delta_t", 0.05),
-            ("q", 0.01),
-            ("r_uwb", 0.025),
+            ("delta_t", 0.02),
+            ("q", 0.1),
+            ("r_uwb", 0.0025),
             ("r_laser", 0.01)
         ])
 

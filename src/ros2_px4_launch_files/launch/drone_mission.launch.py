@@ -66,8 +66,8 @@ def generate_launch_description():
         package="ros2_px4_estimation",
         name="UkfPositioning",
         namespace=LaunchConfiguration("drone_namespace"),
-        parameters=[{"delta_t": 0.02}, {"q": 0.01},
-                    {"r_uwb": 0.005}, {"r_laser": 0.01}],
+        parameters=[{"delta_t": 0.02}, {"q": 0.1},
+                    {"r_uwb": 0.0025}, {"r_laser": 0.01}],
         on_exit=Shutdown()
     )
 
