@@ -61,6 +61,7 @@ namespace gazebo
 
     /// Gaussian noise
     double gaussian_noise_;
+    double anchor_offset_[3] = {0, 0, 0};
 
     /// Pointer to the update event connection
     event::ConnectionPtr update_connection_{nullptr};
@@ -175,6 +176,18 @@ namespace gazebo
       }
     }
 
+    // <anchor_offset> add a constant offset from a uniform distribution
+    if (sdf->HasElement("anchor_offset"))
+    {
+      double anchor_offset_std = sdf->GetElement("anchor_offset")->Get<double>();
+
+      impl_->anchor_offset_[0] = ignition::math::Rand::DblUniform(-anchor_offset_std, anchor_offset_std);
+      impl_->anchor_offset_[1] = ignition::math::Rand::DblUniform(-anchor_offset_std, anchor_offset_std);
+      impl_->anchor_offset_[2] = ignition::math::Rand::DblUniform(-anchor_offset_std, anchor_offset_std);
+
+      gzdbg << "Adding anchor offset of: " << impl_->anchor_offset_[0] << ", " << impl_->anchor_offset_[1] << ", " << impl_->anchor_offset_[2] << std::endl;
+    }
+
     // Setting up the publisher of the anchor pose
     impl_->anchor_pub_ = impl_->gazebo_node_->Advertise<msgs::PoseStamped>(impl_->anchor_topic_, 1);
 
@@ -189,7 +202,7 @@ namespace gazebo
 
       // Setting up ranges publisher
       impl_->sensor_pub_ = impl_->ros_node_->create_publisher<ros2_px4_interfaces::msg::UwbSensor>(
-          impl_->sensor_topic_  + impl_->anchor_id_,
+          impl_->sensor_topic_ + impl_->anchor_id_,
           impl_->ros_node_->get_qos().get_publisher_qos(impl_->sensor_topic_ + impl_->anchor_id_));
 
       // <gaussian_noise> is the sigma value of gaussian noise to add to range readings
@@ -299,9 +312,9 @@ namespace gazebo
 
       sensor_msg.anchor_pose.header.frame_id = _msg->pose().name();
 
-      sensor_msg.anchor_pose.pose.position.x = _msg->pose().position().x();
-      sensor_msg.anchor_pose.pose.position.y = _msg->pose().position().y();
-      sensor_msg.anchor_pose.pose.position.z = _msg->pose().position().z();
+      sensor_msg.anchor_pose.pose.position.x = _msg->pose().position().x() + anchor_offset_[0];
+      sensor_msg.anchor_pose.pose.position.y = _msg->pose().position().y() + anchor_offset_[1];
+      sensor_msg.anchor_pose.pose.position.z = _msg->pose().position().z() + anchor_offset_[2];
 
       sensor_msg.anchor_pose.pose.orientation.x = _msg->pose().orientation().x();
       sensor_msg.anchor_pose.pose.orientation.y = _msg->pose().orientation().y();

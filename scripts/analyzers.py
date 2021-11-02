@@ -1,7 +1,6 @@
-from re import A
-import time
+import math
 import numpy as np
-from matplotlib import pyplot as plt
+from matplotlib import colors, pyplot as plt
 from ros2bag import BagFileParser
 
 
@@ -103,7 +102,7 @@ class MovingTagAnalyzer():
                 row = row.split()
 
                 self.leica_time.append(leica_time)
-                leica_time += 0.150
+                leica_time += 0.100
 
                 self.leica_pose.append([
                     row[1][10:], row[2][10:], row[3][10:]
@@ -158,15 +157,15 @@ class MovingTagAnalyzer():
 
 
 # Filenames
-ROS2BAG_FILE = "rosbags/rosbag2_2021_10_13-16_08_57/rosbag2_2021_10_13-16_08_57_0.db3"
+ROS2BAG_FILE = "/home/cosimocon/rosbag2_2021_10_29-15_38_41/rosbag2_2021_10_29-15_38_41_0.db3"
 ROS2_UWB_TOPIC = "/uwb_sensor_tag_0"
-ROS2_ODOM_TOPIC = "/X500_2/UkfPositioning/Odometry"
+ROS2_ODOM_TOPIC = "/X500_2/UwbPositioning/Pose"
 
-LEICA_FILE = "rosbags/rosbag2_2021_10_13-16_08_57/C3"
-POINTS_ID = "AAA"
+LEICA_FILE = "/home/cosimocon/GABBIA"
+POINTS_ID = "RUNB"
 
 # Time [seconds] and pose [m] offset of LEICA measurements
-LEICA_OFFSET = np.array([1634134147., -100., -100., -100.])
+LEICA_OFFSET = np.array([1635238682., -100., -100., -100.])
 
 if __name__ == "__main__":
     anal = MovingTagAnalyzer()
@@ -174,36 +173,58 @@ if __name__ == "__main__":
     # Analyzing UWB data
     uwb_time, uwb_range = anal.parse_ros2bag_uwb(ROS2BAG_FILE, ROS2_UWB_TOPIC)
 
-    # Analyzing Leica data
-    leica_time, leica_pose, leica_range = anal.parse_leica(
-        LEICA_FILE, POINTS_ID, LEICA_OFFSET)
-
     # Plotting ranges
     N = 0
     for anchor_id in uwb_time.keys():
         print(uwb_time[anchor_id][0])
         N += 1
-        ax = plt.subplot(len(uwb_time.keys()), 1, N)
+
+        plt.subplot(3, 3, N)
         plt.grid()
 
-        plt.plot(uwb_time[anchor_id], uwb_range[anchor_id],
-                 label="UWB, anchor " + anchor_id)
-        plt.plot(leica_time, leica_range[anchor_id],
-                 label="LEICA, anchor " + anchor_id)
+        plt.scatter(uwb_time[anchor_id], uwb_range[anchor_id], s=10.,
+                    label="Anchor " + anchor_id)
         plt.legend()
 
     plt.show()
 
-    # Analyzing odometry
+    # Analyzing odometry and LEICA
     odom_time, odom_pose = anal.parse_ros2bag_odom(
         ROS2BAG_FILE, ROS2_ODOM_TOPIC)
+
+    leica_time, leica_pose, _ = anal.parse_leica(
+        LEICA_FILE, POINTS_ID, LEICA_OFFSET)
 
     for i in range(0, 3):
         ax = plt.subplot(3, 1, i+1)
         plt.grid()
 
         plt.plot(odom_time, odom_pose[:, i], label="Odometry")
-        plt.plot(leica_time, leica_pose[:, i], label="Leica")
+        plt.plot(leica_time, leica_pose[:, i], label="LEICA")
+        plt.legend()
+
+    plt.show()
+
+    # Confront odom derived ranging with real ones
+
+    # Odom derived ranging
+    odom_range = {}
+    offset = np.array([-9.94796576, 5.94353514, -0.52166012])
+    for anchor_id in anal.anchor_pose.keys():
+        odom_range[anchor_id] = np.linalg.norm(
+            (odom_pose + offset) - anal.anchor_pose[anchor_id], axis=1)
+
+    # Plotting ranges with the estimated ones on to
+    N = 0
+    for anchor_id in uwb_time.keys():
+        N += 1
+        ax = plt.subplot(2, 2, N)
+        plt.grid()
+
+        plt.scatter(uwb_time[anchor_id], uwb_range[anchor_id],
+                    label="UWB, anchor " + anchor_id)
+        plt.plot(odom_time, odom_range[anchor_id], "r-",
+                 label="ODOM, anchor " + anchor_id)
         plt.legend()
 
     plt.show()

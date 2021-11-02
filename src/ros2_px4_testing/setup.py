@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "positioning_error = ros2_px4_testing.positioning_error:main",
+            "odometry_error = ros2_px4_testing.odometry_error:main",
             "test_apriltag = ros2_px4_testing.test_apriltag:main",
             "setpoints_flight = ros2_px4_testing.setpoints_flight:main",
             "drone_rover_positioning_error = ros2_px4_testing.drone_rover_positioning_error:main",
