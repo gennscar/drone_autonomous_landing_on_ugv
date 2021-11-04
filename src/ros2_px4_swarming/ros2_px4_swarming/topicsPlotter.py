@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+import math
 import csv
 import os
 from ament_index_python.packages import get_package_prefix
@@ -102,6 +103,7 @@ def main():
     uwb_sensor_target = list()
     trackingError = list()
     targetAnchorsDistances = list()
+    interAnchorsGPSDistances = list()
     # endregion
 
     # region Data retrieval
@@ -203,6 +205,21 @@ def main():
             for field in row:
                 tmp.append(float(field))
             targetAnchorsDistances.append(tmp)
+
+    if len(vehicleGlobalPosition) > 1:
+        counter = 0
+        for i in range(len(vehicleGlobalPosition)):
+            for j in range(i + 1, len(vehicleGlobalPosition)):
+                interAnchorsGPSDistances.append(list())
+                counter += 1
+                for indexI in range(len(vehicleGlobalPosition[i])):
+                    listJ = np.asarray(list(vehicleGlobalPosition[j][tmpIndex][0] for tmpIndex in range(len(vehicleGlobalPosition[j]))))
+                    indexJ = (np.abs(listJ - vehicleGlobalPosition[i][indexI][0])).argmin()
+                    # Check if the time difference is small enough
+                    if math.isclose(vehicleGlobalPosition[i][indexI][0], vehicleGlobalPosition[j][indexJ][0], abs_tol=0.1):
+                        interAnchorsGPSDistances[counter - 1].append([
+                            np.average([vehicleGlobalPosition[i][indexI][0], vehicleGlobalPosition[j][indexJ][0]]),
+                            np.linalg.norm([vehicleGlobalPosition[i][indexI][1] - vehicleGlobalPosition[j][indexJ][1], vehicleGlobalPosition[i][indexI][2] - vehicleGlobalPosition[j][indexJ][2]])])
     # endregion
 
     # region Time analysis
@@ -275,6 +292,31 @@ def main():
         plt.title("Inter-anchors distances [m]", size="xx-large", weight="bold")
 
         plt.savefig(csvFilesPath + folderName + "/interAnchorsDistances.png")
+    # endregion
+
+    # region Inter-anchors GPS distances
+    if interAnchorsGPSDistances:
+        plt.figure()
+        legend = list()
+
+        counters = [0, 0]
+        for couple in range(len(interAnchorsGPSDistances)):
+            plt.plot(list(interAnchorsGPSDistances[couple][i][0] for i in range(len(interAnchorsGPSDistances[couple]))),
+                     list(interAnchorsGPSDistances[couple][i][1] for i in range(len(interAnchorsGPSDistances[couple]))))
+            if counters[1] < N - 1:
+                counters[1] += 1
+            else:
+                counters[0] += 1
+                counters[1] = counters[0] + 1
+            legend.append("$d_{" + str(counters[0]) + str(counters[1]) + "}$")
+
+        plt.xlim(timeLimits)
+        plt.grid()
+        plt.xlabel("$Time \ [s]$")
+        plt.legend(legend)
+        plt.title("Inter-anchors GPS distances [m]", size="xx-large", weight="bold")
+
+        plt.savefig(csvFilesPath + folderName + "/interAnchorsGPSDistances.png")
     # endregion
 
     # region Synchronization error UWB

@@ -6,7 +6,7 @@ from launch.actions import ExecuteProcess
 from ament_index_python.packages import get_package_share_directory, get_package_prefix
 
 RECORD_ON = True
-SIMULATED_GPS = True
+SIMULATED_GPS = False
 
 
 def generate_launch_description():
@@ -21,6 +21,12 @@ def generate_launch_description():
     # Parameters file path
     params = os.path.join(
         get_package_share_directory('ros2_px4_swarming'),
+        '..',
+        '..',
+        '..',
+        '..',
+        'src',
+        'ros2_px4_swarming',
         'parameters',
         'params.yaml'
     )

@@ -12,6 +12,7 @@
         TARGET_ID: 200
         MAX_SWARMING_SPEED: 1.0
         TIMEOUT: 5
+        TIMEOUT_UWB: 1
         UWB_ON: false
         SINGLE_DRONE_FOR_TEST: false
 

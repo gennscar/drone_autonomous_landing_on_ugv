@@ -6,12 +6,13 @@
         A: 0.1
         B: 1.5
         C: 50.0
-        H_DES: 1.0
+        H_DES: 3.0
         K_H: 1.0
         EARTH_RADIUS: 6371000
         TARGET_ID: 200
         MAX_SWARMING_SPEED: 1.0
         TIMEOUT: 5
+        TIMEOUT_UWB: 1
         UWB_ON: false
         NOT_FLYING_FOR_TEST: false
         SINGLE_DRONE_FOR_TEST: false
