@@ -19,20 +19,22 @@ STD_HEIGHT = 3.0               # Standard height used if out of bound
 
 # Autonomous control parameters
 PID_SWITCH_POS = 5.0           # Distance from target to switch from PID1 to PID2
-V_MAX_INT = 1.2                # Anti windup drone velocity limit
+V_MAX_INT = 1.6                # Anti windup drone velocity limit
 KP = 0.8                       # Proportional gain
 KI = 0.08                      # Integral gain
 KD = 0.3                       # Derivative gain
-LAND_ERR_TOLL = 0.4            # XY relative position allowed to shut down motors when on platform
+LAND_ERR_TOLL = 0.35           # XY relative position allowed to shut down motors when on platform
 HEIGHT_SWITCH_TOLL = 0.5       # Height to switch from descending xy tolerance cone to cylinder
-GAIN_HEIGHT_TOLL = 0.3         # XY meters error increase with respect to height
+GAIN_HEIGHT_TOLL = 0.25        # XY meters error increase with respect to height
 LAND_VEL_TOLL = 0.6            # Maximum XY relative velocity allowed to perform landing
 LAND_DESC_VEL = - 0.3          # Z velocity when descending on target
 TARGET_HEIGHT = 0.5            # Target height
-TURN_OFF_MOT_HEIGHT = 0.4      # Relative height allowed to shutdown motors
+TURN_OFF_MOT_HEIGHT = 0.35     # Relative height allowed to shutdown motors
 DETECT_LANDING_COUNT = 1       # Landing conditions verified consecutively for this numer of times
+PREDICTION_TIME = 0.3          # If >0, the drone will land at the predicted rover position
 FOLLOW_HOVERING_HEIGHT = 3.0   # Drone height kept in target follower mode
 WATCHDOG_DT = 0.5              # Watchdog period
+
 
 # NULL definition and check function
 NULL = float("NaN")
@@ -166,9 +168,12 @@ class DroneController(Node):
         self.rel_pos_ = np.array([
             - msg.pose.pose.position.y, - msg.pose.pose.position.x])
         self.rel_z_ = msg.pose.pose.position.z
-
         self.rel_vel_ = np.array([
             - msg.twist.twist.linear.y, - msg.twist.twist.linear.x])
+        self.rover_vel_ = np.array([
+            msg.pose.pose.orientation.y, msg.pose.pose.orientation.x])
+        self.rel_pos_ = self.rel_pos_ + PREDICTION_TIME*self.rover_vel_
+
         # Increment watchdog counter if uwb info received
         self.watchdog_counter_ += 1
 
@@ -360,10 +365,10 @@ class DroneController(Node):
         if self.rel_pos_ == [] or self.rel_vel_ == []:
             x_setpoint_ = NULL
             y_setpoint_ = NULL
-            z_setpoint_ = self.start_local_position_[2] + FOLLOW_HOVERING_HEIGHT
+            z_setpoint_ = float("NaN")
             vx_setpoint_ = 0.0
             vy_setpoint_ = 0.0
-            vz_setpoint_ = NULL
+            vz_setpoint_ = 0.0
             yaw_setpoint_ = NULL
             
         else:

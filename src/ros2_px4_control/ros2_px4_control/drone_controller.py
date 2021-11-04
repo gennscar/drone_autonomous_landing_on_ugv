@@ -22,16 +22,17 @@ V_MAX_INT = 1.2                # Anti windup drone velocity limit
 KP = 0.8                       # Proportional gain
 KI = 0.08                      # Integral gain
 KD = 0.3                       # Derivative gain
-LAND_ERR_TOLL = 0.4            # XY relative position allowed to shut down motors when on platform
+LAND_ERR_TOLL = 0.35           # XY relative position allowed to shut down motors when on platform
 HEIGHT_SWITCH_TOLL = 0.5       # Height to switch from descending xy tolerance cone to cylinder
-GAIN_HEIGHT_TOLL = 0.3         # XY meters error increase with respect to height
+GAIN_HEIGHT_TOLL = 0.25        # XY meters error increase with respect to height
 LAND_VEL_TOLL = 0.6            # Maximum XY relative velocity allowed to perform landing
-LAND_DESC_VEL = - 0.4          # Z velocity when descending on target
-TARGET_HEIGHT = 0.5            # Target height
-TURN_OFF_MOT_HEIGHT = 0.4      # Relative height allowed to shutdown motors
+LAND_DESC_VEL = - 0.3          # Z velocity when descending on target
+TARGET_HEIGHT = 0.4          # Target height
+TURN_OFF_MOT_HEIGHT = 0.2      # Relative height allowed to shutdown motors
 DETECT_LANDING_COUNT = 1       # Landing conditions verified consecutively for this numer of times
 FOLLOW_HOVERING_HEIGHT = 3.0   # Drone height kept in target follower mode
 WATCHDOG_DT = 0.5              # Watchdog period
+PREDICTION_TIME = 0.0          # If >0, the drone will land at the predicted rover position
 
 # NULL definition and check function
 NULL = float("NaN")
@@ -167,6 +168,9 @@ class DroneController(Node):
         self.rel_z_ = msg.pose.pose.position.z
         self.rel_vel_ = np.array([
             - msg.twist.twist.linear.y, - msg.twist.twist.linear.x])
+        self.rover_vel_ = np.array([
+            msg.pose.pose.orientation.y, msg.pose.pose.orientation.x])
+        self.rel_pos_ = self.rel_pos_ + PREDICTION_TIME*self.rover_vel_
         # Increment watchdog counter if uwb info received
         self.watchdog_counter_ += 1
 

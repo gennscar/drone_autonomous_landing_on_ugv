@@ -15,7 +15,7 @@ noise_dt = 2
 t1 = 100
 t2 = t1 + 30
 
-lin_vel = 1.0
+lin_vel = 1.5
 ang_vel = 0.2
 
 curvature = True

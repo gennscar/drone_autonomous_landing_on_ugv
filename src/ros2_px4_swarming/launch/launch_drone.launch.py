@@ -17,6 +17,12 @@ def generate_launch_description():
     # Parameters file path
     params = os.path.join(
         get_package_share_directory('ros2_px4_swarming'),
+        '..',
+        '..',
+        '..',
+        '..',
+        'src',
+        'ros2_px4_swarming',
         'parameters',
         'drone_params.yaml'
     )

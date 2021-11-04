@@ -24,6 +24,8 @@ class TrackingVelocityCalculator(Node):
                 ('RATE', None),
                 ('QUEUE_SIZE', None),
                 ('TARGET_ID', None),
+                ('TIMEOUT', None),
+                ('TIMEOUT_UWB', None),
                 ('MAX_TRACKING_SPEED', None),
                 ('K_P', None),
                 ('K_I', None),
@@ -40,6 +42,8 @@ class TrackingVelocityCalculator(Node):
         self.RATE = self.get_parameter('RATE').value
         self.QUEUE_SIZE = self.get_parameter('QUEUE_SIZE').value
         self.TARGET_ID = self.get_parameter('TARGET_ID').value
+        self.TIMEOUT = self.get_parameter('TIMEOUT').value
+        self.TIMEOUT_UWB = self.get_parameter('TIMEOUT_UWB').value
         self.MAX_TRACKING_SPEED = self.get_parameter('MAX_TRACKING_SPEED').value
         self.K_P = self.get_parameter('K_P').value
         self.K_I = self.get_parameter('K_I').value
@@ -55,6 +59,7 @@ class TrackingVelocityCalculator(Node):
         self.anchorsPosition = {}
         self.anchorsPositionSubs = list()
         self.targetUwbDistances = {}
+        self.lastUwbDistanceReceived = {}
         self.unitVectors = [[None] * self.N] * self.N
         self.anchorsPositionReceived = False
         self.trackingVelocityIntegral = [0.0, 0.0]
@@ -65,6 +70,7 @@ class TrackingVelocityCalculator(Node):
         self.lastPositionReceivedTimer = {}
         for i in range(self.N):
             self.lastPositionReceivedTimer[i] = 0
+            self.lastUwbDistanceReceived[i] = 0
 
         # Subscribers initialization
         if self.NUM_TARGET == 1:
@@ -90,7 +96,7 @@ class TrackingVelocityCalculator(Node):
         centerLongitude = 0.0
         activeDrones = 0
         for key in self.lastPositionReceivedTimer.keys():
-            if self.lastPositionReceivedTimer[key] < 5 * self.RATE:
+            if self.lastPositionReceivedTimer[key] < self.TIMEOUT * self.RATE:
                 activeDrones += 1
                 centerLatitude += self.anchorsPosition[key].lat
                 centerLongitude += self.anchorsPosition[key].lon
@@ -140,7 +146,7 @@ class TrackingVelocityCalculator(Node):
             activeDrones = 0
             dronesToRemove = []
             for key in self.anchorsPosition.keys():
-                if self.lastPositionReceivedTimer[key] >= 5 * self.RATE:
+                if self.lastPositionReceivedTimer[key] >= self.TIMEOUT * self.RATE:
                     dronesToRemove.append(key)
                 else:
                     activeDrones += 1
@@ -154,6 +160,13 @@ class TrackingVelocityCalculator(Node):
             # Compute the tracking velocity (with target)
             velEast = 0.0
             velNorth = 0.0
+
+            # Check if some UWB has not been working for too long
+            for key in self.lastUwbDistanceReceived.keys():
+                if self.lastUwbDistanceReceived[key] >= self.TIMEOUT_UWB * self.RATE:
+                    result.east = 0.0
+                    result.north = 0.0
+                    return result
 
             for couple in permutations(self.anchorsPosition, 2):
                 componentEast = (self.targetUwbDistances[couple[1]] - self.targetUwbDistances[couple[0]]) * self.unitVectors[couple[0]][couple[1]].east
@@ -232,6 +245,8 @@ class TrackingVelocityCalculator(Node):
     def timerCallback(self):
         for key in self.lastPositionReceivedTimer.keys():
             self.lastPositionReceivedTimer[key] += 1
+        for key in self.lastUwbDistanceReceived.keys():
+            self.lastUwbDistanceReceived[key] += 1
         msg = self.computeTrackingVelocity()
         self.trackingVelocityPub.publish(msg)
 
@@ -266,10 +281,7 @@ class TrackingVelocityCalculator(Node):
 
     def targetUwbSensorCallback(self, msg):
         self.targetUwbDistances[int(msg.anchor_pose.header.frame_id)] = msg.range
-        # TODO: implementare la callback per sincronizzare le distanze
-        # self.get_logger().info(msg)
-        # for dis in self.uwbDistances.values():
-        #     self.get_logger().info(str(dis))
+        self.lastUwbDistanceReceived[int(msg.anchor_pose.header.frame_id)] = 0
 
     def anchorsReadyForSwarmingCallback(self, msg):
         self.anchorsReadyForSwarming[msg.data] = True
