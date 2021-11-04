@@ -16,55 +16,28 @@ class OdometryError(Node):
     def __init__(self):
         super().__init__("odometry_error")
 
+        # Retrieve parameter values
+        self.odometry_topic_name_ = self.declare_parameter(
+            "odometry_topic_name", "")
+        self.odometry_topic_name_ = self.get_parameter(
+            "odometry_topic_name").get_parameter_value().string_value
+
         self.sensor_real_pos_ = []
 
         # Subscriber to the real position
         self.real_subscriber_ = self.create_subscription(
             VehicleLocalPositionGroundtruth, "VehicleLocalPositionGroundtruth_PubSubTopic", self.callback_real_subscriber, 10)
 
-        # Subscriber to the estimated position of PX4
-        self.px4_subscriber_ = self.create_subscription(
-            VehicleLocalPosition, "VehicleLocalPosition_PubSubTopic", self.callback_px4_subscriber, 10)
         # Subscriber to the estimated position of UKF
         self.ukf_subscriber_ = self.create_subscription(
-            Odometry, "UkfPositioning/Odometry", self.callback_ukf_subscriber, 10)
+            Odometry, self.odometry_topic_name_ + "/Odometry", self.callback_ukf_subscriber, 10)
 
         # Error publishers
-        self.px4_err_publisher_ = self.create_publisher(
-            Error, "LocalPositionError", 10
-        )
         self.ukf_err_publisher_ = self.create_publisher(
-            Error, "UkfError", 10
+            Error, "~/Error", 10
         )
 
         self.get_logger().info(f"""Node has started""")
-
-    def callback_px4_subscriber(self, msg):
-        """
-        Retriving the estimated/sensor position and evaluating mean square error
-
-        Args:
-            msg (PoseWithCovarianceStamped): Estimated pose
-        """
-
-        # Retriving the estimated position
-        sensor_est_pos = np.array([
-            msg.x, msg.y, msg.z, msg.vx, msg.vy, msg.vz,
-        ])
-
-        # Filling error message
-        error = Error()
-        error.header.stamp = self.get_clock().now().to_msg()
-        error.header.frame_id = "PX4"
-
-        if(self.sensor_real_pos_ != []):
-            diff = sensor_est_pos - self.sensor_real_pos_
-
-            error.rmse = np.linalg.norm(diff)
-            error.mse = error.rmse**2
-
-        # Sending error message only if the estimator is valid
-        self.px4_err_publisher_.publish(error)
 
     def callback_ukf_subscriber(self, msg):
         """
@@ -87,7 +60,7 @@ class OdometryError(Node):
         # Filling error message
         error = Error()
         error.header.stamp = self.get_clock().now().to_msg()
-        error.header.frame_id = "Ukf"
+        error.header.frame_id = self.odometry_topic_name_
 
         if(self.sensor_real_pos_ != []):
             diff = sensor_est_pos - self.sensor_real_pos_
