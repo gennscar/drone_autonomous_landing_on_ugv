@@ -302,6 +302,8 @@ class kf_xyz_estimator(Node):
         msg.pose.pose.position.y = self.rel_pos_y_
         msg.pose.pose.position.z = self.rel_pos_z_
         msg.pose.pose.orientation.w = float(self.kalman_filter_.x[13][0])
+        msg.pose.pose.orientation.x = float(self.kalman_filter_.x[9][0])
+        msg.pose.pose.orientation.y = float(self.kalman_filter_.x[11][0])
         msg.twist.twist.linear.x = self.rel_vel_x_
         msg.twist.twist.linear.y = self.rel_vel_y_
         msg.twist.twist.linear.z = self.rel_vel_z_

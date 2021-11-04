@@ -10,7 +10,7 @@ def generate_launch_description():
     )
 
     drone_controller_node = Node(
-        executable="drone_controller_sim",
+        executable="drone_controller",
         package="ros2_px4_control",
         name="DroneController",
         namespace=LaunchConfiguration("drone_namespace"),

@@ -14,11 +14,13 @@ from filterpy.common import Q_discrete_white_noise
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from ros2_px4_interfaces.msg import UwbSensor
+from px4_msgs.msg import DistanceSensor
 
 
 QUEUE_SIZE = 10
-FILTER_DIM = 10  # Linear kinematic
-IS_SENSOR_ALIVE_TIMEOUT = 5.  # s
+FILTER_DIM = 9+1                  # Linear kinematic model
+IS_SENSOR_ALIVE_TIMEOUT = 5.    # s
+MAHALANOBIS_THRESHOLD = 6.      # sigmas
 
 
 class UkfPositioning(Node):
@@ -29,15 +31,15 @@ class UkfPositioning(Node):
         super().__init__("UkfPositioning")
 
         self.declare_parameters("", [
-            ("delta_t", 0.05),
+            ("delta_t", 0.02),
             ("q", 0.1),
-            ("r_uwb", 0.05),
-            ("r_gps", 1e-5)
+            ("r_uwb", 0.0025),
+            ("r_laser", 0.01)
         ])
 
         self.params_ = {
             x.name: x.value for x in self.get_parameters(
-                ["delta_t", "q", "r_uwb", "r_gps"]
+                ["delta_t", "q", "r_uwb", "r_laser"]
             )
         }
 
@@ -49,6 +51,7 @@ class UkfPositioning(Node):
         self.sensor_wd_ = {
             "uwb": 0,
             "gps": 0,
+            "laser": 0
         }
 
         # Kalman Filter
@@ -63,7 +66,7 @@ class UkfPositioning(Node):
                 [0., 1.,         dt],
                 [0., 0.,         1.]
             ])
-            F = scipy.linalg.block_diag(*[f]*3, np.ones(1))
+            F = scipy.linalg.block_diag(*[f]*3, 1.)
             return F @ x
 
         self.kalman_filter_ = UKF(
@@ -75,7 +78,7 @@ class UkfPositioning(Node):
         )
 
         # Initial estimate
-        self.kalman_filter_.x *= 1.
+        self.kalman_filter_.x *= 0.
 
         # Covariance matrix
         self.kalman_filter_.P *= 1.
@@ -84,7 +87,7 @@ class UkfPositioning(Node):
         self.kalman_filter_.Q = scipy.linalg.block_diag(
             Q_discrete_white_noise(
                 dim=3, dt=self.params_["delta_t"], var=self.params_["q"], block_size=3),
-            np.ones(1)*1e-3
+            0.
         )
 
         # Setting up sensors subscribers
@@ -99,6 +102,10 @@ class UkfPositioning(Node):
         self.gps_subscriber_ = self.create_subscription(
             Odometry, "GpsPositioning/Odometry",
             self.callback_gps_subscriber, QUEUE_SIZE
+        )
+        self.laser_subscriber_ = self.create_subscription(
+            DistanceSensor, "DistanceSensor_PubSubTopic",
+            self.callback_laser_subscriber, QUEUE_SIZE
         )
 
         # Setting up position and velocity publisher
@@ -127,9 +134,11 @@ class UkfPositioning(Node):
         ]) - self.kalman_filter_.x[[0, 3, 6]]
 
         # Mean values until convergence, than this subscriber can be destroyed
-        if np.linalg.norm(self.anchor_offset_ - anchor_offset) > 1e-2 or self.aligning_counter_ < 100:
-            self.anchor_offset_ += (anchor_offset - self.anchor_offset_) / \
-                (self.aligning_counter_ + 1)
+        var = (anchor_offset - self.anchor_offset_) / \
+            (self.aligning_counter_ + 1)
+
+        if np.linalg.norm(var) > 1e-3 or self.aligning_counter_ < 500.:
+            self.anchor_offset_ += var
             self.aligning_counter_ += 1
         else:
             self.get_logger().info(f"""
@@ -168,31 +177,24 @@ class UkfPositioning(Node):
             msg.anchor_pose.pose.position.z
         ])
 
-        # Anchor position rotation error (only for simulation)
-        # r = R.from_euler('z', 45, degrees=True)
-        # anchor_position = r.apply(anchor_position)
-
         # Measurement model for a rotated range sensor
         def h_uwb(x):
             h = np.zeros(FILTER_DIM)
 
-            anchor_yaw = R.from_euler('z', x[9], degrees=True)
-            rot_anchor_position = anchor_yaw.apply(
-                anchor_position - self.anchor_offset_)
-
             # Range measurements
-            h[0] = np.linalg.norm(x[[0, 3, 6]] - rot_anchor_position)
+            h[0] = np.linalg.norm(
+                x[[0, 3, 6]] - (anchor_position - self.anchor_offset_))
             return h
 
         # Filter update
+        x = self.kalman_filter_.x.copy()
+        P = self.kalman_filter_.P.copy()
         self.kalman_filter_.update(z, R=self.params_["r_uwb"], hx=h_uwb)
 
         # Gating
-        x = self.kalman_filter_.x.copy()
-        P = self.kalman_filter_.P.copy()
-        if self.kalman_filter_.mahalanobis > 3. and self.filter_state_ == "Calibrated":
+        if self.kalman_filter_.mahalanobis > MAHALANOBIS_THRESHOLD and self.filter_state_ == "Calibrated":
             self.get_logger().warn(
-                f"Gating @: {self.kalman_filter_.mahalanobis}")
+                f"Gating anchor {msg.anchor_pose.header.frame_id} @: {self.kalman_filter_.mahalanobis}")
             self.kalman_filter_.x = x.copy()
             self.kalman_filter_.P = P.copy()
 
@@ -243,13 +245,53 @@ class UkfPositioning(Node):
 
         self.kalman_filter_.update(z, R, hx=h_gps)
 
+    def callback_laser_subscriber(self, msg):
+        """Measuring laser sensor
+
+        Args:
+            msg (px4_msgs.msg.DistanceSensor): The Laser message
+        """
+
+        # Must predict once first
+        if(self.filter_state_ == "Offline"):
+            return
+
+        # Storing timestamp
+        self.sensor_wd_["laser"] = self.get_clock().now().nanoseconds
+
+        # Storing measurements in a np.array
+        z = np.zeros(FILTER_DIM)
+        z[0] = msg.current_distance
+
+        if any(np.isnan(z)):
+            self.get_logger().error(f"Invalid laser data")
+            return
+
+        # Measurement model for laser sensor
+        def h_laser(x):
+            h = np.zeros(FILTER_DIM)
+            h[0] = x[6]
+            return h
+
+        # Filter update
+        x = self.kalman_filter_.x.copy()
+        P = self.kalman_filter_.P.copy()
+        self.kalman_filter_.update(z, R=self.params_["r_laser"], hx=h_laser)
+
+        # Gating
+        if self.kalman_filter_.mahalanobis > MAHALANOBIS_THRESHOLD and self.filter_state_ == "Calibrated":
+            self.get_logger().warn(
+                f"Gating laser @: {self.kalman_filter_.mahalanobis}")
+            self.kalman_filter_.x = x.copy()
+            self.kalman_filter_.P = P.copy()
+
     def predict_callback(self):
         """This callback perform the filter predict and forward the current
         estimate
         """
 
         if (self.filter_state_ == "Calibrating"):
-            if(np.linalg.norm(self.kalman_filter_.x - self.kalman_filter_.x_prior) < 1.):
+            if(np.linalg.norm(self.kalman_filter_.P) < 10.):
                 self.calibration_counter_ += 1
 
                 if (self.calibration_counter_ > 100):
@@ -262,8 +304,8 @@ class UkfPositioning(Node):
         # Send estimation only if calibrated
         if(self.filter_state_ == "Calibrated"):
             # Check covariance norm
-            if(np.linalg.norm(self.kalman_filter_.P) > 10.):
-                self.filter_state_ = "Offline"
+            if(np.linalg.norm(self.kalman_filter_.P) > 100.):
+                self.filter_state_ = "Diverged"
                 self.get_logger().error("Filter is diverging")
                 return
 
@@ -289,9 +331,6 @@ class UkfPositioning(Node):
             msg.twist.covariance[0] = self.kalman_filter_.P[1][1]
             msg.twist.covariance[1] = self.kalman_filter_.P[4][4]
             msg.twist.covariance[2] = self.kalman_filter_.P[7][7]
-
-            # Anchor Yaw
-            msg.pose.pose.orientation.x = self.kalman_filter_.x[9]
 
             self.odometry_publisher_.publish(msg)
 

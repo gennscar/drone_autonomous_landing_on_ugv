@@ -21,7 +21,7 @@ def generate_launch_description():
         parameters=[
             {"topic_name": "tag_0"},
             {"uwbPort": '/dev/ttyACM0'},
-            {"anchors_pos_file_path": '/home/ubuntu/ros2_px4_ws/json/anchors_covivio_3.json'},
+            {"anchors_pos_file_path": '/home/ubuntu/ros2_px4_ws/json/anchors_gabbia.json'},
         ]
     )
 
@@ -31,7 +31,7 @@ def generate_launch_description():
         name="DroneController",
         namespace=LaunchConfiguration("drone_namespace"),
         parameters=[
-            {"vehicle_number": 1}
+            {"vehicle_number": 3}
         ]
     )
 
@@ -66,9 +66,26 @@ def generate_launch_description():
         package="ros2_px4_estimation",
         name="UkfPositioning",
         namespace=LaunchConfiguration("drone_namespace"),
-        parameters=[{"delta_t": 0.05}, {"q": 0.1},
-                    {"r_uwb": 0.05}, {"r_gps": 1e-5}],
-        # on_exit=Shutdown()
+        parameters=[{"delta_t": 0.02}, {"q": 0.1},
+                    {"r_uwb": 0.0025}, {"r_laser": 0.01}],
+        on_exit=Shutdown()
+    )
+
+    kf_positioning_node = Node(
+        executable="kf_loose_positioning",
+        package="ros2_px4_estimation",
+        name="KfPositioning",
+        namespace=LaunchConfiguration("drone_namespace"),
+        parameters=[{"delta_t": 0.02}, {"q": 0.001},
+                    {"r_uwb": 0.025}, {"r_laser": 0.01}],
+        on_exit=Shutdown()
+    )
+
+    odometry_error_node = Node(
+        executable="odometry_error",
+        package="ros2_px4_testing",
+        name="OdometryError",
+        namespace=LaunchConfiguration("drone_namespace")
     )
 
     return LaunchDescription([
@@ -83,4 +100,6 @@ def generate_launch_description():
         odometry_sender_node,
         gps_positioning_node,
         ukf_positioning_node,
+        # kf_positioning_node,
+        # odometry_error_node
     ])

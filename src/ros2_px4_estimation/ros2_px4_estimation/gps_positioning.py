@@ -100,17 +100,17 @@ class GpsPositioning(Node):
         odom.pose.pose.position.y = self.pos_[1]
         odom.pose.pose.position.z = self.pos_[2]
 
-        odom.pose.covariance[0] = msg.eph
-        odom.pose.covariance[7] = msg.eph
-        odom.pose.covariance[15] = msg.epv
+        odom.pose.covariance[0] = msg.eph**2
+        odom.pose.covariance[7] = msg.eph**2
+        odom.pose.covariance[15] = msg.epv**2
 
         odom.twist.twist.linear.x = msg.vel_e_m_s
         odom.twist.twist.linear.y = msg.vel_n_m_s
         odom.twist.twist.linear.z = -msg.vel_d_m_s
 
-        odom.twist.covariance[0] = msg.s_variance_m_s
-        odom.twist.covariance[7] = msg.s_variance_m_s
-        odom.twist.covariance[15] = msg.s_variance_m_s
+        odom.twist.covariance[0] = msg.s_variance_m_s**2
+        odom.twist.covariance[7] = msg.s_variance_m_s**2
+        odom.twist.covariance[15] = msg.s_variance_m_s**2
 
         self.odometry_publisher_.publish(odom)
 
