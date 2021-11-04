@@ -552,7 +552,8 @@ class Drone(Node):
         # if self.authorizedForOffboard and (self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_STICK or \
         #                                    self.vehicleStatus.latest_disarming_reason == VehicleStatus.ARM_DISARM_REASON_RC_SWITCH):
             self.authorizedForOffboard = False
-            self.publishDroneInfo("RC took control")
+            if self.vehicleStatus.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+                self.publishDroneInfo("RC took control")
             self.droneMode = "idle"
 
     def anchorReadyForTakeoffCallback(self, msg):
