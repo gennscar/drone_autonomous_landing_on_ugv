@@ -1,0 +1,24 @@
+rosbags/Gabbia_2021_11_02/rosbag2_2021_10_26-08_58_33
+Fisrt try with seven UWB anchors + laser, stable takeoff but after 30 sec it
+started oscillating, Giovanni take control immediately
+
+rosbags/Gabbia_2021_11_02/rosbag2_2021_10_26-09_02_21
+I put R_uwb @ 0.025 instead of 0.0025, it started oscillating a lot sooner.
+
+rosbags/Gabbia_2021_11_02/rosbag2_2021_10_26-09_05_40
+Really nice!!! Started with GPS+UWB than a setpoint @ 3N, then suthdown for the
+GPS and coming back gradually @ 0, then auto land.
+
+rosbags/Gabbia_2021_11_02/rosbag2_2021_10_26-09_14_04
+Only UWB, probably when Gennaro and Matteo tryed to block the anchors by hand.
+Work on gating!!!
+
+rosbags/Gabbia_2021_11_02/rosbag2_2021_10_26-09_22_14
+Nothing happened :(
+
+rosbags/Gabbia_2021_11_02/rosbag2_2021_10_26-09_24_06
+Started with only UWB and tried to enable GPS in flight, heading really fucked
+with the drone this time
+
+rosbags/Gabbia_2021_11_02/rosbag2_2021_10_26-09_30_46
+Same test as before UWB->UWB+GPS but now using 3-axis magnetometer. CORRUPTED :(
