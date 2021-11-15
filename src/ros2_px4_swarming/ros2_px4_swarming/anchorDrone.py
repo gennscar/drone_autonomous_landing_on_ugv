@@ -278,15 +278,15 @@ class Drone(Node):
             # Communicate to the other anchors that I am ready to takeoff
             self.readyForTakeoff = True
             self.anchorsReadyForTakeoff[self.ID] = True
-            msg = UInt64()
-            msg.data = self.ID
-            self.readyForTakeoffPub.publish(msg)
+        msg = UInt64()
+        msg.data = self.ID
+        self.readyForTakeoffPub.publish(msg)
 
         if not self.SINGLE_DRONE_FOR_TEST and len(self.anchorsReadyForTakeoff) < self.N:
             # The other anchors are not ready to takeoff yet
-            msg = UInt64()
-            msg.data = self.ID
-            self.readyForTakeoffPub.publish(msg)
+            # msg = UInt64()
+            # msg.data = self.ID
+            # self.readyForTakeoffPub.publish(msg)
             return
 
         # Check if the commanded altitude is high enough
@@ -300,7 +300,6 @@ class Drone(Node):
         if self.localPosition.z <= self.lastGoalPositionReceived.z:
             # Takeoff completed
             self.droneMode = "swarming"
-            # self.droneMode = "hover"
             self.home = [self.localPosition.x, self.localPosition.y, self.localPosition.z]
             return
 
@@ -326,18 +325,18 @@ class Drone(Node):
             self.returnHome()
             return
         elif not self.readyForSwarming:
-            # Communicate to the other anchors that I am ready to start swarming
             self.readyForSwarming = True
             self.anchorsReadyForSwarming[self.ID] = True
-            msg = UInt64()
-            msg.data = self.ID
-            self.readyForSwarmingPub.publish(msg)
+        # Communicate to the other anchors that I am ready to start swarming
+        msg = UInt64()
+        msg.data = self.ID
+        self.readyForSwarmingPub.publish(msg)
 
         if not self.SINGLE_DRONE_FOR_TEST and len(self.anchorsReadyForSwarming) < self.N:
             # The other anchors are not ready to swarm yet
-            msg = UInt64()
-            msg.data = self.ID
-            self.readyForSwarmingPub.publish(msg)
+            # msg = UInt64()
+            # msg.data = self.ID
+            # self.readyForSwarmingPub.publish(msg)
             # self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
             self.returnHome()
             return
@@ -377,6 +376,11 @@ class Drone(Node):
             self.publishDroneInfo("No longer part of the swarm")
             self.nodeDestroyed = True
             self.destroy_node()
+            return
+
+        if self.N == 1:
+            self.hover()
+            self.droneMode = "hover"
             return
 
         # Compute the distances between the drones from their GPS positions
@@ -485,13 +489,12 @@ class Drone(Node):
                 msg = UInt64()
                 msg.data = self.ID
                 self.readyForTakeoffPub.publish(msg)
-
-            if len(self.anchorsReadyForTakeoff) < self.N:
-                # The other anchors are not ready to takeoff yet
+                self.get_logger().info("Setting takeoff mode")
+                self.publishDroneInfo("Setting takeoff mode")
+            else:
                 msg = UInt64()
                 msg.data = self.ID
                 self.readyForTakeoffPub.publish(msg)
-                return
 
             if not self.readyForSwarming:
                 # Communicate to the other anchors that I am ready to start swarming
@@ -500,14 +503,13 @@ class Drone(Node):
                 msg = UInt64()
                 msg.data = self.ID
                 self.readyForSwarmingPub.publish(msg)
-
-            if len(self.anchorsReadyForSwarming) < self.N:
-                # The other anchors are not ready to swarm yet
+                self.get_logger().info("Setting swarming mode")
+                self.publishDroneInfo("Setting swarming mode")
+            else:
                 msg = UInt64()
                 msg.data = self.ID
                 self.readyForSwarmingPub.publish(msg)
                 self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
-                return
 
             self.idle()
         else:

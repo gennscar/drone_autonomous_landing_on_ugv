@@ -458,6 +458,106 @@ def main():
         plt.savefig(csvFilesPath + folderName + "/2Dtrajectories.png")
     # endregion
 
+    # region Vehicles GPS position
+    if vehicleGlobalPosition:
+        plt.figure()
+        legend = list()
+        plt.subplot(311)
+
+        for droneId in range(N):
+            plt.plot(list(vehicleGlobalPosition[droneId][i][0] for i in range(len(vehicleGlobalPosition[droneId]))),
+                     list(vehicleGlobalPosition[droneId][i][1] for i in range(len(vehicleGlobalPosition[droneId]))),
+                     '.')
+            legend.append("$Drone_" + str(droneId) + "$")
+
+        plt.grid()
+        plt.xlabel("$Time \ [s]$")
+        plt.ylabel("$x \ [m]$")
+        plt.legend(legend)
+
+        legend = list()
+        plt.subplot(312)
+
+        for droneId in range(N):
+            plt.plot(list(vehicleGlobalPosition[droneId][i][0] for i in range(len(vehicleGlobalPosition[droneId]))),
+                     list(vehicleGlobalPosition[droneId][i][2] for i in range(len(vehicleGlobalPosition[droneId]))),
+                     '.')
+            legend.append("$Drone_" + str(droneId) + "$")
+
+        plt.grid()
+        plt.xlabel("$Time \ [s]$")
+        plt.ylabel("$y \ [m]$")
+        plt.legend(legend)
+
+        legend = list()
+        plt.subplot(313)
+
+        for droneId in range(N):
+            plt.plot(list(vehicleGlobalPosition[droneId][i][0] for i in range(len(vehicleGlobalPosition[droneId]))),
+                     list(vehicleGlobalPosition[droneId][i][3] for i in range(len(vehicleGlobalPosition[droneId]))),
+                     '.')
+            legend.append("$Drone_" + str(droneId) + "$")
+
+        plt.grid()
+        plt.xlabel("$Time \ [s]$")
+        plt.ylabel("$z \ [m]$")
+        plt.legend(legend)
+
+        plt.suptitle("Drones global position", size="xx-large", weight="bold")
+
+        plt.savefig(csvFilesPath + folderName + "/dronesGlobalPosition.png")
+    # endregion
+
+    # region Vehicles local position
+    if vehicleLocalPosition:
+        plt.figure()
+        legend = list()
+        plt.subplot(311)
+
+        for droneId in range(N):
+            plt.plot(list(vehicleLocalPosition[droneId][i][0] for i in range(len(vehicleLocalPosition[droneId]))),
+                     list(vehicleLocalPosition[droneId][i][1] for i in range(len(vehicleLocalPosition[droneId]))),
+                     '.')
+            legend.append("$Drone_" + str(droneId) + "$")
+
+        plt.grid()
+        plt.xlabel("$Time \ [s]$")
+        plt.ylabel("$x \ [m]$")
+        plt.legend(legend)
+
+        legend = list()
+        plt.subplot(312)
+
+        for droneId in range(N):
+            plt.plot(list(vehicleLocalPosition[droneId][i][0] for i in range(len(vehicleLocalPosition[droneId]))),
+                     list(vehicleLocalPosition[droneId][i][2] for i in range(len(vehicleLocalPosition[droneId]))),
+                     '.')
+            legend.append("$Drone_" + str(droneId) + "$")
+
+        plt.grid()
+        plt.xlabel("$Time \ [s]$")
+        plt.ylabel("$y \ [m]$")
+        plt.legend(legend)
+
+        legend = list()
+        plt.subplot(313)
+
+        for droneId in range(N):
+            plt.plot(list(vehicleLocalPosition[droneId][i][0] for i in range(len(vehicleLocalPosition[droneId]))),
+                     list(vehicleLocalPosition[droneId][i][3] for i in range(len(vehicleLocalPosition[droneId]))),
+                     '.')
+            legend.append("$Drone_" + str(droneId) + "$")
+
+        plt.grid()
+        plt.xlabel("$Time \ [s]$")
+        plt.ylabel("$z \ [m]$")
+        plt.legend(legend)
+
+        plt.suptitle("Drones local position", size="xx-large", weight="bold")
+
+        plt.savefig(csvFilesPath + folderName + "/dronesLocalPosition.png")
+    # endregion
+
     # region Vehicle status
     if vehicleStatus:
         plt.figure()
