@@ -1,0 +1,28 @@
+rosbag2_2021_10_18-16_42_33
+This flight is done entirely by hand using both GPS+UWB. I can easily use it as test bench for the filter but the UWB
+signal is completely missing or really poor in some segment.
+
+rosbag2_2021_10_18-16_49_17
+I put 4 anchors on the field and try to fly by hand, sometime some anchors stop working for reasons so the filter
+notice that and decided to shutdown after P reached a norm of > 100.
+The reason can be the placement of the anchor, the wet ground or the placement of the tag on the drone.
+
+rosbag2_2021_10_18-16_52_25
+Really strange rosbag, but I learned a think, sometime the first estimation of UWB offset is wrong, so all the others will
+be affected by the first. I need to add it to the filter or be sure to obtain a good calibration.
+
+rosbag2_2021_10_18-16_56_16
+I did a takeoff a 5 meters with UWB + GPS. Start oscillating... yaw estimation?
+
+rosbag2_2021_10_18-17_00_01
+Here i did 2 takeoff with GPS+UWB, but the x and y dimensions started to diverge, then we take control. I'm sure that the
+yaw estimation is to strong and need to be slowed down.
+Try here different tatics to tune that part of the filter.
+
+rosbag2_2021_10_18-17_03_44
+Here i did the takeoff with GPS+UWB, but the x and y dimensions started to diverge, then we take control, I think that the
+yaw estimation failed because we didn't let it converge.
+
+rosbag2_2021_10_18-17_08_39
+Because of the lack of information the filter cannot find the offset of the anchors so it used only the GPS, 
+really stable flight but without UWB, only takeoff + a gentle land
