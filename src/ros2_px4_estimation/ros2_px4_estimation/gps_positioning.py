@@ -21,7 +21,7 @@ class GpsPositioning(Node):
         super().__init__("GpsPositioning")
 
         # Enable bit
-        self.enable_ = False
+        self.enable_ = True
 
         # Reference of ENU frame
         self.reference_ = np.zeros(3)

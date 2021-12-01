@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch_ros.actions import Node
 from launch.actions import Shutdown
 from launch.substitutions import LaunchConfiguration
@@ -31,8 +31,21 @@ def generate_launch_description():
         name="DroneController",
         namespace=LaunchConfiguration("drone_namespace"),
         parameters=[
-            {"vehicle_number": 3}
+            {"vehicle_number": 1}
         ]
+    )
+
+    setpoints_flight = Node(
+        executable="setpoints_flight",
+        package="ros2_px4_testing",
+        name="SetpointsFlight",
+        namespace=LaunchConfiguration("drone_namespace"),
+        on_exit=Shutdown()
+    )
+
+    recorder = ExecuteProcess(
+        cmd=['ros2', 'bag', 'record', '-a'],
+        output='screen'
     )
 
     odometry_sender_node = Node(
@@ -50,7 +63,7 @@ def generate_launch_description():
         package="ros2_px4_estimation",
         name="UwbPositioning",
         namespace=LaunchConfiguration("drone_namespace"),
-        parameters=[{"sensor_id": "tag_0"}, {"allowed_delay_ns": 1e8}],
+        parameters=[{"sensor_id": "tag_0"}, {"allowed_delay_ns": 2.5e7}],
         on_exit=Shutdown()
     )
 
@@ -59,6 +72,15 @@ def generate_launch_description():
         package="ros2_px4_estimation",
         name="GpsPositioning",
         namespace=LaunchConfiguration("drone_namespace")
+    )
+
+    kf_positioning_node = Node(
+        executable="kf_loose_positioning",
+        package="ros2_px4_estimation",
+        name="KfPositioning",
+        namespace=LaunchConfiguration("drone_namespace"),
+        parameters=[{"delta_t": 0.02}, {"q": 0.1},
+                    {"r_uwb": 0.0025}, {"r_laser": 0.01}],
     )
 
     ukf_positioning_node = Node(
@@ -71,23 +93,6 @@ def generate_launch_description():
         on_exit=Shutdown()
     )
 
-    kf_positioning_node = Node(
-        executable="kf_loose_positioning",
-        package="ros2_px4_estimation",
-        name="KfPositioning",
-        namespace=LaunchConfiguration("drone_namespace"),
-        parameters=[{"delta_t": 0.02}, {"q": 0.001},
-                    {"r_uwb": 0.025}, {"r_laser": 0.01}],
-        on_exit=Shutdown()
-    )
-
-    odometry_error_node = Node(
-        executable="odometry_error",
-        package="ros2_px4_testing",
-        name="OdometryError",
-        namespace=LaunchConfiguration("drone_namespace")
-    )
-
     return LaunchDescription([
         # Arguments
         drone_namespace_arg,
@@ -96,10 +101,12 @@ def generate_launch_description():
         # Nodes
         drone_controller_node,
         uwb_driver_node,
-        uwb_positioning_node,
+        setpoints_flight,
+        recorder,
         odometry_sender_node,
+        uwb_positioning_node,
         gps_positioning_node,
+        kf_positioning_node,
+        ekf_positioning_node,
         ukf_positioning_node,
-        # kf_positioning_node,
-        # odometry_error_node
     ])
