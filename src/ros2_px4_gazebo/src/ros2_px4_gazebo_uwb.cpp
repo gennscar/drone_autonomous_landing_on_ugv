@@ -208,7 +208,7 @@ namespace gazebo
       // <gaussian_noise> is the sigma value of gaussian noise to add to range readings
       if (!sdf->HasElement("gaussian_noise"))
       {
-        gzwarn << "Missing <gassian_noise>, defaults to 1.0Hz" << std::endl;
+        gzwarn << "Missing <gassian_noise>, defaults to 0.0" << std::endl;
         impl_->gaussian_noise_ = 0;
       }
       else
@@ -302,7 +302,9 @@ namespace gazebo
     {
       // Calculate the range between sensor and anchor + gaussian noise
       range = link_pose_.Pos().Distance(_msg->pose().position().x(), _msg->pose().position().y(), _msg->pose().position().z());
-      range += ignition::math::Rand::DblNormal(0, gaussian_noise_);
+
+      if (gaussian_noise_ > 0)
+        range += ignition::math::Rand::DblNormal(0, gaussian_noise_);
 
       // Fill ROS range message
       ros2_px4_interfaces::msg::UwbSensor sensor_msg;
