@@ -16,15 +16,14 @@ from px4_msgs.msg import DistanceSensor
 
 
 QUEUE_SIZE = 10
-FILTER_DIM = 9+1                # Linear kinematic model
+FILTER_DIM = 9                  # Linear kinematic model
 IS_SENSOR_ALIVE_TIMEOUT = 1.    # s
 MAHALANOBIS_THRESHOLD = 6.      # sigmas
 MAX_ALLOWED_UWB_RANGE = 10.     # meters
 
 
 class UkfPositioning(Node):
-    """UKF: Try to explain this :O
-    """
+    """UKF Positioning node"""
 
     def __init__(self):
         super().__init__("UkfPositioning")
@@ -53,7 +52,7 @@ class UkfPositioning(Node):
             "laser": 0
         }
 
-        # Kalman Filter
+        # Sigma points generator
         sigmas = MerweScaledSigmaPoints(
             FILTER_DIM, alpha=1e-3, beta=2., kappa=0.,
             sqrt_method=scipy.linalg.sqrtm
@@ -68,6 +67,7 @@ class UkfPositioning(Node):
             F = scipy.linalg.block_diag(*[f]*3, 1.)
             return F @ x
 
+        # UKF
         self.kalman_filter_ = UKF(
             dim_x=FILTER_DIM,
             dim_z=FILTER_DIM,

@@ -40,7 +40,7 @@ namespace gazebo
     transport::PublisherPtr anchor_pub_{nullptr};
     transport::SubscriberPtr anchor_sub_{nullptr};
 
-    /// Pointer to ros node
+    /// Pointer to ROS node
     gazebo_ros::Node::SharedPtr ros_node_{nullptr};
 
     /// ROS publisher for sensor ranging data
