@@ -8,12 +8,11 @@ from ros2_px4_interfaces.srv import ControlMode
 
 setpoints = [
     {'mode': 'Nope', 't': 10},
-    {'mode': 'setpoint', 'x': 0.0, 'y': 0.0, 'z': 3.0, 't': 10},
-    {'mode': 'setpoint', 'x': 6.0, 'y': 4.0, 'z': 3.0, 't': 10},
-    {'mode': 'setpoint', 'x': 6.0, 'y': -4.0, 'z': 3.0, 't': 10},
-    {'mode': 'setpoint', 'x': -6.0, 'y': 4.0, 'z': 3.0, 't': 10},
-    {'mode': 'setpoint', 'x': -6.0, 'y': -4.0, 'z': 3.0, 't': 10},
-    {'mode': 'setpoint', 'x': 0.0, 'y': 0.0, 'z': 3.0, 't': 10},
+    {'mode': 'setpoint', 'x': 0.,   'y': 0.,    'z': 3.0, 't': 10},
+    {'mode': 'setpoint', 'x': 25.,  'y': 0.,    'z': 3.0, 't': 15},
+    {'mode': 'setpoint', 'x': 25.,  'y': 5.,    'z': 3.0, 't': 5},
+    {'mode': 'setpoint', 'x': 20.,  'y': 5.,    'z': 3.0, 't': 5},
+    {'mode': 'setpoint', 'x': 20.,  'y': -20.,  'z': 3.0, 't': 10},
     {'mode': 'land', 't': 5}
 ]
 
