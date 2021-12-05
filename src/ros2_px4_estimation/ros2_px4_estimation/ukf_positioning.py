@@ -64,7 +64,7 @@ class UkfPositioning(Node):
                 [0., 1.,         dt],
                 [0., 0.,         1.]
             ])
-            F = scipy.linalg.block_diag(*[f]*3, 1.)
+            F = scipy.linalg.block_diag(*[f]*3)
             return F @ x
 
         # UKF
@@ -85,8 +85,7 @@ class UkfPositioning(Node):
         # Process noise
         self.kalman_filter_.Q = scipy.linalg.block_diag(
             Q_discrete_white_noise(
-                dim=3, dt=self.params_["delta_t"], var=self.params_["q"], block_size=3),
-            0.
+                dim=3, dt=self.params_["delta_t"], var=self.params_["q"], block_size=3)
         )
 
         # Setting up sensors subscribers
