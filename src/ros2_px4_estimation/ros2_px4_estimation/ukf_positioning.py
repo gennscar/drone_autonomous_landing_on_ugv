@@ -5,22 +5,21 @@ from rclpy.node import Node
 
 import numpy as np
 import scipy
-from scipy.spatial.transform import Rotation as R
 
 from filterpy.kalman import MerweScaledSigmaPoints
 from filterpy.kalman import UnscentedKalmanFilter as UKF
 from filterpy.common import Q_discrete_white_noise
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped
 from ros2_px4_interfaces.msg import UwbSensor
 from px4_msgs.msg import DistanceSensor
 
 
 QUEUE_SIZE = 10
-FILTER_DIM = 9+1                  # Linear kinematic model
-IS_SENSOR_ALIVE_TIMEOUT = 5.    # s
+FILTER_DIM = 9+1                # Linear kinematic model
+IS_SENSOR_ALIVE_TIMEOUT = 1.    # s
 MAHALANOBIS_THRESHOLD = 6.      # sigmas
+MAX_ALLOWED_UWB_RANGE = 10.     # meters
 
 
 class UkfPositioning(Node):
@@ -92,7 +91,7 @@ class UkfPositioning(Node):
 
         # Setting up sensors subscribers
         self.uwb_pos_subscriber_ = self.create_subscription(
-            PoseWithCovarianceStamped, "UwbPositioning/Pose",
+            Odometry, "UwbPositioning/Odometry",
             self.callback_uwb_pos_subscriber, QUEUE_SIZE
         )
         self.uwb_subscriber_ = self.create_subscription(
@@ -123,7 +122,7 @@ class UkfPositioning(Node):
         """Measuring UWB position offset estimate wtr of the navigation frame
 
         Args:
-            msg (geometry_msgs.msg.PoseWithCovarianceStamped): The UWB pose
+            msg (nav_msgs.msg.Odometry): The UWB odometry
         """
 
         # Deriving the anchor offset
@@ -137,7 +136,7 @@ class UkfPositioning(Node):
         var = (anchor_offset - self.anchor_offset_) / \
             (self.aligning_counter_ + 1)
 
-        if np.linalg.norm(var) > 1e-3 or self.aligning_counter_ < 500.:
+        if np.linalg.norm(var) > 1e-3 or self.aligning_counter_ < 100.:
             self.anchor_offset_ += var
             self.aligning_counter_ += 1
         else:
@@ -159,16 +158,19 @@ class UkfPositioning(Node):
         if(self.filter_state_ == "Offline" or self.aligning_counter_ > -1):
             return
 
-        # Storing timestamp
-        self.sensor_wd_["uwb"] = self.get_clock().now().nanoseconds
-
         # Storing measurement in a np.array
         z = np.zeros(FILTER_DIM)
         z[0] = msg.range
 
+        if z[0] > MAX_ALLOWED_UWB_RANGE:
+            return
+
         if any(np.isnan(z)):
             self.get_logger().error(f"Invalid UWB data")
             return
+
+        # Storing timestamp
+        self.sensor_wd_["uwb"] = self.get_clock().now().nanoseconds
 
         # Storing anchor position in a np.array
         anchor_position = np.array([
@@ -209,9 +211,6 @@ class UkfPositioning(Node):
         if(self.filter_state_ == "Offline"):
             return
 
-        # Storing timestamp
-        self.sensor_wd_["gps"] = self.get_clock().now().nanoseconds
-
         # Storing measurements in a np.array
         z = np.zeros(FILTER_DIM)
         z[0:6] = np.array([
@@ -226,6 +225,9 @@ class UkfPositioning(Node):
         if any(np.isnan(z)):
             self.get_logger().error(f"Invalid GPS data")
             return
+
+        # Storing timestamp
+        self.sensor_wd_["gps"] = self.get_clock().now().nanoseconds
 
         # Measurement model for a GPS sensor
         def h_gps(x):
@@ -301,6 +303,12 @@ class UkfPositioning(Node):
             else:
                 self.calibration_counter_ = 0
 
+        # Check which sensors are working
+        active_sensor_list = []
+        for sensor in self.sensor_wd_:
+            if self.get_clock().now().nanoseconds - self.sensor_wd_[sensor] < IS_SENSOR_ALIVE_TIMEOUT*1e9:
+                active_sensor_list.append(sensor)
+
         # Send estimation only if calibrated
         if(self.filter_state_ == "Calibrated"):
             # Check covariance norm
@@ -313,6 +321,9 @@ class UkfPositioning(Node):
             msg = Odometry()
             msg.header.frame_id = "UkfPositioning"
             msg.header.stamp = self.get_clock().now().to_msg()
+
+            msg.pose.pose.orientation.x = (1. if ("gps" in active_sensor_list)
+                                           else 0.) + (2. if ("uwb" in active_sensor_list) else 0.)
 
             # Position
             msg.pose.pose.position.x = self.kalman_filter_.x[0]
@@ -333,12 +344,6 @@ class UkfPositioning(Node):
             msg.twist.covariance[2] = self.kalman_filter_.P[7][7]
 
             self.odometry_publisher_.publish(msg)
-
-        # Check which sensors are working
-        active_sensor_list = []
-        for sensor in self.sensor_wd_:
-            if self.get_clock().now().nanoseconds - self.sensor_wd_[sensor] < IS_SENSOR_ALIVE_TIMEOUT*1e9:
-                active_sensor_list.append(sensor)
 
         # Filter predict only if first iteration or new sensor data
         if active_sensor_list != [] or self.filter_state_ == "Offline":

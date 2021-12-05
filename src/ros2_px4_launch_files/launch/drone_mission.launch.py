@@ -106,7 +106,6 @@ def generate_launch_description():
         odometry_sender_node,
         uwb_positioning_node,
         gps_positioning_node,
-        kf_positioning_node,
-        ekf_positioning_node,
+        # kf_positioning_node,
         ukf_positioning_node,
     ])
