@@ -115,7 +115,7 @@ class VideoStreamerNode(Node):
           frame_rgb = cv2.putText(frame_rgb, f"x: {round(self.pose_t_NED_rover[0],1)}, y: {round(self.pose_t_NED_rover[1],1)}, z: {round(self.pose_t_NED_rover[2],1)}, w: {round(self.yaw_NED_raw,2)} ", org, font, fontScale, (0, 0, 255), 2, cv2.LINE_AA)
 
 
-        scale_percent = 200 # percent of original size
+        scale_percent = 100 # percent of original size
         width = int(frame_rgb.shape[1] * scale_percent / 100)
         height = int(frame_rgb.shape[0] * scale_percent / 100)
         dim = (width, height)
