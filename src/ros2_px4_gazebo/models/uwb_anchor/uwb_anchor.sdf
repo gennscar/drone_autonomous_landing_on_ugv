@@ -16,7 +16,7 @@
     <plugin name="gazebo_ros_uwb" filename="libros2_px4_gazebo_uwb.so">
       <link_name>uwb_anchor_head</link_name>
       <update_rate>20</update_rate>
-      <anchor_offset>1.0</anchor_offset>
+      <anchor_offset>0.2</anchor_offset>
     </plugin>
   </model>
 </sdf>

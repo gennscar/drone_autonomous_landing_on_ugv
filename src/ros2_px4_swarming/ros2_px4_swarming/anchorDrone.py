@@ -101,6 +101,7 @@ class Drone(Node):
         self.droneMode = None                           # str                               current drone mode
         self.droneModeOld = None                        # str                               previous drone mode
         self.nodeDestroyed = None                       # bool                              has the node been destroyed?
+        self.NAtStart = None                            # int                               number of drones in the formation at start
         if self.UWB_ON:
             self.uwbDistancesReceived = None            # bool                              has the drone received UWB data from every swarm member?
             self.lastUWBDataReceivedTimer = None        # dict(int: int)                    time from the last received UWB data from every swarm member
@@ -171,6 +172,7 @@ class Drone(Node):
         self.droneMode = "disarmed"
         self.droneModeOld = "disarmed"
         self.nodeDestroyed = False
+        self.NAtStart = None
         if self.UWB_ON:
             self.uwbDistancesReceived = False
             self.lastUWBDataReceivedTimer = {}
@@ -278,15 +280,18 @@ class Drone(Node):
             # Communicate to the other anchors that I am ready to takeoff
             self.readyForTakeoff = True
             self.anchorsReadyForTakeoff[self.ID] = True
-            msg = UInt64()
-            msg.data = self.ID
-            self.readyForTakeoffPub.publish(msg)
+        msg = UInt64()
+        msg.data = self.ID
+        self.readyForTakeoffPub.publish(msg)
 
         if not self.SINGLE_DRONE_FOR_TEST and len(self.anchorsReadyForTakeoff) < self.N:
             # The other anchors are not ready to takeoff yet
-            msg = UInt64()
-            msg.data = self.ID
-            self.readyForTakeoffPub.publish(msg)
+            # msg = UInt64()
+            # msg.data = self.ID
+            # self.readyForTakeoffPub.publish(msg)
+            if self.loggerCounter % self.RATE == 0:
+                self.get_logger().warn("Waiting other drones to takeoff")
+                self.publishDroneInfo("Waiting other drones to takeoff")
             return
 
         # Check if the commanded altitude is high enough
@@ -299,9 +304,8 @@ class Drone(Node):
 
         if self.localPosition.z <= self.lastGoalPositionReceived.z:
             # Takeoff completed
-            self.droneMode = "swarming"
-            # self.droneMode = "hover"
             self.home = [self.localPosition.x, self.localPosition.y, self.localPosition.z]
+            self.droneMode = "swarming"
             return
 
         # Compute the takeoff speed and saturate it to a maximum value
@@ -320,25 +324,32 @@ class Drone(Node):
         self.setTrajectorySetpoint(vx=self.lastGoalVelocityReceived.linear.x, vy=self.lastGoalVelocityReceived.linear.y)
 
     def swarming(self):
-        if (self.UWB_ON and (not self.anchorsPositionReceived or not self.uwbDistancesReceived)) or (not self.UWB_ON and not self.anchorsPositionReceived) or self.SINGLE_DRONE_FOR_TEST:
+        if (self.UWB_ON and (not self.anchorsPositionReceived or not self.uwbDistancesReceived)) or (not self.UWB_ON and not self.anchorsPositionReceived) or self.SINGLE_DRONE_FOR_TEST or self.NAtStart == 1:
             # Complete info from the other anchors has not arrived yet
             # self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
+            if self.loggerCounter % self.RATE == 0 and not self.SINGLE_DRONE_FOR_TEST and self.NAtStart != 1:
+                self.get_logger().warn("Waiting info for swarming")
+                self.publishDroneInfo("Waiting info for swarming")
             self.returnHome()
             return
-        elif not self.readyForSwarming:
-            # Communicate to the other anchors that I am ready to start swarming
+
+        if not self.readyForSwarming:
             self.readyForSwarming = True
             self.anchorsReadyForSwarming[self.ID] = True
-            msg = UInt64()
-            msg.data = self.ID
-            self.readyForSwarmingPub.publish(msg)
+        # Communicate to the other anchors that I am ready to start swarming
+        msg = UInt64()
+        msg.data = self.ID
+        self.readyForSwarmingPub.publish(msg)
 
         if not self.SINGLE_DRONE_FOR_TEST and len(self.anchorsReadyForSwarming) < self.N:
             # The other anchors are not ready to swarm yet
-            msg = UInt64()
-            msg.data = self.ID
-            self.readyForSwarmingPub.publish(msg)
+            # msg = UInt64()
+            # msg.data = self.ID
+            # self.readyForSwarmingPub.publish(msg)
             # self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
+            if self.loggerCounter % self.RATE == 0:
+                self.get_logger().warn("Waiting other drones for swarming")
+                self.publishDroneInfo("Waiting other drones for swarming")
             self.returnHome()
             return
 
@@ -379,6 +390,11 @@ class Drone(Node):
             self.destroy_node()
             return
 
+        if self.N == 1:
+            self.hover()
+            self.droneMode = "hover"
+            return
+
         # Compute the distances between the drones from their GPS positions
         if not self.UWB_ON and self.anchorsPositionReceived:
             self.computeInterDronesDistances()
@@ -399,12 +415,18 @@ class Drone(Node):
                     velEast -= componentEast
                     velNorth -= componentNorth
         else:
-            for key in self.anchorsPosition.keys():
-                if key != self.ID:
-                    componentEast = self.interDronesDistances[key] * self.unitVectors[key].east * (self.A - self.B * math.exp(-self.interDronesDistances[key]**2 / self.C))
-                    componentNorth = self.interDronesDistances[key] * self.unitVectors[key].north * (self.A - self.B * math.exp(-self.interDronesDistances[key]**2 / self.C))
-                    velEast -= componentEast
-                    velNorth -= componentNorth
+            anchorsPositionUpToDate = True
+            for key in self.lastPositionReceivedTimer.keys():
+                if self.lastPositionReceivedTimer[key] > 1 * self.RATE:
+                    anchorsPositionUpToDate = False
+                    break
+            if anchorsPositionUpToDate:
+                for key in self.anchorsPosition.keys():
+                    if key != self.ID:
+                        componentEast = self.interDronesDistances[key] * self.unitVectors[key].east * (self.A - self.B * math.exp(-self.interDronesDistances[key]**2 / self.C))
+                        componentNorth = self.interDronesDistances[key] * self.unitVectors[key].north * (self.A - self.B * math.exp(-self.interDronesDistances[key]**2 / self.C))
+                        velEast -= componentEast
+                        velNorth -= componentNorth
 
         # Swarming speed saturation
         speedNorm = math.sqrt(velEast**2 + velNorth**2)
@@ -462,8 +484,8 @@ class Drone(Node):
         # If the number of drones in the swarm is not known yet
         if self.N is None:
             if self.loggerCounter % self.RATE == 0:
-                self.get_logger().warn("Number of anchors unknown")
-                self.publishDroneInfo("Number of anchors unknown")
+                self.get_logger().warn("Waiting for number of anchors")
+                self.publishDroneInfo("Waiting for number of anchors")
             return
 
         for key in self.lastPositionReceivedTimer.keys():
@@ -485,13 +507,12 @@ class Drone(Node):
                 msg = UInt64()
                 msg.data = self.ID
                 self.readyForTakeoffPub.publish(msg)
-
-            if len(self.anchorsReadyForTakeoff) < self.N:
-                # The other anchors are not ready to takeoff yet
+                self.get_logger().info("Setting takeoff mode")
+                self.publishDroneInfo("Setting takeoff mode")
+            else:
                 msg = UInt64()
                 msg.data = self.ID
                 self.readyForTakeoffPub.publish(msg)
-                return
 
             if not self.readyForSwarming:
                 # Communicate to the other anchors that I am ready to start swarming
@@ -500,14 +521,13 @@ class Drone(Node):
                 msg = UInt64()
                 msg.data = self.ID
                 self.readyForSwarmingPub.publish(msg)
-
-            if len(self.anchorsReadyForSwarming) < self.N:
-                # The other anchors are not ready to swarm yet
+                self.get_logger().info("Setting swarming mode")
+                self.publishDroneInfo("Setting swarming mode")
+            else:
                 msg = UInt64()
                 msg.data = self.ID
                 self.readyForSwarmingPub.publish(msg)
                 self.setTrajectorySetpoint(vx=0.0, vy=0.0, vz=0.0)
-                return
 
             self.idle()
         else:
@@ -572,6 +592,7 @@ class Drone(Node):
 
     def numAnchorsCallback(self, msg):
         self.N = msg.data
+        self.NAtStart = self.N
 
         for i in range(self.N):
             self.activeDrones[i] = True

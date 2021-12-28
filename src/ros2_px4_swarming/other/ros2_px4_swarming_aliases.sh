@@ -435,6 +435,7 @@ function plotcsv() {
 function plotlastcsv() {
   cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/csvfiles/ || exec $SHELL
   fileName=$(ls -1 | tail -n 1)
+  echo $fileName
   python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/topicsPlotter.py $fileName
   cd || exec $SHELL
 }

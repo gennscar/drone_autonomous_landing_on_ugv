@@ -157,9 +157,9 @@ class MovingTagAnalyzer():
 
 
 # Filenames
-ROS2BAG_FILE = "/home/cosimocon/rosbag2_2021_10_29-15_38_41/rosbag2_2021_10_29-15_38_41_0.db3"
+ROS2BAG_FILE = "./rosbags/Gabbia_2021_11_02/rosbag2_2021_10_26-09_05_40/rosbag2_2021_10_26-09_05_40_0.db3"
 ROS2_UWB_TOPIC = "/uwb_sensor_tag_0"
-ROS2_ODOM_TOPIC = "/X500_2/UwbPositioning/Pose"
+ROS2_ODOM_TOPIC = "/X500_2/UkfPositioning/Odometry"
 
 LEICA_FILE = "/home/cosimocon/GABBIA"
 POINTS_ID = "RUNB"
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     # Plotting ranges
     N = 0
     for anchor_id in uwb_time.keys():
-        print(uwb_time[anchor_id][0])
+        # print(uwb_time[anchor_id][0])
         N += 1
 
         plt.subplot(3, 3, N)
@@ -186,30 +186,26 @@ if __name__ == "__main__":
                     label="Anchor " + anchor_id)
         plt.legend()
 
-    plt.show()
+    # plt.show()
 
-    # Analyzing odometry and LEICA
+    # Analyzing odometry
     odom_time, odom_pose = anal.parse_ros2bag_odom(
         ROS2BAG_FILE, ROS2_ODOM_TOPIC)
-
-    leica_time, leica_pose, _ = anal.parse_leica(
-        LEICA_FILE, POINTS_ID, LEICA_OFFSET)
 
     for i in range(0, 3):
         ax = plt.subplot(3, 1, i+1)
         plt.grid()
 
         plt.plot(odom_time, odom_pose[:, i], label="Odometry")
-        plt.plot(leica_time, leica_pose[:, i], label="LEICA")
         plt.legend()
 
-    plt.show()
+    # plt.show()
 
     # Confront odom derived ranging with real ones
 
     # Odom derived ranging
     odom_range = {}
-    offset = np.array([-9.94796576, 5.94353514, -0.52166012])
+    offset = np.array([-0.03892287, -9.1108743, -0.40855168])
     for anchor_id in anal.anchor_pose.keys():
         odom_range[anchor_id] = np.linalg.norm(
             (odom_pose + offset) - anal.anchor_pose[anchor_id], axis=1)
@@ -218,13 +214,34 @@ if __name__ == "__main__":
     N = 0
     for anchor_id in uwb_time.keys():
         N += 1
-        ax = plt.subplot(2, 2, N)
+        ax = plt.subplot(3, 3, N)
         plt.grid()
 
         plt.scatter(uwb_time[anchor_id], uwb_range[anchor_id],
                     label="UWB, anchor " + anchor_id)
         plt.plot(odom_time, odom_range[anchor_id], "r-",
                  label="ODOM, anchor " + anchor_id)
+        plt.legend()
+
+    plt.show()
+
+    # Interpolating UWB ranging to be subtracted to the odometry
+    uwb_range_interp = {}
+    range_diff = {}
+    N = 0
+    for anchor_id in uwb_time.keys():
+        uwb_range_interp[anchor_id] = np.interp(
+            odom_time, uwb_time[anchor_id], uwb_range[anchor_id])
+
+        range_diff[anchor_id] = uwb_range_interp[anchor_id] - \
+            odom_range[anchor_id]
+
+        N += 1
+        ax = plt.subplot(3, 3, N)
+
+        plt.hist(range_diff[anchor_id], label=anchor_id)
+        print(
+            f"""Tag: {anchor_id} Mean: {np.mean(range_diff[anchor_id])} Std: {np.std(range_diff[anchor_id])}""", sep="")
         plt.legend()
 
     plt.show()
