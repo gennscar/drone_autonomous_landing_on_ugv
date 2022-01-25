@@ -281,7 +281,7 @@ function dronegoto() {
   n=${1:-0}
   x=${2:-0}
   y=${3:-0}
-  z=${4:--3}
+  z=${4:-0}
   eval "ros2 service call /X500_$n/DroneCustomCommand ros2_px4_interfaces/srv/DroneCustomCommand '{operation: 'goTo', x: $x, y: $y, z: $z}'"
 }
 
@@ -429,7 +429,7 @@ function plotlastbag() {
 function plotcsv() {
   csvFileName=${1:fileName}
   cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/csvfiles/ || exec $SHELL
-  python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/plotTopics.py $csvFileName
+  python3 $HOME/ros2_px4_ws/src/ros2_px4_swarming/ros2_px4_swarming/topicsPlotter.py $csvFileName
 }
 
 function plotlastcsv() {

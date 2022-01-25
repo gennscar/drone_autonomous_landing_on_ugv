@@ -10,6 +10,7 @@ from px4_msgs.msg import Timesync, OffboardControlMode, TrajectorySetpoint, Vehi
 from std_msgs.msg import Float64
 from nav_msgs.msg import Odometry
 from ros2_px4_interfaces.msg import DistanceStamped, DistanceStampedArray, UnitVector, UwbSensor, VelocityVector
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 
 class TopicsRecorder(Node):
@@ -24,6 +25,7 @@ class TopicsRecorder(Node):
                 ('RATE', None),
                 ('QUEUE_SIZE', None),
                 ('TARGET_ID', None),
+                ('BEST_EFFORT', None),
                 ('N', None),
                 ('NUM_TARGET', None)
             ]
@@ -33,6 +35,7 @@ class TopicsRecorder(Node):
         self.RATE = self.get_parameter('RATE').value
         self.QUEUE_SIZE = self.get_parameter('QUEUE_SIZE').value
         self.TARGET_ID = self.get_parameter('TARGET_ID').value
+        self.BEST_EFFORT = self.get_parameter('BEST_EFFORT').value
         self.N = self.get_parameter('N').value
         self.NUM_TARGET = self.get_parameter('NUM_TARGET').value
         # endregion
@@ -110,24 +113,39 @@ class TopicsRecorder(Node):
 
         # Useful variables
         self.subscribers = list()
+        self.qosProfile = None
 
-        self.subscribers.append(self.create_subscription(DistanceStampedArray, "/performanceAnalyzer/interAnchorsDistances", self.interAnchorsDistancesCallback, self.QUEUE_SIZE))
-        self.subscribers.append(self.create_subscription(Float64, "/performanceAnalyzer/synchronizationErrorUwb", self.synchronizationErrorUwbCallback, self.QUEUE_SIZE))
-        self.subscribers.append(self.create_subscription(Odometry, "/performanceAnalyzer/swarmCenter", self.swarmCenterCallback, self.QUEUE_SIZE))
-        self.subscribers.append(self.create_subscription(VelocityVector, "/trackingVelocityCalculator/trackingVelocity", self.trackingVelocityCallback, self.QUEUE_SIZE))
-        self.subscribers.append(self.create_subscription(VelocityVector, "/trackingVelocityCalculator/trackingVelocityProportional", self.trackingVelocityProportionalCallback, self.QUEUE_SIZE))
-        self.subscribers.append(self.create_subscription(VelocityVector, "/trackingVelocityCalculator/trackingVelocityIntegral", self.trackingVelocityIntegralCallback, self.QUEUE_SIZE))
-        self.subscribers.append(self.create_subscription(VelocityVector, "/trackingVelocityCalculator/trackingVelocityDerivative", self.trackingVelocityDerivativeCallback, self.QUEUE_SIZE))
+        # QOS initialization
+        if self.BEST_EFFORT:
+            self.qosProfile = QoSProfile(
+                reliability=QoSReliabilityPolicy.RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
+                history=QoSHistoryPolicy.RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+                depth=1
+            )
+        else:
+            self.qosProfile = QoSProfile(
+                reliability=QoSReliabilityPolicy.RMW_QOS_POLICY_RELIABILITY_RELIABLE,
+                history=QoSHistoryPolicy.RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+                depth=1
+            )
+
+        self.subscribers.append(self.create_subscription(DistanceStampedArray, "/performanceAnalyzer/interAnchorsDistances", self.interAnchorsDistancesCallback, self.qosProfile))
+        self.subscribers.append(self.create_subscription(Float64, "/performanceAnalyzer/synchronizationErrorUwb", self.synchronizationErrorUwbCallback, self.qosProfile))
+        self.subscribers.append(self.create_subscription(Odometry, "/performanceAnalyzer/swarmCenter", self.swarmCenterCallback, self.qosProfile))
+        self.subscribers.append(self.create_subscription(VelocityVector, "/trackingVelocityCalculator/trackingVelocity", self.trackingVelocityCallback, self.qosProfile))
+        self.subscribers.append(self.create_subscription(VelocityVector, "/trackingVelocityCalculator/trackingVelocityProportional", self.trackingVelocityProportionalCallback, self.qosProfile))
+        self.subscribers.append(self.create_subscription(VelocityVector, "/trackingVelocityCalculator/trackingVelocityIntegral", self.trackingVelocityIntegralCallback, self.qosProfile))
+        self.subscribers.append(self.create_subscription(VelocityVector, "/trackingVelocityCalculator/trackingVelocityDerivative", self.trackingVelocityDerivativeCallback, self.qosProfile))
         for i in range(self.N):
-            self.subscribers.append(self.create_subscription(VehicleLocalPosition, "/X500_" + str(i) + "/VehicleLocalPosition_PubSubTopic", partial(self.vehicleLocalPositionCallback, droneId=i), self.QUEUE_SIZE))
-            self.subscribers.append(self.create_subscription(VehicleGlobalPosition, "/X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.vehicleGlobalPositionCallback, droneId=i), self.QUEUE_SIZE))
-            self.subscribers.append(self.create_subscription(VehicleStatus, "/X500_" + str(i) + "/VehicleStatus_PubSubTopic", partial(self.vehicleStatusCallback, droneId=i), self.QUEUE_SIZE))
-            self.subscribers.append(self.create_subscription(UwbSensor, "/uwb_sensor_" + str(i), partial(self.uwb_sensorCallback, droneId=i), self.QUEUE_SIZE))
-            self.subscribers.append(self.create_subscription(TrajectorySetpoint, "/X500_" + str(i) + "/TrajectorySetpoint_PubSubTopic", partial(self.trajectorySetpointCallback, droneId=i), self.QUEUE_SIZE))
+            self.subscribers.append(self.create_subscription(VehicleLocalPosition, "/X500_" + str(i) + "/VehicleLocalPosition_PubSubTopic", partial(self.vehicleLocalPositionCallback, droneId=i), self.qosProfile))
+            self.subscribers.append(self.create_subscription(VehicleGlobalPosition, "/X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.vehicleGlobalPositionCallback, droneId=i), self.qosProfile))
+            self.subscribers.append(self.create_subscription(VehicleStatus, "/X500_" + str(i) + "/VehicleStatus_PubSubTopic", partial(self.vehicleStatusCallback, droneId=i), self.qosProfile))
+            self.subscribers.append(self.create_subscription(UwbSensor, "/uwb_sensor_" + str(i), partial(self.uwb_sensorCallback, droneId=i), self.qosProfile))
+            self.subscribers.append(self.create_subscription(TrajectorySetpoint, "/X500_" + str(i) + "/TrajectorySetpoint_PubSubTopic", partial(self.trajectorySetpointCallback, droneId=i), self.qosProfile))
         if self.NUM_TARGET != 0:
-            self.subscribers.append(self.create_subscription(UwbSensor, "/uwb_sensor_" + str(self.TARGET_ID), partial(self.uwb_sensorCallback, droneId=self.TARGET_ID), self.QUEUE_SIZE))
-            self.subscribers.append(self.create_subscription(DistanceStamped, "/performanceAnalyzer/trackingError", self.trackingErrorCallback, self.QUEUE_SIZE))
-            self.subscribers.append(self.create_subscription(DistanceStampedArray, "/performanceAnalyzer/targetAnchorsDistances", self.targetAnchorsDistancesCallback, self.QUEUE_SIZE))
+            self.subscribers.append(self.create_subscription(UwbSensor, "/uwb_sensor_" + str(self.TARGET_ID), partial(self.uwb_sensorCallback, droneId=self.TARGET_ID), self.qosProfile))
+            self.subscribers.append(self.create_subscription(DistanceStamped, "/performanceAnalyzer/trackingError", self.trackingErrorCallback, self.qosProfile))
+            self.subscribers.append(self.create_subscription(DistanceStampedArray, "/performanceAnalyzer/targetAnchorsDistances", self.targetAnchorsDistancesCallback, self.qosProfile))
 
     def __del__(self):
         self.interAnchorsDistancesFile.close()

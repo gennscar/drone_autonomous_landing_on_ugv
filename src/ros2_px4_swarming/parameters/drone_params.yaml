@@ -1,19 +1,20 @@
 /**:
     ros__parameters:
-        RATE: 20.0
+        RATE: 20.0                          # node frequency
         QUEUE_SIZE: 10
-        MAX_TAKEOFF_SPEED: 1.0
-        A: 0.1
-        B: 1.5
-#        C: 50.0
-        C: 10.0
-        H_DES: 3.0
-        K_H: 1.0
-        EARTH_RADIUS: 6371000
-        TARGET_ID: 200
-        MAX_SWARMING_SPEED: 1.0
-        TIMEOUT: 5
-        TIMEOUT_UWB: 1
-        UWB_ON: false
-        NOT_FLYING_FOR_TEST: false
-        SINGLE_DRONE_FOR_TEST: false
+        MAX_TAKEOFF_SPEED: 1.0              # vertical saturation speed
+        A: 0.1                              # swarming algorithm parameters
+        B: 1.5                              # -
+#        C: 50.0                            # -
+        C: 10.0                             # -
+        H_DES: 2.0                          # swarming altitude
+        K_H: 1.0                            # altitude control proportional coefficient
+        EARTH_RADIUS: 6371000               # Earth radius
+        TARGET_ID: 200                      # ID of the target UWB sensor
+        MAX_SWARMING_SPEED: 1.0             # horizontal swarming saturation speed
+        TIMEOUT: 5                          # timeout for lost drone
+        TIMEOUT_UWB: 1                      # timeout for lost UWB signal
+        UWB_ON: false                       # if the UWB sensor is on or off on the drone
+        NOT_FLYING_FOR_TEST: false          # if the drone is thought to just send data without being armed
+        SINGLE_DRONE_FOR_TEST: false        # to fly a single drone with this code
+        BEST_EFFORT: true                   # if the subscribers' QoS is set to best_effort or reliable

@@ -26,7 +26,6 @@ setup(
         'console_scripts': [
             'targetRover = ros2_px4_swarming.targetRover:main',
             'anchorDrone = ros2_px4_swarming.anchorDrone:main',
-            'unitVectorsCalculator = ros2_px4_swarming.unitVectorsCalculator:main',
             'trackingVelocityCalculator = ros2_px4_swarming.trackingVelocityCalculator:main',
             'performanceAnalyzer = ros2_px4_swarming.performanceAnalyzer:main',
             'numAnchorsNode = ros2_px4_swarming.numAnchorsNode:main',

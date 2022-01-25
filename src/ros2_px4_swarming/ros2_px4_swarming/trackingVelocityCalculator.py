@@ -11,10 +11,17 @@ from std_msgs.msg import UInt64
 from ros2_px4_interfaces.srv import SwarmCommand
 from ros2_px4_interfaces.msg import UnitVector, UwbSensor, VelocityVector
 from ros2_px4_functions import swarming_functions
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 
 class TrackingVelocityCalculator(Node):
     def __init__(self):
+        """
+        This method declares and initializes the parameters imported by "params.yaml". It declares and initializes
+        useful variables, publishers, subscribers, and services. It creates a timer to regulate the frequency of the
+        controller.
+        """
+
         super().__init__("trackingVelocityCalculator")
 
         # Parameters declaration
@@ -33,6 +40,7 @@ class TrackingVelocityCalculator(Node):
                 ('FILTER_WINDOW', None),
                 ('MAX_ERROR_FOR_INTEGRAL_AND_DERIVATIVE', None),
                 ('EARTH_RADIUS', None),
+                ('BEST_EFFORT', None),
                 ('N', None),
                 ('NUM_TARGET', None)
             ]
@@ -51,6 +59,7 @@ class TrackingVelocityCalculator(Node):
         self.FILTER_WINDOW = self.get_parameter('FILTER_WINDOW').value
         self.MAX_ERROR_FOR_INTEGRAL_AND_DERIVATIVE = self.get_parameter('MAX_ERROR_FOR_INTEGRAL_AND_DERIVATIVE').value
         self.EARTH_RADIUS = self.get_parameter('EARTH_RADIUS').value
+        self.BEST_EFFORT = self.get_parameter('BEST_EFFORT').value
         self.N = self.get_parameter('N').value
         self.NUM_TARGET = self.get_parameter('NUM_TARGET').value
 
@@ -68,30 +77,51 @@ class TrackingVelocityCalculator(Node):
         self.anchorsReadyForSwarming = {}
         self.anchorsReadyForSwarming = {}
         self.lastPositionReceivedTimer = {}
+        self.qosProfile = None
         for i in range(self.N):
             self.lastPositionReceivedTimer[i] = 0
             self.lastUwbDistanceReceived[i] = 0
 
+        # QOS initialization
+        if self.BEST_EFFORT:
+            self.qosProfile = QoSProfile(
+                reliability=QoSReliabilityPolicy.RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
+                history=QoSHistoryPolicy.RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+                depth=1
+            )
+        else:
+            self.qosProfile = QoSProfile(
+                reliability=QoSReliabilityPolicy.RMW_QOS_POLICY_RELIABILITY_RELIABLE,
+                history=QoSHistoryPolicy.RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+                depth=1
+            )
+
         # Subscribers initialization
         if self.NUM_TARGET == 1:
-            self.targetUwbSensorSub = self.create_subscription(UwbSensor, "/uwb_sensor_" + str(self.TARGET_ID), self.targetUwbSensorCallback, self.QUEUE_SIZE)
+            self.targetUwbSensorSub = self.create_subscription(UwbSensor, "/uwb_sensor_" + str(self.TARGET_ID), self.targetUwbSensorCallback, self.qosProfile)
         for i in range(self.N):
-            self.anchorsPositionSubs.append(self.create_subscription(VehicleGlobalPosition, "/X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.QUEUE_SIZE))
-            self.anchorsReadyForSwarmingSub = self.create_subscription(UInt64, "/readyForSwarming", self.anchorsReadyForSwarmingCallback, self.QUEUE_SIZE)
+            self.anchorsPositionSubs.append(self.create_subscription(VehicleGlobalPosition, "/X500_" + str(i) + "/VehicleGlobalPosition_PubSubTopic", partial(self.anchorsPositionCallback, droneId=i), self.qosProfile))
+            self.anchorsReadyForSwarmingSub = self.create_subscription(UInt64, "/readyForSwarming", self.anchorsReadyForSwarmingCallback, self.qosProfile)
 
         # Services initialization
         self.droneCommandSrv = self.create_service(SwarmCommand, "SwarmCommand", self.swarmCommandCallback)
 
         # Publishers initialization
-        self.trackingVelocityPub = self.create_publisher(VelocityVector, "trackingVelocity", self.QUEUE_SIZE)
-        self.trackingVelocityProportionalPub = self.create_publisher(VelocityVector, "trackingVelocityProportional", self.QUEUE_SIZE)
-        self.trackingVelocityIntegralPub = self.create_publisher(VelocityVector, "trackingVelocityIntegral", self.QUEUE_SIZE)
-        self.trackingVelocityDerivativePub = self.create_publisher(VelocityVector, "trackingVelocityDerivative", self.QUEUE_SIZE)
+        self.trackingVelocityPub = self.create_publisher(VelocityVector, "trackingVelocity", self.qosProfile)
+        self.trackingVelocityProportionalPub = self.create_publisher(VelocityVector, "trackingVelocityProportional", self.qosProfile)
+        self.trackingVelocityIntegralPub = self.create_publisher(VelocityVector, "trackingVelocityIntegral", self.qosProfile)
+        self.trackingVelocityDerivativePub = self.create_publisher(VelocityVector, "trackingVelocityDerivative", self.qosProfile)
 
         # Control loop timer
         self.timer = self.create_timer(1 / self.RATE, self.timerCallback)
 
     def computeSwarmCenter(self):
+        """
+        @return: GNSS location of the swarm center
+
+        Given the global position of every drone, this method computes the GNSS position of the center of the formation.
+        """
+
         centerLatitude = 0.0
         centerLongitude = 0.0
         activeDrones = 0
@@ -105,6 +135,13 @@ class TrackingVelocityCalculator(Node):
         return [centerLatitude, centerLongitude]
 
     def computeTrackingVelocity(self):
+        """
+        @return: tracking velocity vector
+
+        After checking that the drones communicate correctly, this method performs a PID control of the tracking
+        velocity, that is then saturated to self.MAX_TRACKING_SPEED before being returned.
+        """
+
         result = VelocityVector()
         timestamp = self.get_clock().now().to_msg()
         result.header.stamp = timestamp
@@ -243,6 +280,11 @@ class TrackingVelocityCalculator(Node):
 
     # Callbacks
     def timerCallback(self):
+        """
+        It increments the counters keeping track of the last GNSS position and UWB distance sent by each drone, and it
+        publishes the tracking velocity at a given rate.
+        """
+
         for key in self.lastPositionReceivedTimer.keys():
             self.lastPositionReceivedTimer[key] += 1
         for key in self.lastUwbDistanceReceived.keys():
@@ -251,6 +293,16 @@ class TrackingVelocityCalculator(Node):
         self.trackingVelocityPub.publish(msg)
 
     def swarmCommandCallback(self, request, response):
+        """
+        @param request: service request
+        @param response: service response
+        @return: response
+
+        The field "request.operation" describes the mode to be set, and the other fields (defined in "SwarmCommand.srv")
+        are used to update the various position setpoint. Then, the response is returned. In case the operation field is
+        not recognized, default values are used and hover mode is set to avoid problems.
+        """
+
         response.result = "success"
         if request.operation == "hover":
             self.get_logger().info("Swarm hovering at current location")
@@ -274,16 +326,37 @@ class TrackingVelocityCalculator(Node):
         return response
 
     def anchorsPositionCallback(self, msg, droneId):
+        """
+        @param msg: message
+        @param droneId: drone id
+
+        It saves the GNSS position of the drone indicated by droneId, it resets the related timer, and checks if all the
+        drones sent their data already.
+        """
+
         self.anchorsPosition[droneId] = msg
         self.lastPositionReceivedTimer[droneId] = 0
         if not self.anchorsPositionReceived and len(self.anchorsPosition) == self.N:
             self.anchorsPositionReceived = True
 
     def targetUwbSensorCallback(self, msg):
+        """
+        @param msg: message
+
+        It saves the distance from the target to the drone denoted by msg.anchor_pose.header.frame_id, and resets the
+        relative timer.
+        """
+
         self.targetUwbDistances[int(msg.anchor_pose.header.frame_id)] = msg.range
         self.lastUwbDistanceReceived[int(msg.anchor_pose.header.frame_id)] = 0
 
     def anchorsReadyForSwarmingCallback(self, msg):
+        """
+        @param msg: message
+
+        It records that the drone indicated by msg.data is ready for swarming.
+        """
+
         self.anchorsReadyForSwarming[msg.data] = True
 
 

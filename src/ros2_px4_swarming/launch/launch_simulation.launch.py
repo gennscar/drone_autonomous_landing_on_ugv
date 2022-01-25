@@ -74,7 +74,8 @@ def generate_launch_description():
             name='X500_' + str(i),
             parameters=[
                 params,
-                {'N': numDrones}
+                {'N': numDrones},
+                {"reliability": "best_effort"}
             ]
         )
         ld.add_action(anchorDrone)

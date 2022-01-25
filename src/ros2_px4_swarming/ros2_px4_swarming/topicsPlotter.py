@@ -260,16 +260,16 @@ def main():
     for i in range(N):
         if vehicleLocalPosition[i]:
             minTimeList.append(vehicleLocalPosition[i][0][0])
-            maxTimeList.append(vehicleLocalPosition[i][len(vehicleLocalPosition) - 1][0])
+            maxTimeList.append(vehicleLocalPosition[i][len(vehicleLocalPosition[i]) - 1][0])
         if vehicleGlobalPosition[i]:
             minTimeList.append(vehicleGlobalPosition[i][0][0])
-            maxTimeList.append(vehicleGlobalPosition[i][len(vehicleGlobalPosition) - 1][0])
+            maxTimeList.append(vehicleGlobalPosition[i][len(vehicleGlobalPosition[i]) - 1][0])
         if vehicleStatus[i]:
             minTimeList.append(vehicleStatus[i][0][0])
-            maxTimeList.append(vehicleStatus[i][len(vehicleStatus) - 1][0])
+            maxTimeList.append(vehicleStatus[i][len(vehicleStatus[i]) - 1][0])
         if trajectorySetpoint[i]:
             minTimeList.append(trajectorySetpoint[i][0][0])
-            maxTimeList.append(trajectorySetpoint[i][len(trajectorySetpoint) - 1][0])
+            maxTimeList.append(trajectorySetpoint[i][len(trajectorySetpoint[i]) - 1][0])
 
     timeLimits = [min(minTimeList), max(maxTimeList)]
     # endregion
@@ -722,6 +722,24 @@ def main():
         plt.suptitle("Drones velocity setpoint", size="xx-large", weight="bold")
 
         plt.savefig(csvFilesPath + folderName + "/dronesVelocitySetpoint.png")
+
+        plt.figure()
+        legend = list()
+
+        for droneId in range(N):
+            plt.plot(list(trajectorySetpoint[droneId][i][0] for i in range(len(trajectorySetpoint[droneId]))),
+                     list(math.degrees(math.atan2(trajectorySetpoint[droneId][i][6], trajectorySetpoint[droneId][i][7])) for i in range(len(trajectorySetpoint[droneId]))))
+            legend.append("$Drone_" + str(droneId) + "$")
+
+        plt.xlim(timeLimits)
+        plt.grid()
+        plt.xlabel("$Time \ [s]$")
+        plt.ylabel("$\\theta \ [deg]$")
+        plt.legend(legend)
+
+        plt.suptitle("Drones velocity direction", size="xx-large", weight="bold")
+
+        plt.savefig(csvFilesPath + folderName + "/dronesVelocityDirection.png")
     # endregion
 
     # region Target-anchors UWB distances
