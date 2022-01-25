@@ -87,9 +87,9 @@ class PositioningError(Node):
         positioning_error_vector = estimated_position - self.true_position_NED
 
         norm_positioning_error_vector_ = Point()
-        norm_positioning_error_vector_.x = positioning_error_vector[0]**2
-        norm_positioning_error_vector_.y = positioning_error_vector[1]**2
-        norm_positioning_error_vector_.z = positioning_error_vector[2]**2
+        norm_positioning_error_vector_.x = np.linalg.norm([positioning_error_vector[0],positioning_error_vector[1]], ord=2)
+        norm_positioning_error_vector_.y = np.abs(positioning_error_vector[1])
+        norm_positioning_error_vector_.z = np.abs(positioning_error_vector[2])
         
         self.publish_true_position()
 

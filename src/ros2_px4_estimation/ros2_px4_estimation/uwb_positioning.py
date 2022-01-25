@@ -8,7 +8,7 @@ from rclpy.node import Node
 from rclpy.time import Time, Duration
 
 from ros2_px4_interfaces.msg import UwbSensor
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from nav_msgs.msg import Odometry
 
 import ros2_px4_functions
 
@@ -60,9 +60,9 @@ class UwbPositioning(Node):
             UwbSensor, "/uwb_sensor_" + self.sensor_id_, self.callback_sensor_subscriber, 10)
 
         # Setting up a publishers to send the estimated position
-        self.estimator_topic_name_ = "~/Pose"
+        self.estimator_topic_name_ = "~/Odometry"
         self.position_mse_publisher_ = self.create_publisher(
-            PoseWithCovarianceStamped, self.estimator_topic_name_, 10
+            Odometry, self.estimator_topic_name_, 10
         )
 
         self.get_logger().info(f"""Node has started:
@@ -102,7 +102,7 @@ class UwbPositioning(Node):
         ranges = ranges[0:N]
 
         # Only if trilateration is possible
-        if N > 3:
+        if N > 2:
             # Perform Least-Square
             if(self.method_ == "LS"):
                 self.sensor_est_pos_ = ros2_px4_functions.ls_trilateration(
@@ -116,22 +116,22 @@ class UwbPositioning(Node):
                         self.sensor_est_pos_, anchor_pos, ranges)
 
             # Sending the estimated position and the name of the node that generated it
-            msg = PoseWithCovarianceStamped()
+            msg = Odometry()
             msg.header.frame_id = self.estimator_topic_name_
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.pose.pose.position.x = self.sensor_est_pos_[0]
             msg.pose.pose.position.y = self.sensor_est_pos_[1]
             msg.pose.pose.position.z = self.sensor_est_pos_[2]
 
-            msg.pose.covariance[0] = 6.25e-4
+            msg.pose.covariance[0] = 0.0025
             msg.pose.covariance[1] = 0.0
             msg.pose.covariance[2] = 0.0
             msg.pose.covariance[6] = 0.0
-            msg.pose.covariance[7] = 6.25e-4
+            msg.pose.covariance[7] = 0.0025
             msg.pose.covariance[8] = 0.0
             msg.pose.covariance[12] = 0.0
             msg.pose.covariance[13] = 0.0
-            msg.pose.covariance[14] = 1e0
+            msg.pose.covariance[14] = 0.0025
 
             self.position_mse_publisher_.publish(msg)
 
