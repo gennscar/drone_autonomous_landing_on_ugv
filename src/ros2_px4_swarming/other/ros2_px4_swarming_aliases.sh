@@ -106,7 +106,6 @@ function launchsimulation() {
 
   ros2 launch ros2_px4_swarming launch_simulation.launch.py &
 
-  sleep 10
   cd $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles || exec $SHELL
   fileName=$(ls -1 | tail -n 1)
   cp $HOME/ros2_px4_ws/src/ros2_px4_swarming/parameters/params.yaml $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles/$fileName

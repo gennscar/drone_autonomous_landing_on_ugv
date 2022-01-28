@@ -14,7 +14,7 @@ This is a set of ROS2 packages that work with PX4 Drone Autopilot
 4. Source the workspace with `source ros2_px4_ws/install/setup.bash`
 
 ### Drone-side
-1. Use [this version](https://github.com/PX4/PX4-Autopilot/releases/tag/v1.12.0-beta5) of the PX4 firmware
+1. Use [this version](https://github.com/PX4/PX4-Autopilot/tree/v1.12.0-beta5) of the PX4 firmware
 2. Build and upload the firmware on the autopilot with `make px4_fmu-v5_rtps upload`
 3. Install Ubuntu 20.04 Server on the RaspberryPi
 4. Install ROS2 Foxy following [this guide](https://roboticsbackend.com/install-ros2-on-raspberry-pi/#Install_ROS2_core_packages)
