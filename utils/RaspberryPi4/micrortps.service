@@ -1,0 +1,11 @@
+Description=PX4 micrortps agent
+After=network.target
+
+[Service]
+Restart=always
+ExecStart=/usr/local/bin/micrortps.sh
+User=ubuntu
+Group=ubuntu
+
+[Install]
+WantedBy=multi-user.target

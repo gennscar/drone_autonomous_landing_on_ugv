@@ -134,9 +134,20 @@ This file, which should be sourced in the *.bashrc*, generates some aliases, use
 + `plotlastcsv`: plots the data stored in the last csv created
 
 So for example, to launch a simulation with 4 drones and 1 target, the commands should be:
-1. `source ~/ros2_px4_ws/src/ros2_px4_swarming/other/ros2_px4_swarming_aliases.sh`
-2. `buildws`
-3. `gazebosimulation 4 1`
-4. `launchsimulation`
-5. `swarmtakeoff`
-6. `targetroverrandom`
+-  in every used terminal, run `source ~/ros2_px4_ws/src/ros2_px4_swarming/other/ros2_px4_swarming_aliases.sh`
+1. in a terminal, run `gazebosimulation 4 1`
+2. in a second terminal, run `launchsimulation`
+3. in a third terminal, run `swarmtakeoff`
+4. in a fourth terminal, run `targetroverrandom`
+
+---
+
+To launch a real world test, do:
+1. turn on the drones, the command `launchdrone` is executed automatically at startup
+
+On the computer:
+- in every used terminal, run `source ~/ros2_px4_ws/src/ros2_px4_swarming/other/ros2_px4_swarming_aliases.sh`
+2. in a terminal, run `ddsserver`
+3. in a second terminal, run `rds && launchtest 2 0` to initialize the test with two drones and no target rover
+4. in a third terminal, run `rds && swarmtakeoff`
+5. in the third terminal, run `rds && swarmland`
