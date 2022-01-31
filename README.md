@@ -5,7 +5,7 @@ This is a set of ROS2 packages that work with PX4 Drone Autopilot
 1. Cosimo Conte [@cosmo97](https://github.com/cosmo97)
 2. Gennaro Scarati [@gennscar](https://github.com/gennscar)
 3. Matteo Celada [@MatteoCelada](https://github.com/MatteoCelada)
-4. Giovanni Fantin []()
+4. Giovanni Fantin [@giofnt]()
 
 ## Installation
 ### PC-side
