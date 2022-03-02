@@ -411,6 +411,18 @@ function srvstop() {
 # endregion
 
 # region Analysis commands
+
+# Record ros2 bag witth DDS server
+function recordbagserver(){
+  bageFileName='rosbag2_'$(date +'%Y_%m_%d-%H_%M_%S')
+  export FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/ros2_px4_ws/src/ros2_px4_swarming/other/super_client_configuration_file.xml
+  ros2 daemon stop
+  sleep 0.5
+  ros2 daemon start
+
+  ros2 bag record -a --output $HOME/ros2_px4_ws/src/ros2_px4_swarming/bagfiles/$bageFileName
+
+}
 # Plot data from bag
 function plotbag() {
   bagFileName=${1:fileName}

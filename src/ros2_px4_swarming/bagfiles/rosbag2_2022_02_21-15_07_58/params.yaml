@@ -1,0 +1,80 @@
+/**:
+    ros__parameters:
+        RATE: 20.0                                          # node frequency
+        QUEUE_SIZE: 10
+        MAX_TAKEOFF_SPEED: 1.0                              # vertical saturation speed
+        A: 0.1                                              # swarming algorithm parameters
+        B: 1.5                                              # -
+#        C: 50.0                                            # -
+        C: 10.0                                             # -
+        H_DES: 2.0                                          # swarming altitude
+        K_H: 1.0                                            # altitude control proportional coefficient
+        EARTH_RADIUS: 6371000                               # Earth radius
+        TARGET_ID: 200                                      # ID of the target UWB sensor
+        MAX_SWARMING_SPEED: 1.0                             # horizontal swarming saturation speed
+        TIMEOUT: 5                                          # timeout for lost drone
+        TIMEOUT_UWB: 1                                      # timeout for lost UWB signal
+        UWB_ON: false                                       # if the UWB sensor is on or off on the drone
+        SINGLE_DRONE_FOR_TEST: false                        # to fly a single drone with this code
+        BEST_EFFORT: true                                   # if the subscribers' QoS is set to best_effort or reliable
+
+targetRover:
+    targetRover:
+        ros__parameters:
+            MAX_THROTTLE: 1.0                               # rover's maximum linear speed
+            MAX_ROTATION: 0.785                             # rover's maximum rotational speed
+            KT: 1.0                                         # rover's throttle control proportional coefficient
+            KR: 1.0                                         # rover's rotational control proportional coefficient
+            DISTANCE_ERROR: 0.3                             # rover's acceptable error's distance
+
+trackingVelocityCalculator:
+    trackingVelocityCalculator:
+        ros__parameters:
+            MAX_TRACKING_SPEED: 3.0                         # tracking saturation speed
+            K_P: 1.2                                        # tracking control proportional coefficient
+            K_I: 0.01                                       # tracking control integral coefficient
+            K_D: 0.7                                        # tracking control differential coefficient
+            FILTER_WINDOW: 1                                # window for filtering the error data
+            MAX_ERROR_FOR_INTEGRAL_AND_DERIVATIVE: 2.0      # maximum tracking error to use integral and derivative control
+
+X500_0:
+    X500_0:
+        ros__parameters:
+            ID: 0                                           # drone ID
+            MAVSYS_ID: 1                                    # MAVLINK's ID (generally ID + 1)
+            NOT_FLYING_FOR_TEST: false                      # true if the drone is used to send signals without being armed
+
+X500_1:
+    X500_1:
+        ros__parameters:
+            ID: 1
+            MAVSYS_ID: 2
+            NOT_FLYING_FOR_TEST: false
+
+X500_2:
+    X500_2:
+        ros__parameters:
+            ID: 2
+            MAVSYS_ID: 3
+            NOT_FLYING_FOR_TEST: false
+
+X500_3:
+    X500_3:
+        ros__parameters:
+            ID: 3
+            MAVSYS_ID: 4
+            NOT_FLYING_FOR_TEST: false
+
+X500_4:
+    X500_4:
+        ros__parameters:
+            ID: 4
+            MAVSYS_ID: 5
+            NOT_FLYING_FOR_TEST: false
+
+X500_5:
+    X500_5:
+        ros__parameters:
+            ID: 5
+            MAVSYS_ID: 6
+            NOT_FLYING_FOR_TEST: false
