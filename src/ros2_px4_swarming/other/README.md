@@ -128,6 +128,7 @@ This file, which should be sourced in the *.bashrc*, generates some aliases, use
 * `srvstatus`: command to check the status of the service on the RaspberryPi
 * `srvrestart`: command to restart the service on the RaspberryPi
 * `srvstop`: command to stop the service on the RaspberryPi
+* `recordbagserver`: use this alias to record a bag of all the topics while using the discovery server
 + `plotbag rosbag2_2021_09_02-11_33_25`: plots the data stored in *rosbag2_2021_09_02-11_33_25*
 + `plotlastbag`: plots the data stored in the last bag created
 + `plotcsv 2021_09_02-11_33_25`: plots the data stored in *2021_09_02-11_33_25*
