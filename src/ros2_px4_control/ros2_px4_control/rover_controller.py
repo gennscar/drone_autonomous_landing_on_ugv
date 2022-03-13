@@ -18,7 +18,7 @@ t2 = t1 + 30
 lin_vel = -1.0
 ang_vel = 0.2
 
-curvature = False
+curvature = True
 noise = False
 
 
