@@ -1,11 +1,5 @@
-# ROS2 PX4 WS
-This is a set of ROS2 packages that work with PX4 Drone Autopilot
-
-## Authors
-1. Cosimo Conte [@cosmo97](https://github.com/cosmo97)
-2. Gennaro Scarati [@gennscar](https://github.com/gennscar)
-3. Matteo Celada [@MatteoCelada](https://github.com/MatteoCelada)
-4. Giovanni Fantin [@giofnt]()
+# Description
+An autonomous drone landing system achieving centimeter-level precision on moving UGVs, using an EKF-based localization pipeline integrating drone, UGV, and Ultra-Wideband (UWB) data.
 
 ## Installation
 ### PC-side
