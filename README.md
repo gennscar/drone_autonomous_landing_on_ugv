@@ -4,7 +4,7 @@ An autonomous drone landing system achieving centimeter-level precision on movin
 ## Installation
 ### PC-side
 1. Install [Ubuntu 20.04](https://ubuntu.com/server/docs/installation)
-2. Clone [this repository](https://github.com/PIC4SeRCentre/ros2_px4_ws) running `git clone https://github.com/PIC4SeRCentre/ros2_px4_ws.git`
+2. Clone this repository running `git clone git@github.com:gennscar/drone_autonomous_landing_on_ugv.git`
 3. Clone the PX4 firmware with (`git clone https://github.com/PX4/PX4-Autopilot.git --recursive`)
 4. Checkout to the correct version of the PX4 firmware running `cd PX4-Autopilot && git checkout f15eefc`
 5. Substitute file [_ros2_px4_ws/utils/PX4-Autopilot/uorb_rtps_message_ids.yaml_](utils/PX4-Autopilot/uorb_rtps_message_ids.yaml) in folder _PX4-Autopilot/msg/tools_
@@ -51,7 +51,7 @@ of this repo
 8. [ros2_px4_testing](src/ros2_px4_testing)
 
 ## Autonomous landing package guide
-Author: Gennaro Scarati [@gennscar](https://github.com/gennscar). 
+
 In order to have a basic understanding of the autonomous landing system you can read my thesis [here](https://webthesis.biblio.polito.it/21180/). Note that in the real implementation the user has to manually send the takeoff first and only then the autonomous landing command. This has been done in order to debug the system but it can easily be automatized. 
 ### Autonomous landing simulation guide
 1. Insert [iris](other_material/iris) (substitute the original one) and [rover_uwb](other_material/rover_uwb) folders inside the folder `PX4-Autopilot/Tools/sitl_gazebo/models`. Substitute [empty.world](other_material/empty.world) inside the folder `PX4-Autopilot/Tools/sitl_gazebo/worlds`.
